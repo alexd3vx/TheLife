@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { isFree } from "@thelife/shared";
+import { AdaptiveQuality, type Quality } from "../graphics";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
@@ -35,6 +36,8 @@ export interface TapMenu {
 export interface PlayRuntime {
   dispose(): void;
   buyGroceries(): void;
+  quality(): Quality;
+  setQuality(q: Quality): void;
   /** Draws the 3D scene less while the phone covers it. */
   setPhoneOpen(open: boolean): void;
   /** The running game, for the phone screen. Null in the showroom. */
@@ -85,10 +88,11 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return null;
   }
   const small = window.matchMedia("(max-width: 860px)").matches;
-  // Quality adapts to the device: the pixel ratio and shadow refresh rate drop when the frame rate does, and recover when it can.
-  const baseRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-  let ratio = baseRatio;
-  renderer.setPixelRatio(ratio);
+  // Quality adapts to the device (see graphics.ts): sharp by default, shadow refreshes are given up first.
+  const quality = new AdaptiveQuality((r) => {
+    renderer.setPixelRatio(r);
+    if (container.clientWidth) renderer.setSize(container.clientWidth, container.clientHeight, false);
+  });
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -302,43 +306,12 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return set;
   }
   let renderEvery = 1;
-  let shadowEvery = 1;
   let frameNo = 0;
   let lowFor = 0;
   let highFor = 0;
   let updateMs = 0;
   let renderMs = 0;
   let timedFrames = 0;
-  function adapt(fps: number) {
-    if (renderEvery > 1 || document.hidden) return;
-    const resize = () => {
-      renderer.setPixelRatio(ratio);
-      const el = renderer.domElement;
-      renderer.setSize(el.clientWidth, el.clientHeight, false);
-    };
-    if (fps < 45) {
-      lowFor += 1;
-      highFor = 0;
-      if (lowFor >= 2) {
-        lowFor = 0;
-        if (ratio > baseRatio * 0.55) {
-          ratio = Math.max(baseRatio * 0.55, ratio * 0.82);
-          resize();
-        } else if (shadowEvery < 4) shadowEvery *= 2;
-      }
-    } else if (fps > 56) {
-      highFor += 1;
-      lowFor = 0;
-      if (highFor >= 6) {
-        highFor = 0;
-        if (shadowEvery > 1) shadowEvery /= 2;
-        else if (ratio < baseRatio) {
-          ratio = Math.min(baseRatio, ratio * 1.12);
-          resize();
-        }
-      }
-    } else lowFor = highFor = 0;
-  }
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
@@ -379,7 +352,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
 
     const t1 = performance.now();
     frameNo++;
-    if (frameNo % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
+    if (frameNo % quality.shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
     // With the phone open the scene is hidden behind it, so draw it rarely: smoother phone, cooler device.
     if (renderEvery === 1 || frames % renderEvery === 0) renderer.render(world.scene, camera);
     renderMs += performance.now() - t1;
@@ -389,7 +362,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     acc += dt;
     if (acc >= 0.5) {
       const fps = frames / acc;
-      adapt(fps);
+      quality.update(fps);
       events.onStats(`${Math.round(fps)} fps`);
       frames = 0;
       acc = 0;
@@ -402,6 +375,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
 
   return {
     session,
+    quality: () => quality.mode,
+    setQuality: (q) => quality.setQuality(q),
     setFollow(on) {
       follow = on;
     },
@@ -478,7 +453,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       perf: () => {
         const r = {
           calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
-          updateMs: timedFrames ? updateMs / timedFrames : 0, renderMs: timedFrames ? renderMs / timedFrames : 0, ratio, shadowEvery,
+          updateMs: timedFrames ? updateMs / timedFrames : 0, renderMs: timedFrames ? renderMs / timedFrames : 0, ratio: quality.ratio, shadowEvery: quality.shadowEvery,
         };
         updateMs = renderMs = timedFrames = 0;
         return r;

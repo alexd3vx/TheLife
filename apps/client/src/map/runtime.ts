@@ -9,6 +9,7 @@ import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
 import { buildGroundDetail } from "./chunkBuilder";
+import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 
 export interface MapStats {
@@ -36,6 +37,8 @@ export interface MapRuntime {
   dispose(): void;
   resetView(): void;
   zoomOut(): void;
+  quality(): Quality;
+  setQuality(q: Quality): void;
   /** Switches between day and night (street lamps light up). */
   setNight(on: boolean): void;
   /** Flies over the whole district while measuring the frame rate. */
@@ -66,9 +69,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     return null;
   }
   const small = window.matchMedia("(max-width: 860px)").matches;
-  const baseRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-  let ratio = baseRatio;
-  renderer.setPixelRatio(ratio);
+  const quality = new AdaptiveQuality((r) => {
+    renderer.setPixelRatio(r);
+    if (container.clientWidth) renderer.setSize(container.clientWidth, container.clientHeight, false);
+  });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -228,9 +232,6 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   let stopped = false;
   let frames = 0;
   let acc = 0;
-  let lowFor = 0;
-  let highFor = 0;
-  let shadowEvery = 1;
   let frameNo = 0;
   let fps = 60;
   const followTarget = new THREE.Vector3();
@@ -241,36 +242,6 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   let tourCancel = false;
   renderer.shadowMap.autoUpdate = false;
 
-  function adapt(f: number) {
-    if (document.hidden) return;
-    const apply = () => {
-      renderer.setPixelRatio(ratio);
-      renderer.setSize(container.clientWidth, container.clientHeight, false);
-    };
-    if (f < 45) {
-      lowFor++;
-      highFor = 0;
-      if (lowFor >= 2) {
-        lowFor = 0;
-        if (ratio > baseRatio * 0.55) {
-          ratio = Math.max(baseRatio * 0.55, ratio * 0.82);
-          apply();
-        } else if (shadowEvery < 4) shadowEvery *= 2;
-      }
-    } else if (f > 56) {
-      highFor++;
-      lowFor = 0;
-      if (highFor >= 6) {
-        highFor = 0;
-        if (shadowEvery > 1) shadowEvery /= 2;
-        else if (ratio < baseRatio) {
-          ratio = Math.min(baseRatio, ratio * 1.12);
-          apply();
-        }
-      }
-    } else lowFor = highFor = 0;
-  }
-
   function currentStats(): MapStats {
     return {
       fps,
@@ -278,7 +249,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       triangles: renderer.info.render.triangles,
       geometries: renderer.info.memory.geometries,
       stream: streamer.stats(),
-      ratio,
+      ratio: quality.ratio,
       position: { x: controller.position.x, z: controller.position.z },
     };
   }
@@ -311,7 +282,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (m.opacity <= 0) marker.visible = false;
 
     frameNo++;
-    if (frameNo % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
+    if (frameNo % quality.shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, camera);
     if (tourFrames) {
       tourFrames.push(rawDt * 1000);
@@ -322,7 +293,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     acc += dt;
     if (acc >= 0.5) {
       fps = frames / acc;
-      adapt(fps);
+      quality.update(fps);
       events.onStats(currentStats());
       frames = 0;
       acc = 0;
@@ -381,6 +352,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   return {
     resetView,
+    quality: () => quality.mode,
+    setQuality(q) {
+      quality.setQuality(q);
+    },
     setNight(on) {
       night = on;
       groundDetail.setNight(on);

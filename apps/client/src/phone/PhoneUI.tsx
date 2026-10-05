@@ -333,8 +333,8 @@ function StatusBar(p: { clock: string; battery: number; plugged: string | null; 
     <div className="phone-status" onClick={p.onTap}>
       <span className="phone-time">{p.clock}</span>
       <span className="phone-status-right">
-        <Icon name="signal" size={14} />
-        <span>{p.dataMB > 0 ? "4G" : "No data"}</span>
+        <Icon name="signal" size={14} className="phone-sig" />
+        <span className="phone-net">{p.dataMB > 0 ? "4G" : "No data"}</span>
         <span className={`phone-battery${low ? " is-low" : ""}`} title={p.plugged ? (p.plugged === "wall" && !p.wall ? "Plugged in, no power" : "Charging") : "Battery"}>
           <span className="phone-battery-cell">
             <span style={{ width: `${Math.round(p.battery)}%` }} />
