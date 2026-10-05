@@ -391,3 +391,51 @@ button.phone-btn-side { border: 0; padding: 0; cursor: pointer; }
 .phone-boundary { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .phone-crash { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; color: var(--text); }
 .phone-crash span { color: var(--muted); font-size: .8rem; }
+
+/* ---- LifeStore, Settings and the downloadable apps */
+.pa-tile { flex: none; display: grid; place-items: center; color: #fff; border-radius: 28%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 8px rgba(0, 0, 0, .2); }
+.phone-go .pa-tile { border-radius: 50%; }
+.pa-bar { height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; margin-top: 4px; }
+.pa-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+.pa-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 40px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+.pa-search input { all: unset; flex: 1; min-width: 0; color: var(--text); font-size: .88rem; }
+.pa-conn { display: flex; align-items: center; gap: 8px; font-size: .78rem; }
+.pa-conn.is-none { background: rgba(217, 83, 79, .15); }
+.pa-textarea, .pa-text { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: .9rem; resize: none; }
+.pa-text { min-height: 40px; }
+.pa-big { font-size: 2.2rem; font-weight: 300; font-variant-numeric: tabular-nums; text-align: center; }
+.pa-hue { height: 150px; border-radius: var(--r); display: grid; place-items: center; color: rgba(255, 255, 255, .85); }
+.pa-feed { display: grid; gap: 12px; }
+.pa-post { display: grid; gap: 8px; padding: 12px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); }
+.pa-post header { display: flex; align-items: center; gap: 10px; }
+.pa-post header small { color: var(--muted); display: block; }
+.pa-post p { margin: 0; line-height: 1.4; }
+.pa-like { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); }
+.pa-like.is-on { color: #e03131; }
+.pa-calc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pa-calc button { all: unset; cursor: pointer; text-align: center; padding: 14px 0; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-weight: 700; font-size: 1.1rem; }
+.pa-calc button.is-op { background: var(--accent); color: #fff; }
+.pa-calc button:active { transform: scale(.95); }
+.pa-board { display: grid; gap: 4px; margin: 0 auto; touch-action: none; user-select: none; }
+.pa-board.g2048 { grid-template-columns: repeat(4, 1fr); width: min(100%, 300px); background: #bbada0; padding: 6px; border-radius: 10px; }
+.pa-cell { aspect-ratio: 1; display: grid; place-items: center; border-radius: 6px; background: #cdc1b4; font-weight: 800; color: #776e65; }
+.pa-xo { grid-template-columns: repeat(3, 1fr); width: min(100%, 240px); }
+.pa-xo button { all: unset; cursor: pointer; aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 2.2rem; font-weight: 800; }
+.pa-memory { grid-template-columns: repeat(4, 1fr); width: min(100%, 300px); }
+.pa-memory button { all: unset; cursor: pointer; aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; background: var(--accent); color: #fff; font-size: 1.6rem; }
+.pa-memory button.is-up { background: var(--card); border: 1px solid var(--line); }
+.pa-memory button.is-done { background: #2fbf71; opacity: .6; }
+.pa-canvas { display: block; margin: 0 auto; border-radius: 12px; background: #111; touch-action: none; max-width: 100%; }
+.pa-dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(2, 48px); gap: 6px; justify-content: center; }
+.pa-dpad button { all: unset; cursor: pointer; display: grid; place-items: center; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 1.2rem; }
+.pa-dpad .up { grid-column: 2; } .pa-dpad .left { grid-column: 1; grid-row: 2; } .pa-dpad .down { grid-column: 2; grid-row: 2; } .pa-dpad .right { grid-column: 3; grid-row: 2; }
+.pa-opts { display: grid; gap: 8px; }
+.pa-opts button { all: unset; cursor: pointer; padding: 12px 14px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); font-weight: 600; font-size: .9rem; }
+.pa-opts button.is-right { background: #2fbf71; color: #fff; border-color: #2fbf71; }
+.pa-opts button.is-wrong { background: #d9534f; color: #fff; border-color: #d9534f; }
+.pa-dots { display: flex; gap: 6px; justify-content: center; padding: 6px 0 2px; }
+.pa-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .45); }
+.pa-dots i.is-on { background: #fff; }
+.torch-on { position: absolute; inset: 0; z-index: 3; background: #fffbe6; display: grid; place-items: center; color: #5c4b00; }
+.phone-pages { flex: none; touch-action: pan-y; }
+.phone-go .pa-dots i, .pa-dots i { box-shadow: 0 1px 2px rgba(0, 0, 0, .3); }

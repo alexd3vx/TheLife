@@ -16,11 +16,11 @@ import "../map/map.css";
 export type Act = (fn: (s: GameState) => PhoneResult) => PhoneResult;
 
 export const naira = (n: number) => `₦${Math.round(n).toLocaleString()}`;
-const MB = (n: number) => (n >= 1024 ? `${(n / 1024).toFixed(1)} GB` : `${Math.round(n)} MB`);
+export const MB = (n: number) => (n >= 1024 ? `${(n / 1024).toFixed(1)} GB` : `${Math.round(n)} MB`);
 const hhmm = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:00`;
 
 /** A bottom tab bar, like a real app. */
-function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; icon: IconName }[]; value: T; onChange(v: T): void }) {
+export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; icon: IconName }[]; value: T; onChange(v: T): void }) {
   return (
     <nav className="pa-tabs" role="tablist">
       {tabs.map((t) => (
@@ -33,7 +33,7 @@ function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; labe
   );
 }
 
-function Row({ icon, title, sub, right, tone }: { icon?: IconName; title: string; sub?: string; right?: React.ReactNode; tone?: string }) {
+export function Row({ icon, title, sub, right, tone }: { icon?: IconName; title: string; sub?: string; right?: React.ReactNode; tone?: string }) {
   return (
     <div className="pa-row">
       {icon && (
@@ -50,7 +50,7 @@ function Row({ icon, title, sub, right, tone }: { icon?: IconName; title: string
   );
 }
 
-function Btn({ children, onClick, disabled, kind = "solid" }: { children: React.ReactNode; onClick(): void; disabled?: boolean; kind?: "solid" | "soft" }) {
+export function Btn({ children, onClick, disabled, kind = "solid" }: { children: React.ReactNode; onClick(): void; disabled?: boolean; kind?: "solid" | "soft" }) {
   return (
     <button className={`pa-btn is-${kind}`} onClick={onClick} disabled={disabled}>
       {children}

@@ -315,3 +315,27 @@ export function diaryCheckIn(state: GameState, mood: number, text: string): Phon
   addFun(state, 3);
   return done("Saved. Writing it down helps.");
 }
+
+// --- streaming and tickets
+
+/** Streaming (video, music, radio) uses data on mobile data and nothing on Wi-Fi. */
+export function streamData(state: GameState, mb: number): PhoneResult {
+  const link = connection(state);
+  if (link.kind === "none") return fail("You're offline. Turn on Wi-Fi or mobile data in Settings.");
+  if (link.kind === "data") {
+    if (state.phone.dataMB < mb) return fail("Not enough data left. Use Wi-Fi or buy a bundle in LifePay.");
+    state.phone.dataMB -= mb;
+  }
+  return done();
+}
+
+/** A ticket for a film or an event: costs money, lifts the mood. */
+export function buyTicket(state: GameState, label: string, price: number, fun: number): PhoneResult {
+  if (price > 0) {
+    const r = transfer(state.ledger, PLAYER, SINK, price, label, state.minute);
+    if (!r.ok) return fail(`That costs ₦${price.toLocaleString()}. You don't have enough.`);
+    state.stats.totalSpent += price;
+  }
+  addFun(state, fun);
+  return done(price > 0 ? `Ticket booked: ${label}.` : `You're going: ${label}.`);
+}

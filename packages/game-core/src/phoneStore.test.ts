@@ -3,7 +3,7 @@ import {
   AJO_AMOUNT, BACKGROUNDS, MINT, PLAYER, SINK, STORE_APPS, Sim, addNote, balance, buyHomePlan, buyShares, cancelDownload, connection, createGameState, diaryCheckIn,
   hasApp, isPowerCut, joinAjo, ledgerTotal, nextLessonIn, openApp, orderEats, parseGameState, payAjo, portfolioValue, profileFrom, recordScore, sellShares,
   setMobileData, setWifi, startDownload, stockPrice, storageUsedMB, takeLesson, transfer, uninstallApp, weatherFor, quizRound, ratesFor, feedPosts, seeded,
-  STORAGE_MB, MOBILE_SPEED,
+  STORAGE_MB, MOBILE_SPEED, streamData, buyTicket,
 } from "./index.js";
 
 const background = (tier: string) => BACKGROUNDS.find((b) => b.tier === tier)!;
@@ -251,5 +251,25 @@ describe("what the apps do", () => {
     expect(s.state.phone.scores.snake).toBe(12);
     recordScore(s.state, "snake", 5);
     expect(s.state.phone.scores.snake).toBe(12);
+  });
+
+  it("streaming uses data only on mobile data; tickets cost money and lift the mood", () => {
+    const s = sim("nepo");
+    const data = s.state.phone.dataMB;
+    expect(streamData(s.state, 25).ok).toBe(true);
+    expect(s.state.phone.dataMB).toBe(data - 25);
+    s.state.phone.dataMB = 10;
+    expect(streamData(s.state, 25).ok).toBe(false);
+    s.state.minute = quietMinute();
+    buyHomePlan(s.state, "wifi_basic");
+    expect(streamData(s.state, 25).ok).toBe(true);
+    expect(s.state.phone.dataMB).toBe(10);
+    s.state.needs.fun = 20;
+    const before = balance(s.state.ledger);
+    expect(buyTicket(s.state, "Lagos Midnight", 3_500, 25).ok).toBe(true);
+    expect(balance(s.state.ledger)).toBe(before - 3_500);
+    expect(s.state.needs.fun).toBe(45);
+    transfer(s.state.ledger, PLAYER, SINK, balance(s.state.ledger), "spend", 0);
+    expect(buyTicket(s.state, "x", 3_500, 25).ok).toBe(false);
   });
 });

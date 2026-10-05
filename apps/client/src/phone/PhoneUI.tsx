@@ -1,31 +1,25 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  APP_INFO, bestCharger, call, clearNotifications, clockOf, contactsFor, dismissNotification, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn,
-  unreadCount, wallPower, balance,
-  type AppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier,
+  appInfo, bestCharger, call, clearNotifications, clockOf, connection, contactsFor, dismissNotification, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn,
+  storeAppById, unreadCount, useApp, wallPower, balance,
+  type AnyAppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier, type StoreAppId,
 } from "@thelife/game-core";
 import type { GameSession } from "../play/gameSession";
 import { Battery, Chat, Jobs, Maps, News, Pay, Shop, naira, type Act } from "./PhoneApps";
-import { Icon, type IconName } from "./icons";
+import { ExtraApp } from "./PhoneExtras";
+import { LifeStore, Settings } from "./PhoneSystem";
+import { Icon } from "./icons";
+import { nameOf, styleOf, type ClientApp } from "./appStyle";
+import { AppActive } from "./active";
 import "./phone.css";
-
-type ClientApp = AppId | "battery";
 
 /** Each model has its own look (CSS class). */
 const LOOK = { basic: "go", mid: "plus", flagship: "max" } as const;
-const APP_STYLE: Record<ClientApp, { icon: IconName; from: string; to: string }> = {
-  chat: { icon: "chat", from: "#3ddc84", to: "#12a35a" },
-  pay: { icon: "pay", from: "#ffb347", to: "#e8761f" },
-  shop: { icon: "shop", from: "#ff7a7a", to: "#d93a5b" },
-  jobs: { icon: "jobs", from: "#6aa5ff", to: "#3558e0" },
-  news: { icon: "news", from: "#b57cf0", to: "#7a3fc4" },
-  maps: { icon: "maps", from: "#3fd0b8", to: "#0f8f9a" },
-  battery: { icon: "power", from: "#6b7a90", to: "#38455a" },
-};
-const APP_NAME = (app: ClientApp) => (app === "battery" ? "Power" : APP_INFO[app].name);
-/** The dock holds four apps on every model; the grid holds the rest. */
+const APP_NAME = nameOf;
+/** The dock holds four apps on every model; the grid holds the rest, then anything you download. */
 const DOCK: ClientApp[] = ["chat", "pay", "shop", "news"];
-const GRID: ClientApp[] = ["jobs", "maps", "battery"];
+const GRID: ClientApp[] = ["store", "jobs", "maps", "settings", "battery"];
+const PAGE_SIZE: Record<PhoneTier, number> = { basic: 9, mid: 12, flagship: 12 };
 
 /** If an app throws while drawing, show what happened and a restart button instead of a blank screen. */
 class AppBoundary extends Component<{ name: string; children: ReactNode }, { error: Error | null; attempt: number }> {
@@ -87,6 +81,13 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     };
   }, [phone, refresh]);
 
+  // Time spent in social, media and some other apps lifts the mood a little.
+  useEffect(() => {
+    if (!current || !storeAppById(current)) return;
+    const id = window.setInterval(() => useApp(session.sim.state, current as StoreAppId, 1), 10_000);
+    return () => window.clearInterval(id);
+  }, [current, session]);
+
   const say = useCallback((text: string, bad = false) => {
     const id = ++flashId.current;
     setFlash({ text, bad, id });
@@ -111,8 +112,8 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
       const s = session.sim.state;
       const alreadyOpen = running.includes(next);
       if (next !== "battery" && !alreadyOpen) {
-        if (!hasApp(s.phone, next)) return say(`${APP_NAME(next)} needs a better phone than the ${modelOf(s.phone).name}.`, true);
-        const result = openApp(s, next);
+        if (!hasApp(s.phone, next as AnyAppId)) return say(`${APP_NAME(next)} needs a better phone than the ${modelOf(s.phone).name}.`, true);
+        const result = openApp(s, next as AnyAppId);
         if (!result.ok) return say(result.reason, true);
       }
       setDrawer(false);
@@ -216,8 +217,8 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
   const changeModel = (tier: PhoneTier) => {
     phone.model = tier;
     phone.plugged = null;
-    setRunning((list) => list.filter((a) => a === "battery" || hasApp(phone, a as AppId)));
-    setCurrent((c) => (c && c !== "battery" && !hasApp(phone, c as AppId) ? null : c));
+    setRunning((list) => list.filter((a) => a === "battery" || hasApp(phone, a as AnyAppId)));
+    setCurrent((c) => (c && c !== "battery" && !hasApp(phone, c as AnyAppId) ? null : c));
     say(`Now holding the ${modelOf(phone).name}.`);
     refresh();
   };
@@ -238,7 +239,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
               <DeadScreen plugged={phone.plugged} wall={wall} hasCharger={!!bestCharger(phone)} onPlug={() => act((s) => plug(s, "wall"))} onClose={close} />
             ) : (
               <>
-                <StatusBar clock={clock.label} battery={phone.battery} plugged={phone.plugged} wall={wall} dataMB={phone.dataMB} onTap={() => !locked && setDrawer((v) => !v)} />
+                <StatusBar clock={clock.label} battery={phone.battery} plugged={phone.plugged} wall={wall} net={connection(state)} onTap={() => !locked && setDrawer((v) => !v)} />
                 {model.tier === "flagship" && <div className="phone-island" aria-hidden="true" />}
                 {model.tier === "mid" && <div className="phone-punch" aria-hidden="true" />}
                 {model.tier === "basic" && <div className="phone-drop" aria-hidden="true" />}
@@ -252,13 +253,14 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                     aria-hidden={app !== current}
                     style={app === current && dragX !== null ? { transform: `translateX(${dragX}px)`, transition: "none" } : undefined}
                   >
-                    <header className="phone-head" style={{ ["--app-from" as string]: APP_STYLE[app].from, ["--app-to" as string]: APP_STYLE[app].to }}>
+                    <header className="phone-head" style={{ ["--app-from" as string]: styleOf(app).from, ["--app-to" as string]: styleOf(app).to }}>
                       <button className="phone-back" onClick={home} aria-label="Minimise">
                         <Icon name="back" size={22} />
                       </button>
                       <h1>{APP_NAME(app)}</h1>
                     </header>
                     <div className="phone-app-body">
+                      <AppActive.Provider value={app === current && !switcher}>
                       <AppBoundary name={APP_NAME(app)}>
                       {app === "chat" && <Chat state={state} act={act} startCall={startCall} refresh={refresh} />}
                       {app === "pay" && <Pay state={state} act={act} />}
@@ -267,7 +269,11 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       {app === "news" && <News state={state} />}
                       {app === "maps" && <Maps state={state} />}
                       {app === "battery" && <Battery state={state} act={act} onModel={changeModel} />}
+                      {app === "settings" && <Settings state={state} act={act} />}
+                      {app === "store" && <LifeStore state={state} act={act} onOpen={(id) => open(id)} />}
+                      {storeAppById(app) && <ExtraApp id={app as StoreAppId} state={state} act={act} />}
                       </AppBoundary>
+                      </AppActive.Provider>
                     </div>
                   </section>
                 ))}
@@ -355,14 +361,14 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
 
 // ------------------------------------------------------------------ pieces
 
-function StatusBar(p: { clock: string; battery: number; plugged: string | null; wall: boolean; dataMB: number; onTap(): void }) {
+function StatusBar(p: { clock: string; battery: number; plugged: string | null; wall: boolean; net: { kind: string; label: string }; onTap(): void }) {
   const low = p.battery <= 20 && !p.plugged;
   return (
     <div className="phone-status" onClick={p.onTap}>
       <span className="phone-time">{p.clock}</span>
       <span className="phone-status-right">
-        <Icon name="signal" size={14} className="phone-sig" />
-        <span className="phone-net">{p.dataMB > 0 ? "4G" : "No data"}</span>
+        <Icon name={p.net.kind === "wifi" ? "wifi" : "signal"} size={14} className="phone-sig" />
+        <span className="phone-net">{p.net.kind === "wifi" ? "Wi-Fi" : p.net.label}</span>
         <span className={`phone-battery${low ? " is-low" : ""}`} title={p.plugged ? (p.plugged === "wall" && !p.wall ? "Plugged in, no power" : "Charging") : "Battery"}>
           <span className="phone-battery-cell">
             <span style={{ width: `${Math.round(p.battery)}%` }} />
@@ -395,8 +401,8 @@ function DeadScreen(p: { plugged: string | null; wall: boolean; hasCharger: bool
 
 function appBadge(n: PhoneNotification) {
   return (
-    <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[n.app].from}, ${APP_STYLE[n.app].to})` }}>
-      <Icon name={APP_STYLE[n.app].icon} size={16} />
+    <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${styleOf(n.app).from}, ${styleOf(n.app).to})` }}>
+      <Icon name={styleOf(n.app).icon} size={16} />
     </span>
   );
 }
@@ -440,15 +446,21 @@ function LockScreen({ state, onUnlock, onOpen }: { state: GameState; onUnlock():
 function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTier; onOpen(a: ClientApp): void; hidden: boolean }) {
   const phone = state.phone;
   const clock = clockOf(state.minute);
+  const apps: ClientApp[] = [...GRID, ...phone.installed];
+  const size = PAGE_SIZE[tier];
+  const pages = Math.max(1, Math.ceil(apps.length / size));
+  const [pageRaw, setPage] = useState(0);
+  const page = Math.min(pageRaw, pages - 1);
+  const swipe = useRef<number | null>(null);
   const cut = powerCutOn(clock.day);
   const upcoming = cut && state.minute < cut.endMinute ? cut : null;
   const icon = (id: ClientApp) => {
-    const supported = id === "battery" || hasApp(phone, id as AppId);
+    const supported = id === "battery" || hasApp(phone, id as AnyAppId);
     const badge = id === "chat" ? Object.values(phone.threads).reduce((s, t) => s + t.unread, 0) : 0;
     return (
       <button key={id} className={`phone-icon${supported ? "" : " is-locked"}`} onClick={() => onOpen(id)} tabIndex={hidden ? -1 : 0}>
-        <span className="phone-icon-tile" style={{ background: `linear-gradient(150deg, ${APP_STYLE[id].from}, ${APP_STYLE[id].to})` }}>
-          <Icon name={APP_STYLE[id].icon} size={tier === "basic" ? 30 : 28} />
+        <span className="phone-icon-tile" style={{ background: `linear-gradient(150deg, ${styleOf(id).from}, ${styleOf(id).to})` }}>
+          <Icon name={styleOf(id).icon} size={tier === "basic" ? 30 : 28} />
           {!supported && (
             <span className="phone-lockpin">
               <Icon name="lock" size={11} />
@@ -484,7 +496,20 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
           </div>
         )}
       </div>
-      <div className="phone-grid">{GRID.map(icon)}</div>
+      <div className="phone-pages" onPointerDown={(e) => (swipe.current = e.clientX)} onPointerUp={(e) => {
+        const x0 = swipe.current;
+        swipe.current = null;
+        if (x0 === null) return;
+        const dx = e.clientX - x0;
+        if (Math.abs(dx) > 50) setPage((n) => Math.max(0, Math.min(pages - 1, n + (dx < 0 ? 1 : -1))));
+      }}>
+        <div className="phone-grid">{apps.slice(page * size, page * size + size).map(icon)}</div>
+      </div>
+      {pages > 1 && (
+        <div className="pa-dots" role="tablist" aria-label="Home screens">
+          {Array.from({ length: pages }, (_, i) => <i key={i} className={i === page ? "is-on" : ""} onClick={() => setPage(i)} />)}
+        </div>
+      )}
       <div className="phone-dock">{DOCK.map(icon)}</div>
     </div>
   );
@@ -495,6 +520,7 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
   const [drag, setDrag] = useState<{ app: ClientApp; dy: number } | null>(null);
   const start = useRef<{ app: ClientApp; y: number; id: number } | null>(null);
   const gist = (app: ClientApp): string => {
+    if (app === "store" && state.phone.downloads.length) return `${state.phone.downloads.length} downloading`;
     const p = state.phone;
     if (app === "chat") return `${Object.values(p.threads).reduce((s, t) => s + t.unread, 0)} unread`;
     if (app === "pay") return naira(balance(state.ledger));
@@ -502,7 +528,8 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
     if (app === "jobs") return p.job ? "You have a job" : "Find a job";
     if (app === "news") return `Day ${clockOf(state.minute).day} headlines`;
     if (app === "maps") return "Around you";
-    return `${Math.round(p.battery)}% battery`;
+    if (app === "battery") return `${Math.round(p.battery)}% battery`;
+    return appInfo(app).blurb;
   };
   const cards = [...running].reverse();
   return (
@@ -530,8 +557,8 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
             }}
           >
             <div className="phone-card-head">
-              <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[app].from}, ${APP_STYLE[app].to})` }}>
-                <Icon name={APP_STYLE[app].icon} size={16} />
+              <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${styleOf(app).from}, ${styleOf(app).to})` }}>
+                <Icon name={styleOf(app).icon} size={16} />
               </span>
               <strong>{APP_NAME(app)}</strong>
               <button
@@ -547,8 +574,8 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
                 ×
               </button>
             </div>
-            <div className="phone-card-body" style={{ background: `linear-gradient(160deg, ${APP_STYLE[app].from}, ${APP_STYLE[app].to})` }}>
-              <Icon name={APP_STYLE[app].icon} size={54} />
+            <div className="phone-card-body" style={{ background: `linear-gradient(160deg, ${styleOf(app).from}, ${styleOf(app).to})` }}>
+              <Icon name={styleOf(app).icon} size={54} />
               <span>{gist(app)}</span>
             </div>
           </div>
@@ -599,9 +626,9 @@ function Drawer({ state, onOpen, onDismiss, onClear, onClose, onPlug, onOpenApp 
           <Icon name="power" size={22} />
           <span>{Math.round(phone.battery)}%</span>
         </button>
-        <button onClick={() => onOpenApp("pay")}>
-          <Icon name="signal" size={22} />
-          <span>{phone.dataMB >= 1024 ? `${(phone.dataMB / 1024).toFixed(1)} GB` : `${Math.round(phone.dataMB)} MB`}</span>
+        <button onClick={() => onOpenApp("settings")}>
+          <Icon name={connection(state).kind === "wifi" ? "wifi" : "signal"} size={22} />
+          <span>{connection(state).kind === "wifi" ? "Wi-Fi" : phone.dataMB >= 1024 ? `${(phone.dataMB / 1024).toFixed(1)} GB` : `${Math.round(phone.dataMB)} MB`}</span>
         </button>
         <button onClick={() => onOpenApp("pay")}>
           <Icon name="call" size={22} />
@@ -644,7 +671,7 @@ function Drawer({ state, onOpen, onDismiss, onClear, onClose, onPlug, onOpenApp 
             {appBadge(n)}
             <span className="phone-notice-main">
               <span className="phone-notice-meta">
-                {APP_INFO[n.app].name} · {clockOf(n.minute).label}
+                {appInfo(n.app).name} · {clockOf(n.minute).label}
               </span>
               <strong>{n.title}</strong>
               <small>{n.text}</small>
