@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, ECONOMY, Sim, balance, createGameState, createLedger, ledgerTotal, mood, parseGameState, performance, simulateAbsence, transfer, MINT, PLAYER, SINK } from "./index.js";
+import { ACTIONS, BILL_PER_WEEK, ECONOMY, Sim, balance, createGameState, createLedger, ledgerTotal, mood, parseGameState, performance, simulateAbsence, transfer, MINT, PLAYER, SINK } from "./index.js";
 
 const run = (sim: Sim, actionId: string) => {
   const result = sim.start(actionId);
@@ -170,7 +170,7 @@ describe("rent and money", () => {
     sim.state.minute = 6 * 24 * 60 + 7 * 60; // Day 7, 07:00
     const before = sim.money;
     sim.advance(120);
-    expect(sim.money).toBe(before - ECONOMY.rentPerWeek);
+    expect(sim.money).toBe(before - ECONOMY.rentPerWeek - BILL_PER_WEEK); // rent, then the weekly water and power bill
     expect(sim.state.rentOwed).toBe(0);
   });
 

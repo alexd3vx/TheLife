@@ -2,6 +2,7 @@ import { ACTIONS, ECONOMY, skillPayMultiplier } from "./actions";
 import { MINT, PLAYER, SINK, balance, createLedger, transfer } from "./ledger";
 import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./needs";
 import type { Profile } from "./profile";
+import { createPhone, groceriesFor, jobPayBoost, notify, startLateFeeClock, tickPhone } from "./phone";
 import { combineTraits, type TraitEffects } from "./traits";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
@@ -35,6 +36,7 @@ export function createGameState(profile: Profile | null = null): GameState {
     rentOwed: 0,
     lastRentDay: 0,
     profile,
+    phone: createPhone(profile),
     lastAllowanceDay: 0,
     warned: {},
     stats: { daysSurvived: 0, totalEarned: 0, totalSpent: 0, timesPassedOut: 0 },
@@ -143,7 +145,7 @@ export class Sim {
   }
 
   get groceriesPrice(): number {
-    return Math.round((ECONOMY.groceriesPrice * this.traits.groceries) / 100) * 100;
+    return groceriesFor(this.state, ECONOMY.groceriesPrice, this.traits.groceries);
   }
 
   buyGroceries(): StartResult {
@@ -218,7 +220,7 @@ export class Sim {
 
     if (act) {
       act.done += minutes;
-      if (act.def.incomePerHour) this.earn(act.def.incomePerHour * performance(s.needs) * skillPayMultiplier(s.skills.computer ?? 0) * this.traits.workPay * hours);
+      if (act.def.incomePerHour) this.earn(act.def.incomePerHour * performance(s.needs) * skillPayMultiplier(s.skills.computer ?? 0) * this.traits.workPay * jobPayBoost(s.phone) * hours);
       if (act.def.skill) {
         const before = Math.floor(Math.sqrt((s.skills[act.def.skill.id] ?? 0) / 8));
         s.skills[act.def.skill.id] = (s.skills[act.def.skill.id] ?? 0) + act.def.skill.xpPerHour * hours;
@@ -233,6 +235,7 @@ export class Sim {
 
     this.checkNeeds();
     this.checkRent();
+    tickPhone(s, minutes); // after rent, so rent is paid before the weekly bill
   }
 
   private earn(amount: number) {
@@ -294,14 +297,18 @@ export class Sim {
       s.rentOwed += rent;
       this.emit("warn", `Rent is due: ₦${rent.toLocaleString()}.`);
     }
-    if (s.rentOwed > 0 && this.money > 0) {
+    if (s.rentOwed > 0 && this.money > 0 && s.phone.autoPay) {
       const pay = Math.min(this.money, s.rentOwed);
       transfer(s.ledger, PLAYER, SINK, pay, "Rent", s.minute);
       s.rentOwed -= pay;
       s.stats.totalSpent += pay;
       if (s.rentOwed === 0) this.emit("info", `Rent paid (₦${pay.toLocaleString()}).`);
     }
-    if (due && s.rentOwed > 0) {
+    if (due && s.rentOwed > 0 && !s.phone.autoPay) {
+      startLateFeeClock(s);
+      notify(s, "pay", "Rent due", `Pay ₦${s.rentOwed.toLocaleString()} in LifePay before tomorrow to avoid a late fee.`);
+    }
+    if (due && s.rentOwed > 0 && s.phone.autoPay) {
       s.rentOwed += ECONOMY.lateFee;
       this.emit("bad", `You couldn't cover the rent. ₦${s.rentOwed.toLocaleString()} is owed, including a late fee.`);
     }

@@ -8,3 +8,5 @@ export * from "./persist.js";
 export * from "./catalog.js";
 export * from "./profile.js";
 export * from "./traits.js";
+export * from "./phone.js";
+export * from "./phoneData.js";

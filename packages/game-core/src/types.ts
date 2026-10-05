@@ -24,6 +24,7 @@ export interface Ledger {
 }
 
 import type { Profile } from "./profile.js";
+import type { PhoneState } from "./phone.js";
 
 export interface Inventory {
   /** Raw food portions from the shop. */
@@ -51,6 +52,8 @@ export interface GameState {
   profile: Profile | null;
   /** Game day number on which the family allowance was last paid. */
   lastAllowanceDay: number;
+  /** The phone: battery, chats, bank extras, deliveries, job. */
+  phone: PhoneState;
   /** Needs that already triggered their "low" warning, so each warning fires once per dip. */
   warned: Partial<Record<NeedId, boolean>>;
   stats: { daysSurvived: number; totalEarned: number; totalSpent: number; timesPassedOut: number };

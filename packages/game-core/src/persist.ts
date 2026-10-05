@@ -1,4 +1,5 @@
 import { createGameState } from "./sim";
+import { parsePhone } from "./phone";
 import { parseProfile } from "./profile";
 import { createNeeds } from "./needs";
 import { NEED_IDS, type GameState } from "./types";
@@ -32,6 +33,7 @@ export function parseGameState(raw: unknown): GameState | null {
     portions: Math.max(0, Math.floor(r.inventory?.portions ?? 0)),
     meals: Math.max(0, Math.floor(r.inventory?.meals ?? 0)),
   };
+  const profile = parseProfile(r.profile);
   return {
     version: 1,
     minute: Math.max(0, r.minute),
@@ -42,7 +44,8 @@ export function parseGameState(raw: unknown): GameState | null {
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
     rentOwed: Math.max(0, r.rentOwed ?? 0),
     lastRentDay: Math.max(0, r.lastRentDay ?? 0),
-    profile: parseProfile(r.profile),
+    profile,
+    phone: parsePhone(r.phone, profile),
     lastAllowanceDay: Math.max(0, r.lastAllowanceDay ?? 0),
     warned: {},
     stats: { ...fresh.stats, ...(r.stats ?? {}) },
