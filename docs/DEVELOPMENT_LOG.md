@@ -2,6 +2,15 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Realistic furniture, priced catalog, showroom
+- **Realistic furniture replaces the cartoon set in the house:** 60 CC0 Poly Haven models (sofas, chairs, tables, shelves, lamps, TV, radio, stove, fan...) fetched and compressed by the asset pipeline (`fetch_polyhaven.py`), plus 14 pieces built in code (fridge, toilet, basin, shower cabin, bed, wardrobe, flat TV, washer, kitchen units, lamp, rug, doormat). Image-based lighting makes metal, glass and wood read as real.
+- **Catalog (game-core):** 77 pieces with name, category, naira price and the action they enable. Players will buy these in a shop later; for now the house and showroom place them directly. Tests check every item has a model and every model is sold.
+- **Interactions derived from shape, not hand-tuned:** seat height by ray, hips offset measured from `Sitting_Idle_Loop`, real `Sitting_Enter`/`Sitting_Exit`, lying pose lowered onto the mattress using the measured sleeping body, approach spots found by search. Sofas have one seat per cushion.
+- **Furniture animation:** fridge and oven doors open, fans spin, shower water runs, TV glows when watched, radio pulses, lamps light at night; ceilings are cut away like other life sims.
+- **Showroom (`#/showroom`):** every catalog item on display with its price; "Run all tests" uses each piece. Headless run: all 33 usable pieces start the right activity and animation; the 15 house interactions pass (one refusal was the game rule "You're not hungry").
+- Bugs found by looking at screenshots: seat height was read off a pillow on the big sofa (now the lowest of a sample grid); lying body floated above the mattress (3rd-percentile body height instead of the lowest vertex); dining chairs tucked under the table had no approach spot (ring search).
+- Limits: in headless software rendering each test is slow, frame rates there are not representative; mattress contact and sofa cushion depth are approximate; ceiling fans are hidden in the game view (no ceilings yet); some pieces' look (e.g. black coffee table) may be swapped later.
+
 ## 2026-10-05 — Playable day: needs, time, money, more furniture, polish
 - **game-core** (`packages/game-core`, 24 tests): five needs with mood/performance, a double-entry ledger (total always 0, no overdrafts, tampered saves rejected), data-driven actions (12 activities), weekly rent with late fee and eviction warning, skills, groceries/cooking/eating inventory, collapse from exhaustion, accidents, and offline catch-up with a "While you were away" summary. Full spec: `docs/GAMEPLAY_SYSTEMS.md`.
 - **Prototype is now a game:** HUD (clock, money, need bars, mood, inventory, rent, skills), action banner with progress, toasts, away panel, day/night lighting with house lights, saved on the device. Tired characters walk slower; collapsing puts the character on the floor.

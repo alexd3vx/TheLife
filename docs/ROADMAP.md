@@ -38,6 +38,18 @@ Total estimate: roughly 14–18 weeks part-time; to be re-estimated at the end o
 - **Realistic furniture (Oct 2026):** the house is now furnished with 60 photoscanned CC0 models and 14 pieces built in code, 77 catalog items with naira prices (to be sold in a shop later), real sitting animations on every seat, animated furniture (fridge/oven doors, fans, shower, TV, lamps) and a `#/showroom` test page.
 - **Stage 3 (Map):** started with the **tap-to-walk prototype** (`#/play`): a small house with kitchen, dining, living, desk, bedroom and a yard; tap the floor to walk, tap furniture to cook, eat, sit, work or sleep. Next: a real district layout, lot loading, travel between lots, day/night.
 
+## Owner's big-picture wishlist (Oct 2026), done one step at a time
+
+Direction: a **Project Zomboid-style realism sim without zombies**: detailed props, animation and mechanics, in a big living Nigerian map. Brand: **Alexion Studios**. Order of work, each step finished before the next:
+
+1. **Furniture (done):** realistic furniture, naira-priced catalog, showroom test page.
+2. **Launch experience and updates:** loving intro splash (Alexion Studios brand), feature highlights, a first-run download of assets into the browser cache with a progress bar, then "Finding assets... loading animations... welcome" on later visits (fast, no re-download). Update system: the game checks its version, and when a new one is released players see "New update, tap to reload"; no maintenance windows. (Service worker + versioned asset manifest.)
+3. **More realistic animation and a better-posed new character:** more life animations (transitions, hand poses, expressions), a new base character with better poses, then build content on it.
+4. **Phones (each its own brand):** several phone models, each with a different UI and design, named after our own game (no real-world trademarks); apps likewise.
+5. **Houses of many types:** multi-storey duplex and mansion (upstairs/downstairs, stairs), garages that come with a house type, trees and gardens outside instead of bare grass, a farm plot where the player plants and harvests.
+6. **The map (the biggest piece):** a big district with many buildings, moving cars, planes and more, streamed in by chunk and level of detail so it stays fast on phones. Given its size it gets its own planning step first.
+7. **Deeper survival-sim mechanics:** more detail and realism in needs, crafting, farming and consequences.
+
 ## Later phases (from the project brief)
 
 | Phase | Theme | Highlights |
