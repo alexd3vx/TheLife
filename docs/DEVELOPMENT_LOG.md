@@ -2,6 +2,14 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Asset Lab v0 (roadmap stage 1)
+- Chose "adapt free CC0 packs" for characters. Downloaded and verified licences: Quaternius Universal Base Characters + Universal Animation Library, Kenney Furniture Kit + Car Kit (all CC0).
+- New `tools/assets` pipeline: reproducible fetch (`fetch-all.sh`, incl. itch.io free-download flow), `sources.mjs` (what we take + budgets), `build-assets.mjs` (optimise to compressed glTF, enforce budgets, write `manifest.json`). ~330 MB of raw packs become a 5.3 MB game library (78 assets, all in budget).
+- New Asset Lab at `#/lab`: orbit viewer, lighting presets, wireframe, turntable, stats, PNG export; character composer (2 bodies, 7 skin tones, 5 hairstyles + 8 colours, beard, eyebrows, eye colours, 43 animations, randomise); prop and vehicle browsers; Pipeline report (budgets, licences, heaviest assets). Responsive with a collapsible panel on phones.
+- Fixed a bug found in browser testing: hair rendered giant because meshopt quantization stores its scale in the skeleton's inverse-bind matrices. Skinned assets now skip quantization.
+- Dependencies added: `@gltf-transform/{core,extensions,functions}`, `meshoptimizer`, `sharp` (dev tools only, `tools/assets`).
+- Known gaps: no clothing, no African hairstyles, one face shape per body, Kenney props/cars are cartoon-styled vs semi-realistic people (see `ASSET_PIPELINE.md`).
+
 ## 2026-10-05 — Offline-first, real 3D, asset-first order
 - Owner decisions: build the **offline single-player** game first and add multiplayer later; make the world **realistic** (true 3D); build **all asset models first** (faces, hair, props), then animation/rigging, then the map, then the main game.
 - Replaced the planned PixiJS isometric renderer with **Three.js** (`apps/client/src/world3d/`): procedural textures, buildings, shopfronts, props (lamps, power poles, palms, billboard), cars and yellow minibuses, walking people, sky dome, sun shadows, fog, ACES tone mapping. Lazy-loaded; scene builds in ≈ 0.4 s on desktop; falls back to the SVG art without WebGL; lowers resolution on slow devices; honours reduced-motion.

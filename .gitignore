@@ -4,3 +4,6 @@ dist
 .env.local
 *.log
 .DS_Store
+# Raw third-party downloads; re-create with tools/assets/fetch-all.sh
+assets-src/*
+!assets-src/README.md
