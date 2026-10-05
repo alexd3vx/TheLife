@@ -1,13 +1,20 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createSave, deleteSave, loadSave, touchSave, type GameSave } from "../save/localSave";
 import { createAuthService } from "./createAuthService";
 import type { AuthService, AuthUser } from "./types";
 
-type AuthStatus = "loading" | "signedIn" | "signedOut";
+type AppStatus = "loading" | "inGame" | "signedOut";
 
 interface AuthContextValue {
-  status: AuthStatus;
+  status: AppStatus;
+  /** Signed-in account, if any. Playing offline needs no account. */
   user: AuthUser | null;
   service: AuthService;
+  /** The on-device save, if one exists. */
+  save: GameSave | null;
+  playOffline(): void;
+  startOver(): void;
+  leave(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -15,7 +22,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const service = useMemo(() => createAuthService(), []);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  const [authReady, setAuthReady] = useState(false);
+  const [save, setSave] = useState<GameSave | null>(() => loadSave());
+  const [inGame, setInGame] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -24,13 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((current) => {
         if (!active) return;
         setUser(current);
-        setStatus(current ? "signedIn" : "signedOut");
+        setInGame(!!current);
       })
-      .catch(() => active && setStatus("signedOut"));
+      .catch(() => undefined)
+      .finally(() => active && setAuthReady(true));
 
     const unsubscribe = service.onChange((next) => {
       setUser(next);
-      setStatus(next ? "signedIn" : "signedOut");
+      if (next) setInGame(true);
     });
     return () => {
       active = false;
@@ -38,7 +48,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [service]);
 
-  return <AuthContext.Provider value={{ status, user, service }}>{children}</AuthContext.Provider>;
+  // Accounts get a save too, so the same game works with or without a login.
+  useEffect(() => {
+    if (user && !save) setSave(createSave());
+  }, [user, save]);
+
+  const playOffline = useCallback(() => {
+    setSave((current) => (current ? touchSave(current) : createSave()));
+    setInGame(true);
+  }, []);
+
+  const startOver = useCallback(() => {
+    deleteSave();
+    setSave(createSave());
+    setInGame(true);
+  }, []);
+
+  const leave = useCallback(async () => {
+    setInGame(false);
+    if (user) await service.signOut();
+  }, [service, user]);
+
+  const status: AppStatus = !authReady ? "loading" : inGame || user ? "inGame" : "signedOut";
+
+  return (
+    <AuthContext.Provider value={{ status, user, service, save, playOffline, startOver, leave }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

@@ -2,6 +2,15 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Offline-first, real 3D, asset-first order
+- Owner decisions: build the **offline single-player** game first and add multiplayer later; make the world **realistic** (true 3D); build **all asset models first** (faces, hair, props), then animation/rigging, then the map, then the main game.
+- Replaced the planned PixiJS isometric renderer with **Three.js** (`apps/client/src/world3d/`): procedural textures, buildings, shopfronts, props (lamps, power poles, palms, billboard), cars and yellow minibuses, walking people, sky dome, sun shadows, fog, ACES tone mapping. Lazy-loaded; scene builds in ≈ 0.4 s on desktop; falls back to the SVG art without WebGL; lowers resolution on slow devices; honours reduced-motion.
+- Added **"Play now"**: device save (`apps/client/src/save`, versioned), "Continue my life" / "Start a new life instead", optional account. The in-game placeholder shows the 3D street behind a card.
+- Dependencies added: `three`, `@types/three` (3D rendering).
+- Verified in a browser (software WebGL, so frame rate there is not representative): scene renders on desktop and phone widths, offline start, save persists across reload, continue, back to start, account sign-up all work.
+- Docs updated: `TECH_ARCHITECTURE.md` (§5 rendering, new §5b offline-first), `GAME_VISION.md` (decisions 5, 20, 23–25), `ROADMAP.md` (new stage order and asset sourcing plan).
+- Known caveat: procedural people/vehicles are placeholders; stage 1 replaces them with proper rigged glTF assets.
+
 ## 2026-10-05 — M0 (part 1): foundation + auth page
 - Added pnpm monorepo (`apps/client`, `packages/shared`), strict TypeScript, Vitest.
 - Client: React + Vite. Original auth page (log in / create account, 18+ confirmation, validation, responsive layout, animated isometric hero in SVG).

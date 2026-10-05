@@ -18,7 +18,7 @@ This is an original game. It is inspired by the *genre* (life sims, e.g. The Sim
 | 2 | Audience | Nigeria + diaspora. English with Pidgin flavour. Culture is **Nigeria-wide** (Yoruba, Igbo, Hausa, etc.), Lagos is only the first district. |
 | 3 | Age rating | 18+ at launch. |
 | 4 | First district | Fully **fictional**, Lagos-inspired, mixed-zone (poor / middle / rich pockets). Data model supports real geography later. |
-| 5 | View | Sims-style **isometric 2.5D** lots, click-to-move avatars, stylised vector art. District map for click-to-travel between lots. |
+| 5 | View | **Real-time 3D (Three.js), Sims-style**: realistic lighting/shadows, rigged animated characters, orbit/follow camera. District map for click-to-travel between lots. (Changed from isometric 2.5D on request.) |
 | 6 | Start | Character creator + **random starting background** (poor / medium / rich — "lapo" / "nepo") that shapes money, housing, contacts and responsibilities. A poor roll must always have viable paths. |
 | 7 | Time | Hybrid: world clock runs in accelerated time; actions (work, sleep) can skip time. |
 | 8 | Offline | Cheap offline simulation + "while you were away" summary. Safety rails: no permanent loss while offline. |
@@ -33,10 +33,12 @@ This is an original game. It is inspired by the *genre* (life sims, e.g. The Sim
 | 17 | Currency | Naira only. Double-entry ledger. |
 | 18 | Monetisation | None in the prototype. Later: in-game billboard ads, cosmetics, and **capped** top-up (weekly caps, always worse value than earning). Never unlimited pay-to-win. |
 | 19 | Platform | Browser-first installable PWA; desktop, tablet and mobile designed together. |
-| 20 | Art | Stylised vector 2.5D. AI-generated assets with human cleanup, kit-based placeholders first. Licences checked before shipping. |
+| 20 | Art | Realistic-leaning stylised 3D. Characters/props as glTF assets; procedural variation; AI-assisted textures with cleanup. Licences checked before shipping. |
 | 21 | Hosting | Managed platform (no VPS administration): Supabase (Postgres/Auth/Storage) + an always-on Node game server on Fly.io/Railway/Render. |
 | 22 | Success (slice) | 30 testers, ≥10 return on day 3, median session >15 min. |
-| 23 | Timeline | 6–8 weeks to a playable slice. |
+| 23 | Timeline | Reordered: asset lab → animation/rigging → map → offline single-player game → multiplayer. Timeline to be re-estimated after the asset lab. |
+| 24 | Offline-first | Play now with a device save, no account needed. Account is optional (sync + future multiplayer). |
+| 25 | Build order | Build all asset models first (faces, hair, bodies, clothing, props), then animation and rigging so the Sims-style character layer is solid, then the map, then the main game. |
 
 ## Design principles
 

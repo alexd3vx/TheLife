@@ -8,7 +8,7 @@ Status: **proposed** (awaiting approval). Update this file whenever an architect
 |-------|--------|-----|-----------------------|
 | Language | **TypeScript** everywhere | One language across client, server and shared rules; strong typing helps AI-assisted development; shared types prevent client/server drift. | JS-only (no safety); Godot (excluded by brief). |
 | UI shell | **Preact or React + Vite** (default: **React + Vite**) | Mature, fast HMR, best AI-tooling support. UI (phone, dashboard, menus) is DOM, not canvas, so it is responsive and accessible. | Next.js (SSR not needed for a game, adds complexity); Svelte (smaller ecosystem for AI help). |
-| World renderer | **PixiJS v8** (WebGL/WebGPU, canvas fallback) | Fast 2D renderer, texture atlases, sprite batching, good on mobile. Isometric depth sorting is simple to build on top. | Phaser (heavier, opinionated game loop we don't need); Three.js (3D, unneeded cost); raw Canvas (slow). |
+| World renderer | **Three.js** (WebGL, true 3D) | Realistic lighting, shadows and PBR materials; skinned/rigged characters with glTF animation; proven on mobile when scenes are budgeted. Chosen over PixiJS (2D) after the owner asked for realistic, Sims-style 3D. | PixiJS/isometric sprites (flat look); Babylon.js (heavier); photorealistic engines (not viable in-browser on phones). |
 | State (client) | **Zustand** (UI state) + a thin **client-side world mirror** | Small, readable. Server remains the source of truth. | Redux (more boilerplate). |
 | Realtime | **WebSocket** via `ws` + a typed message protocol (Zod-validated) | Simple, debuggable, no framework lock-in. | Colyseus (nice rooms, but lock-in and we need custom authority/ledger rules); Socket.IO (extra overhead). |
 | API | **Fastify** REST for non-realtime (auth callbacks, account, admin) | Fast, typed, plugin model. | Express (slower, less typed); tRPC (revisit later). |
@@ -29,8 +29,8 @@ Dependencies are added only with a stated reason in `DEVELOPMENT_LOG.md`.
 ```
  ┌──────────────────────────── BROWSER (PWA) ────────────────────────────┐
  │  UI (React)   ◄─ state ─►  Client World Mirror  ◄─ draws ─►  Renderer  │
- │  phone, HUD,               (interpolated copy                (PixiJS    │
- │  dashboard                  of server state)                  isometric)│
+ │  phone, HUD,               (interpolated copy                (Three.js  │
+ │  dashboard                  of server state)                  3D scene) │
  └───────────────▲──────────────────────────┬─────────────────────────────┘
         snapshots/events (WS)        action requests (WS / REST)
  ┌───────────────┴──────────────────────────▼─────────────────────────────┐
@@ -96,16 +96,28 @@ Server:
 - **Hybrid actions:** actions that "take time" (a work shift, sleeping) reserve game time and may be skipped forward when the player is alone, or run in parallel with other players when on a shared lot.
 - **Offline catch-up:** on login the server runs `simulateAbsence(character, from, to)` — a cheap, deterministic, bounded function (needs decay with floors, scheduled rent/bills, queued storylets, NPC messages). It outputs a **"While you were away"** summary. Rails: no jail, no death, no repossession during absence beyond a grace window.
 
-## 5. Rendering (isometric 2.5D)
+## 5. Rendering (real-time 3D, Sims-style)
 
-- **Projection:** 2:1 isometric tiles; grid logic in tile coordinates, screen position derived. Depth sorting by `(y, x, layer)`.
-- **Scene = Lot:** one lot (home, workplace, shop, hangout) is a scene of tiles, walls, props and avatars. Lots are small (≈24×24 tiles) to stay performant on mobile.
-- **Layers:** floor → floor decals → walls → props → avatars → effects → lighting/overlay. Static layers are baked to render textures; only avatars/animated props redraw.
-- **Atlases:** sprites packed into texture atlases per lot kit; lazy-loaded when entering a lot.
-- **Avatars:** layered sprite composition (body, hair, outfit, accessories) so customisation = swapping layers, not new animations.
-- **Lighting/time-of-day:** a colour-grade overlay and baked light masks, not real-time 3D lighting.
-- **Performance budgets:** ≤150 draw calls, ≤40 MB GPU memory on mid-range phones, 60 fps target / 30 fps floor, ≤2 MB initial JS (gzipped), lots streamed on demand.
+Decision (Oct 2026): the world is **true 3D** rendered with Three.js, not 2D isometric sprites. Camera is a free orbit/follow camera in the style of The Sims.
+
+- **Scene = Lot / street:** built from data (layouts) and reusable asset kits (buildings, props, vehicles, characters). Procedural variation fills in the detail.
+- **Look:** ACES tone mapping, sun + hemisphere lighting with soft shadow maps, fog, textured PBR-style materials, emissive windows/lamps, sky dome. Goal: believable, not photoreal.
+- **Characters:** a single shared humanoid skeleton so any animation can be retargeted; customisation by swapping head/face, hair, body and clothing parts and by morph targets for body/face shape.
+- **Animation:** clip library (idle, walk, run, sit, sleep, eat, talk, gestures, work actions) driven by an animation state machine; interactions play clips from data.
+- **Asset format:** glTF/GLB, Draco/meshopt compressed, KTX2 textures; per-lot lazy loading from the CDN.
+- **Performance budgets (mid-range phone):** ≤ 150 draw calls, ≤ 300k triangles on screen, ≤ 40 MB GPU memory, 60 fps target / 30 fps floor, shadow map 1024 on phones, pixel ratio capped (1.5 phone, 2 desktop), auto-drop resolution if frames are slow, pause when the tab is hidden, respect reduced-motion.
+- **Fallback:** if WebGL is unavailable, show a static illustrated scene.
+- **Today:** `apps/client/src/world3d/` contains the procedural street scene (textures, buildings, props, vehicles, people, sky, layout) used behind the auth/home screens. It is lazy-loaded so the form is usable immediately.
 - **Map screen:** a separate illustrated district map (DOM/SVG) for click-to-travel; not the same renderer scene.
+
+## 5b. Offline-first (Oct 2026)
+
+Decision: build and prove the **single-player offline game first**; add multiplayer afterward.
+
+- The game rules live in `packages/game-core` as pure functions, so they run in the browser with no server. The same code later runs on the authoritative server.
+- Saves are stored on the device (`apps/client/src/save`, versioned JSON; moves to IndexedDB when saves grow). "Play now" needs no account; an account is optional and later enables sync and multiplayer.
+- To keep the later server-authoritative design cheap, all state changes already go through the action pipeline interface (validate → execute → commit), with the local "server" running in-process offline.
+- Offline mode is trusted on the client by definition, so offline saves can never be imported into the online economy without server validation.
 
 ## 6. Multiplayer model
 
@@ -265,7 +277,7 @@ TheLife/
 
 | Risk | Mitigation |
 |------|-----------|
-| Isometric art/engineering cost blows the 6–8 week plan | Slice = 3–4 small lots, one avatar kit, kit-based placeholders; art polish after fun is proven. |
+| 3D art/rigging cost blows the plan | Asset lab first with a strict budget; one shared skeleton; parametric/kit parts; reuse CC0/licensed assets where possible; polish after fun is proven. |
 | AI art inconsistent / licence uncertainty | Style guide + palette lock + cleanup pass; record licences; keep placeholders swappable via atlas manifests. |
 | Economy exploits ("trillionaire" bugs) | Ledger + audits + server authority from commit one; rate limits; admin rollback. |
 | Offline sim unfair or exploitable | Bounded catch-up, safety rails, summary screen. |

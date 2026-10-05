@@ -1,27 +1,35 @@
 # Roadmap
 
-Principle: **fun before feature count.** Each milestone ends with something playable and a go/no-go check. Timeline assumes part-time solo work with AI assistance; adjust after Milestone 1.
+Principle: **fun before feature count.** Each stage ends with something visible and a go/no-go check. Timeline assumes part-time solo work with AI assistance.
 
-## Vertical slice (target: 6–8 weeks)
+## Build order (revised Oct 2026)
 
-**Goal:** prove that "living a life in this world is fun" with ~30 testers.
-**Scope:** one fictional mixed-zone district with 3–4 isometric lots, a character creator, random starting background, needs, time, money (ledger), inventory, 3 jobs, a few shops/businesses (NPC-run), a home, one vehicle, basic relationships + memories, storylets, basic multiplayer + chat, phone (messages, bank, jobs, news), notifications, persistence, offline summary.
+Decided with the project owner: **offline single-player first, multiplayer later**, and **assets before gameplay** — models for faces, hair, bodies, clothing and props first, then animation and rigging so the Sims-style character layer is solid, then the map, then the main game.
 
-| Milestone | Weeks | Deliverable | Go/no-go check |
-|-----------|-------|-------------|----------------|
-| **M0 — Foundation** | 0–1 | Monorepo, CI, Supabase project + migrations, auth, WS gateway, shared protocol, content schemas + validator, Hello-world isometric lot rendering on desktop + phone. | A logged-in user sees a lot and a moving avatar on a phone at ≥30 fps. |
-| **M1 — A person in a room** | 1–2 | Character creator (layered avatar), random background roll, one home lot, needs + time system, inventory, first interactions (eat, sleep, wash), persistence + reload. | Close tab, reopen, same life. Needs affect outcomes in a visible way. |
-| **M2 — Money & work** | 2–3 | Ledger, wallet/bank, 3 data-driven jobs, shifts with skill gain, rent due, shops (buy/sell), first "what to do now?" dashboard + goals. | A poor-roll player can reach rent via ≥2 different routes (job / trade / ask for help). |
-| **M3 — The district** | 3–4 | District map + click-to-travel, 3–4 lots (home, workplace, shop, hangout), NPCs with schedules (LOD 0/1), basic vehicle/commute. | Players move through a day naturally; NPCs feel present. |
-| **M4 — Consequence engine** | 4–5 | Storylet engine + ~40 storylets, personality effects, relationship memories, notifications, offline catch-up + "While you were away". | Two playthroughs of the same background diverge noticeably; testers retell a moment. |
-| **M5 — Other people** | 5–6 | Real-time multiplayer on lots (instances), chat, phone messaging, friend requests, simple trade/gift, moderation tools (report/block/mute/filter/admin). | Two players meet, chat, trade, and one affects the other's day. |
-| **M6 — Polish & AI** | 6–7 | AI news + NPC chat (capped + fallback), onboarding/first-10-minutes pass, art cleanup, sound, PWA install + push, performance pass. | New tester completes first goal in <10 min without help. |
-| **M7 — Playtest** | 7–8 | Invite 30 testers, analytics (events only, no PII), feedback loop, bugfix sprint. | ≥10 of 30 return on day 3; median session >15 min. |
+**Risk to watch:** gameplay (and therefore "is it fun?") is now proven later. To contain that, every stage ends with a short playable demo moment, and stage 4 starts with the fun test before more content is added.
 
-### Slice exit decision
-- **Success:** proceed to Phase 2 with learned priorities.
+| Stage | Est. | Deliverable | Done when |
+|-------|------|-------------|-----------|
+| **0 — Foundation** (done) | — | Monorepo, auth page, offline "Play now" + device save, procedural 3D street scene (lighting, shadows, buildings, vehicles, people), docs. | Page runs on desktop and phone; offline and account flows work. |
+| **1 — Asset Lab** | 2–3 wks | `/lab` viewer to inspect any asset (orbit, lighting presets, wireframe, stats). Asset spec + budgets. **Characters:** body base, ≥ 8 face shapes, skin tones, hair styles and colours, facial features, a first clothing set. **Props:** furniture and appliances, street furniture, vehicles, shop fixtures. Pipeline tool to validate/compress glTF against budgets. | A character can be assembled from parts and viewed from every angle; every asset passes the budget check. |
+| **2 — Animation & Rigging** | 2 wks | One shared humanoid skeleton, clip library (idle, walk, run, sit, sleep, eat, talk, gestures, work actions), animation state machine, facial expressions via morph targets, clip retargeting. | A character walks to a chair, sits, eats, and talks in the lab, in any outfit/face combination. |
+| **3 — The Map** | 2 wks | District layout data → 3D streets and lots, lot loader (interiors/exteriors), district map screen, click-to-travel, day/night cycle. | You can travel between 3–4 lots, and the world looks right at all times of day on a phone. |
+| **4 — Main game (offline)** | 4–5 wks | Character creator + random starting background, needs, time, money ledger, 3 jobs, shops, home, vehicle, NPC schedules, storylets + relationship memories, notifications, phone, offline summary, AI news/NPC chat (capped). | **Fun test:** testers can play a full week of life and want to continue. |
+| **5 — Multiplayer** | 3–4 wks | Supabase accounts + sync, authoritative server, lot instances, chat, friends, trade, moderation tools. Move the offline rules onto the server. | Two players meet, chat, trade, and one affects the other's day. |
+| **6 — Playtest** | 1–2 wks | 30 invited testers, analytics (events only), bugfixes. | ≥ 10 of 30 return on day 3; median session > 15 min. |
+
+Total estimate: roughly 14–18 weeks part-time; to be re-estimated at the end of stage 1, when asset cost is known.
+
+### Asset sourcing plan (stage 1)
+- Characters: parametric head/body/hair parts exported as glTF, using CC0 sources where licences allow (e.g. MakeHuman/Quaternius-style bases) plus our own authored variations for African features, hairstyles (braids, locs, afro, fade, wraps) and clothing (including Nigerian fashion).
+- Props: modular kits authored in Blender or sourced from CC0 libraries, restyled to a common palette.
+- Textures: procedural + AI-assisted, with cleanup and recorded licences.
+- Every third-party asset is logged with its licence in `docs/ASSET_PIPELINE.md` before use.
+
+### Stage exit decision
+- **Success:** continue to the next stage.
 - **Partial:** identify the loop that worked (economy? stories? social?) and double down; cut the rest.
-- **Fail:** redesign the core loop before adding any features.
+- **Fail:** redesign the core loop before adding features.
 
 ## Later phases (from the project brief)
 

@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { lazy, Suspense, useState, type FormEvent } from "react";
 import { validateLogin, validateSignUp } from "@thelife/shared";
 import { useAuth } from "../auth/AuthProvider";
 import { IsoHero } from "./IsoHero";
+
+// Three.js is large, so it loads after the form is already usable.
+const HeroCanvas = lazy(() => import("../world3d/HeroCanvas"));
 
 type Tab = "login" | "signup";
 
@@ -15,7 +18,7 @@ interface FormState {
 const EMPTY_FORM: FormState = { email: "", password: "", confirmPassword: "", isAdult: false };
 
 export function AuthPage() {
-  const { service } = useAuth();
+  const { service, save, playOffline, startOver } = useAuth();
   const [tab, setTab] = useState<Tab>("signup");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -68,7 +71,9 @@ export function AuthPage() {
   return (
     <main className="auth">
       <section className="auth-hero" aria-hidden="true">
-        <IsoHero />
+        <Suspense fallback={<IsoHero />}>
+          <HeroCanvas />
+        </Suspense>
       </section>
 
       <section className="auth-panel">
@@ -80,6 +85,23 @@ export function AuthPage() {
         <h1 className="auth-title">Live a life. See what happens.</h1>
         <p className="auth-sub">
           Build your person, chase your goals, and share a living world with real people. Every choice leaves a mark.
+        </p>
+
+        <div className="play-now">
+          <button className="btn btn-primary btn-wide" onClick={playOffline}>
+            {save ? "Continue my life" : "Play now — no account needed"}
+          </button>
+          {save ? (
+            <button className="link-button" onClick={startOver}>
+              Start a new life instead
+            </button>
+          ) : (
+            <p className="play-now-hint">Your life is saved on this device. Add an account any time to sync it.</p>
+          )}
+        </div>
+
+        <p className="divider">
+          <span>or use an account (optional)</span>
         </p>
 
         <div className="tabs" role="tablist" aria-label="Account">
@@ -160,7 +182,7 @@ export function AuthPage() {
           )}
 
           <button className="btn btn-primary" type="submit" disabled={busy || service.mode === "unconfigured"}>
-            {busy ? "One moment…" : isSignUp ? "Start my life" : "Log in"}
+            {busy ? "One moment…" : isSignUp ? "Create account" : "Log in"}
           </button>
         </form>
 

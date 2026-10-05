@@ -8,5 +8,5 @@ export function App() {
   if (status === "loading") {
     return <div className="splash" role="status" aria-label="Loading" />;
   }
-  return status === "signedIn" ? <HomePlaceholder /> : <AuthPage />;
+  return status === "inGame" ? <HomePlaceholder /> : <AuthPage />;
 }
