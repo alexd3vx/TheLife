@@ -27,6 +27,9 @@ export function HomePlaceholder() {
         )}
         {save && <p className="muted">Save started {new Date(save.createdAt).toLocaleDateString()}</p>}
         <p className="muted">Next: build the character and asset lab, then step into the district.</p>
+        <a className="btn btn-primary" href="#/play" style={{ textAlign: "center", textDecoration: "none", display: "grid", placeItems: "center" }}>
+          Try the walking prototype
+        </a>
         <button className="btn btn-ghost" onClick={() => void leave()}>
           {user ? "Log out" : "Back to start"}
         </button>

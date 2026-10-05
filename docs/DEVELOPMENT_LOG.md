@@ -2,6 +2,14 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Tap-to-walk prototype (`#/play`)
+- Pathfinding in `packages/shared/src/nav.ts` (grid A*, no corner cutting, string-pulling) with 6 unit tests. Shared package so the server can validate moves later.
+- Prototype house as data (`play/layout.ts`): walls with a front door and a partition doorway, 24 furniture items from the Kenney kit at real-world scale, 7 interactions (fridge, stove, dining, sofa/TV, desk, bed). Camera orbit/zoom/pan with follow; walls fade when the camera is outside; hover highlight; target marker.
+- Controller: smooth turning, walk/jog, sit/lie tweens onto seats and the mattress, stand-action timers, getting up before walking off. The character uses the look saved from the Lab.
+- Verified in a browser (software WebGL): walks through the doorway into the bedroom, sleeps in the bed, switches to the sofa, snacks at the fridge, works at the desk, walks out of the front door; real mouse clicks and phone touch taps start walks; a drag does not count as a tap.
+- Bugs found and fixed: (1) nav cells touched by a wall were all blocked, which closed 1.2 m doorways (fixed with 12.5 cm cells and 1.4 m doors); (2) only the chair was tappable at the desk (now desk, monitor, laptop, table, TV, sink and nightstand also work).
+- Limits: one lot only; no collision between characters; pose offsets (sit/lie) are tuned by eye and will need per-furniture tuning; furniture is cartoon-styled; no sounds; the frame rate in my tests (about 10 fps) is software rendering, not real hardware.
+
 ## 2026-10-05 — Everyday-life animations (roadmap stage 2, first pass)
 - Audit of the 43 CC0 clips: sitting, talking, interact, pick-up, driving, dancing already exist. Missing life-sim actions were authored in code: sleep, eat (seated + standing), drink, type, phone, wave, cook (8 clips, `procedural/lifeClips.ts`). 51 clips total, available in the Lab on both bodies.
 - Method: base clip (Idle/Sitting) + keyframed joint offsets. First attempt assumed fixed hinge axes and posed elbows sideways; fixed by measuring on the posed skeleton which local axis moves the hand toward a goal direction.

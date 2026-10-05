@@ -119,6 +119,18 @@ Decision: build and prove the **single-player offline game first**; add multipla
 - To keep the later server-authoritative design cheap, all state changes already go through the action pipeline interface (validate → execute → commit), with the local "server" running in-process offline.
 - Offline mode is trusted on the client by definition, so offline saves can never be imported into the online economy without server validation.
 
+## 5c. Movement and interaction (tap to walk)
+
+Sims-style control. The player never steers; they say *where*, and the character gets there.
+
+- **Tap/click the floor:** a ray from the camera is cast onto the ground; the character walks there along a path around walls and furniture. Long trips switch from walk to jog.
+- **Tap furniture:** the character walks to that item's approach point, then performs its action: stand actions (fridge, cooking) end on a timer; seat/lie actions (sofa, dining chair, desk, bed) move the character onto the seat or mattress and hold until the next tap, which makes them get up first. Several pieces can share one action (tapping the TV sends you to the sofa; tapping the desk, monitor or laptop starts work).
+- **Camera:** drag to orbit, pinch/wheel to zoom, right-drag to pan; "Follow" keeps the character centred. Walls between the camera and the house fade out so you can always see in. Taps are told apart from drags by distance (< 9 px) and time (< 450 ms), and a second finger cancels a tap.
+- **Pathfinding** lives in `packages/shared/src/nav.ts` (pure logic, unit-tested): grid A* with diagonal moves, no corner cutting, then string-pulling so routes are straight lines. The grid is 12.5 cm cells; walls and furniture are padded by the character's radius, and doorways are 1.4 m so they stay open after padding. The server will reuse the same code to check that a requested move is possible.
+- **Data, not code:** the house (walls, doors, furniture, which action each piece triggers, where to stand, where to sit) is `apps/client/src/play/layout.ts`. A new room or lot is a new layout file.
+- **Code map:** `play/controller.ts` (walk, turn, run, sit/lie tweens, action timers), `play/runtime.ts` (renderer, camera, picking, loop), `play/world.ts` (scene + nav grid), `play/PlayPage.tsx` (UI).
+- **Look sharing:** the character built in the Lab is saved on the device and shows up in the prototype.
+
 ## 6. Multiplayer model
 
 - **Lot instances:** the world is one logical world; each lot has one or more *instances* (rooms) capped at ~100 players. Players in the same instance see each other live.

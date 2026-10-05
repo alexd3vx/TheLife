@@ -111,3 +111,25 @@ export const DEFAULT_LOOK: Look = {
   topFabric: "plain",
   bottomFabric: "plain",
 };
+
+const LOOK_KEY = "thelife.look.v1";
+
+/** The character's look, shared by the Lab and the play prototype. Falls back to the default if nothing valid is stored. */
+export function loadSavedLook(): Look {
+  try {
+    const raw = localStorage.getItem(LOOK_KEY);
+    if (!raw) return { ...DEFAULT_LOOK };
+    const parsed = JSON.parse(raw) as Partial<Look>;
+    return { ...DEFAULT_LOOK, ...parsed, body: parsed.body === "female" ? "female" : "male" };
+  } catch {
+    return { ...DEFAULT_LOOK };
+  }
+}
+
+export function saveLook(look: Look): void {
+  try {
+    localStorage.setItem(LOOK_KEY, JSON.stringify(look));
+  } catch {
+    // Storage may be blocked (private mode); the look just won't be remembered.
+  }
+}

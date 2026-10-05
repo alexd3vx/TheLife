@@ -31,6 +31,11 @@ Total estimate: roughly 14–18 weeks part-time; to be re-estimated at the end o
 - **Partial:** identify the loop that worked (economy? stories? social?) and double down; cut the rest.
 - **Fail:** redesign the core loop before adding features.
 
+### Progress snapshot (Oct 2026)
+- **Stage 1 (Asset Lab):** done for a first version: CC0 bodies, hair, outfits, props, vehicles; procedural African hairstyles and modern clothing; budgets enforced. Gaps: skirts/long clothes, face variety, more realistic props/vehicles.
+- **Stage 2 (Animation):** first pass done: 43 library clips + 8 everyday-life clips. Polish list in `ASSET_PIPELINE.md`.
+- **Stage 3 (Map):** started with the **tap-to-walk prototype** (`#/play`): a small house with kitchen, dining, living, desk, bedroom and a yard; tap the floor to walk, tap furniture to cook, eat, sit, work or sleep. Next: a real district layout, lot loading, travel between lots, day/night.
+
 ## Later phases (from the project brief)
 
 | Phase | Theme | Highlights |

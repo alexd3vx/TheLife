@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Avatar } from "./avatar";
 import { loadGLTF } from "./loaders";
-import { CLOTH_COLORS, DEFAULT_LOOK, EYE_COLORS, FABRIC_OPTIONS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { CLOTH_COLORS, EYE_COLORS, FABRIC_OPTIONS, HAIR_COLORS, SKIN_TONES, loadSavedLook, saveLook, type Look } from "./looks";
 import { PROC_BOTTOMS, PROC_SHOES, PROC_TOPS } from "./procedural/garments";
 import { PROC_HAIR } from "./procedural/hair";
 import { assetUrl, loadManifest, type AssetManifest, type AssetRecord } from "./manifest";
@@ -28,7 +28,7 @@ export default function LabPage() {
   const [manifest, setManifest] = useState<AssetManifest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("character");
-  const [look, setLook] = useState<Look>(DEFAULT_LOOK);
+  const [look, setLook] = useState<Look>(() => loadSavedLook());
   const [clip, setClip] = useState<string | null>(null);
   const [clips, setClips] = useState<string[]>([]);
   const [speed, setSpeed] = useState(1);
@@ -64,7 +64,7 @@ export default function LabPage() {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!manifest || !viewer) return;
-    const avatar = new Avatar(manifest, DEFAULT_LOOK);
+    const avatar = new Avatar(manifest, loadSavedLook());
     avatarRef.current = avatar;
     viewer.addFrameCallback((delta) => avatar.update(delta));
     avatar
@@ -86,7 +86,11 @@ export default function LabPage() {
   tabRef.current = tab;
 
   const updateLook = useCallback((patch: Partial<Look>) => {
-    setLook((prev) => ({ ...prev, ...patch }));
+    setLook((prev) => {
+      const next = { ...prev, ...patch };
+      saveLook(next);
+      return next;
+    });
     const avatar = avatarRef.current;
     if (!avatar) return;
     setBusy(true);
@@ -194,6 +198,9 @@ export default function LabPage() {
             ← Back
           </a>
           <strong className="lab-title">Asset Lab</strong>
+          <a className="lab-back" href="#/play">
+            Try walking ▶
+          </a>
           <button className="lab-panel-toggle" onClick={() => setPanelOpen((v) => !v)} aria-expanded={panelOpen}>
             {panelOpen ? "Hide panel" : "Show panel"}
           </button>
