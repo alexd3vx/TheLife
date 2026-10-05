@@ -304,7 +304,7 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   // ---- what you can do with each piece, worked out from its shape
   const derived: DerivedItem[] = items.map((item) => {
     const base = item.def.onTopOf ? byId.get(item.def.onTopOf) : undefined;
-    return { def: item.def, category: item.catalog.category, action: item.catalog.action, meta: item.instance.meta, group: item.group, box: item.bounds, reach: base?.bounds ?? item.bounds };
+    return { def: item.def, category: item.catalog.category, action: item.catalog.action, toggle: item.catalog.toggle, meta: item.instance.meta, group: item.group, box: item.bounds, reach: base?.bounds ?? item.bounds };
   });
   const start = { x: layout.start.x, z: layout.start.z };
   const reachable = (x: number, z: number) => isFree(nav, x, z) && findPath(nav, start, { x, z }) !== null;

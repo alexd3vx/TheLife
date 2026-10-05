@@ -293,10 +293,11 @@ function floorLamp(): FurnitureBuild {
   const light = new THREE.PointLight("#ffd9a0", 0, 5, 1.8);
   light.position.set(0, 1.55, 0);
   g.add(light);
+  let on = 0;
   return {
     object: g,
-    update(_dt, ctx) {
-      const on = ctx.night;
+    update(dt, ctx) {
+      on += ((ctx.using ? 1 : 0) - on) * Math.min(1, dt * 10); // `using` means "switched on"
       (shade.material as THREE.MeshStandardMaterial).emissiveIntensity = on * 1.2;
       light.intensity = on * 6;
     },

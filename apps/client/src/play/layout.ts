@@ -120,7 +120,7 @@ export const HOUSE_LAYOUT: Layout = {
     p("bed", "p_bed", 3.9, -3.3),
     p("nightL", "painted_wooden_nightstand", 2.7, -4.15, { via: "bed" }),
     p("nightR", "painted_wooden_nightstand", 5.1, -4.15, { via: "bed" }),
-    p("oilLamp", "vintage_oil_lamp", 5.1, -4.15, { onTopOf: "nightR" }),
+    p("oilLamp", "vintage_oil_lamp", 5.65, 0.9, { onTopOf: "commode" }),
     p("wardrobe", "p_wardrobe", 1.95, -2.3, { rot: 90 }),
     p("bookshelf", "wooden_bookshelf_worn", 5.65, -0.9, { rot: -90 }),
     p("bedRug", "p_rug", 3.9, -0.7),

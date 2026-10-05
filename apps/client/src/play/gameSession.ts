@@ -32,7 +32,8 @@ export interface HudSnapshot {
   rentPerWeek: number;
   /** Days until the next rent is due. */
   rentInDays: number;
-  action: { label: string; progress: number } | null;
+  /** `seconds` is how long it takes in real time; short activities don't need a progress display. */
+  action: { label: string; progress: number; seconds: number } | null;
   skills: { id: string; level: number }[];
   groceriesPrice: number;
 }
@@ -149,7 +150,7 @@ export class GameSession implements GameBridge {
       rentOwed: s.rentOwed,
       rentPerWeek: ECONOMY.rentPerWeek,
       rentInDays: daysToRent === 0 && clock.hour < ECONOMY.rentHour ? 0 : daysToRent === 0 ? ECONOMY.rentDay : daysToRent,
-      action: act ? { label: ACTIONS[act.def.id]?.label ?? act.def.label, progress: Math.min(1, act.done / act.def.minutes) } : null,
+      action: act ? { label: ACTIONS[act.def.id]?.label ?? act.def.label, progress: Math.min(1, act.done / act.def.minutes), seconds: act.def.minutes / act.def.minutesPerSecond } : null,
       skills: Object.entries(s.skills).map(([id, xp]) => ({ id, level: skillLevel(xp) })),
       groceriesPrice: ECONOMY.groceriesPrice,
     };

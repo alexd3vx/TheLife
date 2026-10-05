@@ -81,8 +81,10 @@ function lampAnimator(meta: ModelMeta, object: THREE.Object3D): Animator | null 
   const light = new THREE.PointLight(meta.lamp.color, 0, 4, 2);
   light.position.set(meta.lamp.x, meta.lamp.y, meta.lamp.z);
   object.add(light);
+  // Lamps are switched on by the player (tap them); `using` means "switched on".
   return (_dt, ctx) => {
-    light.intensity = ctx.night * meta.lamp!.strength;
+    const target = ctx.using ? meta.lamp!.strength : 0;
+    light.intensity += (target - light.intensity) * Math.min(1, _dt * 10);
   };
 }
 

@@ -151,14 +151,18 @@ export default function PlayPage() {
       )}
 
       {(banner || hud?.action) && (
-        <div className="play-banner" role="status">
-          <strong>{status.label ?? hud?.action?.label ?? banner}</strong>
-          {status.label && status.hint && <span>{status.hint}</span>}
-          {hud?.action && status.label && (
-            <span className="play-progress">
-              <span style={{ width: `${Math.round(hud.action.progress * 100)}%` }} />
-            </span>
+        <div className={`play-banner${status.label ? " is-doing" : ""}`} role="status">
+          {status.label && hud?.action && hud.action.seconds >= 10 && (
+            <svg className="play-ring" viewBox="0 0 44 44" aria-hidden="true">
+              <circle className="play-ring-track" cx="22" cy="22" r="18" />
+              <circle className="play-ring-fill" cx="22" cy="22" r="18" pathLength="1" style={{ strokeDashoffset: 1 - hud.action.progress }} />
+            </svg>
           )}
+          <div className="play-banner-text">
+            <strong>{status.label ?? hud?.action?.label ?? banner}</strong>
+            {status.label && status.hint && <span>{status.hint}</span>}
+            {status.label && hud?.action && hud.action.seconds >= 10 && <span className="play-lapse">⏩ time is passing quickly</span>}
+          </div>
         </div>
       )}
 

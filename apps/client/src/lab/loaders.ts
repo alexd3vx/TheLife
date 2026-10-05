@@ -4,6 +4,13 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
+// By default three decodes the textures inside a model by fetching a blob: URL (ImageBitmapLoader). Hosted pages with a
+// strict Content Security Policy (connect-src without blob:), like the playtest artifact, refuse that and every model
+// silently turns white. Loading them through an <img> element works everywhere.
+loader.register((parser) => {
+  parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+  return { name: "THELIFE_image_element_textures" };
+});
 
 const gltfCache = new Map<string, Promise<GLTF>>();
 

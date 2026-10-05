@@ -11,6 +11,9 @@ import "./lab.css";
 
 type Tab = "character" | "furniture" | "props" | "vehicles" | "pipeline";
 
+/** Quaternius hairstyles whose scalp cap does not render in our pipeline (they show bald); hidden until replaced. */
+const BROKEN_HAIR = new Set(["hair_buzzed_f", "hair_long", "hair_buns"]);
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "character", label: "People" },
   { id: "furniture", label: "Furniture" },
@@ -160,7 +163,7 @@ export default function LabPage() {
     const realistic = look.body.startsWith("real");
     const body = bodyFor(pick(["male", "female"] as const), realistic);
     const outfits = realistic ? (["p_tee", "p_tank", "p_long", "p_kaftan"] as const) : (["p_tee", "p_tank", "p_long", "p_kaftan", "peasant", "ranger"] as const);
-    const hairs = [...PROC_HAIR, ...(manifest?.assets ?? []).filter((a) => a.slot === "hair")];
+    const hairs = [...PROC_HAIR, ...(manifest?.assets ?? []).filter((a) => a.slot === "hair" && !BROKEN_HAIR.has(a.id))];
     updateLook({
       body,
       skinTone: pick(SKIN_TONES).id,
@@ -192,7 +195,7 @@ export default function LabPage() {
     link.click();
   }, []);
 
-  const hairStyles = useMemo(() => (manifest?.assets ?? []).filter((a) => a.slot === "hair"), [manifest]);
+  const hairStyles = useMemo(() => (manifest?.assets ?? []).filter((a) => a.slot === "hair" && !BROKEN_HAIR.has(a.id)), [manifest]);
   const brows = useMemo(() => (manifest?.assets ?? []).filter((a) => a.slot === "brows"), [manifest]);
 
   return (

@@ -52,8 +52,14 @@
 .boot-dots i.is-on { background: var(--accent); transform: scale(1.25); }
 
 .boot-progress { width: 100%; display: grid; gap: 10px; }
-.boot-bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.boot-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #e8782a, #ffd27a); transition: width .35s ease; }
+.boot-emblem { position: relative; width: 132px; height: 150px; margin: 0 auto 4px; display: grid; place-items: center; }
+.boot-emblem svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.boot-emblem path { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.boot-emblem-track { stroke: var(--surface-2); }
+.boot-emblem-fill { stroke: url(#boot-fill); stroke-dasharray: 1; transition: stroke-dashoffset .6s cubic-bezier(.3, .1, .2, 1); filter: drop-shadow(0 0 6px rgba(242, 164, 58, .55)); }
+.boot-emblem-dot { fill: var(--surface-2); transition: fill .4s, filter .4s; }
+.boot-emblem-dot.is-lit { fill: #ffd27a; filter: drop-shadow(0 0 8px rgba(255, 210, 122, .9)); }
+.boot-emblem-num { margin-top: 104px; font-variant-numeric: tabular-nums; font-size: .95rem; font-weight: 600; color: var(--accent-strong); }
 .boot-status { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; color: var(--text-muted); min-height: 1.5em; }
 .boot-num { font-variant-numeric: tabular-nums; color: var(--text); }
 .boot-note { margin: 0; font-size: .82rem; color: var(--text-muted); }

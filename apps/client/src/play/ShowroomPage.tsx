@@ -113,6 +113,20 @@ export default function ShowroomPage() {
         continue;
       }
       p.focus(id, 7);
+      if (def.toggle) {
+        if (!p.tapItem(id)) {
+          record({ status: "fail", note: "nothing to tap: no approach found" });
+          continue;
+        }
+        let acted = false;
+        for (let waited = 0; waited < 60_000 && !stopRef.current; waited += 100) {
+          await sleep(100);
+          if (p.state().mode !== "idle") acted = true;
+          if (acted && p.state().mode === "idle") break;
+        }
+        record(p.isOn(id) ? { status: "pass", note: "switches on · lamp lights" } : { status: "fail", note: "did not switch on" });
+        continue;
+      }
       if (!def.action) {
         const reacted = p.tapItem(id);
         record({ status: reacted ? "fail" : "info", note: reacted ? "decor reacted unexpectedly" : item.animated ? "decor (animates)" : "decor, no action" });
@@ -220,9 +234,9 @@ export default function ShowroomPage() {
                           {result && result.status !== "pass" && <small className="showroom-note-line">{result.note}</small>}
                         </span>
                       </button>
-                      {f.action && (
+                      {(f.action || f.toggle) && (
                         <button className="showroom-use" disabled={!!running} onClick={() => use(f.id)}>
-                          Use
+                          {f.toggle ? "Switch" : "Use"}
                         </button>
                       )}
                     </li>

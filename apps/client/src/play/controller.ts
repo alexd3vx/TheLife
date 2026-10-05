@@ -71,6 +71,8 @@ export class CharacterController {
   private nextGlanceAt = 2;
   /** A short body-language clip (yawn, stretch...) in progress while standing idle. */
   private gesture: { until: number } | null = null;
+  /** While sitting down or settling onto a bed: "slide" = still stepping in, "sit" = lowering onto the seat. A tap in either takes it back. */
+  private settlePhase: "slide" | "sit" | null = null;
   private nextGestureAt = 9;
   private clock = 0;
   /** A tap that arrived during a short transition (sitting down, standing up); run once it finishes. */
@@ -84,6 +86,7 @@ export class CharacterController {
     private readonly nav: NavGrid,
     private readonly game: GameBridge,
     private readonly onStatus: (status: Status) => void,
+    private readonly onToggle?: (itemId: string) => void,
   ) {
     this.apply();
     this.setClip("Idle_Loop");
@@ -112,12 +115,6 @@ export class CharacterController {
   }
 
   private go(target: Point, interaction: Interaction | null): boolean {
-    if (this.mode === "settling" || this.mode === "leaving") {
-      if (!findPath(this.nav, { x: target.x, z: target.z }, { x: target.x, z: target.z })) return false;
-      this.queued = { target, interaction };
-      return true;
-    }
-
     const begin = () => {
       const route = findPath(this.nav, { x: this.position.x, z: this.position.z }, target);
       if (!route || route.length === 0) {
@@ -132,6 +129,26 @@ export class CharacterController {
       this.setStatus(null, null);
       return true;
     };
+
+    if (this.mode === "settling" && this.settlePhase && this.interaction) {
+      // Changed their mind while still sitting down: stop that activity and get up straight away.
+      if (!findPath(this.nav, { x: this.interaction.approach[0], z: this.interaction.approach[1] }, target)) return false;
+      const early = this.settlePhase === "slide";
+      this.game.cancel();
+      this.actionId = null;
+      this.tween = null;
+      this.wait = null;
+      this.settlePhase = null;
+      this.getUp(() => {
+        begin();
+      }, early);
+      return true;
+    }
+    if (this.mode === "settling" || this.mode === "leaving") {
+      if (!findPath(this.nav, { x: target.x, z: target.z }, { x: target.x, z: target.z })) return false;
+      this.queued = { target, interaction };
+      return true;
+    }
 
     if (this.mode === "doing") {
       // Check the way is clear before giving up the current activity.
@@ -151,7 +168,7 @@ export class CharacterController {
   }
 
   /** Stand back up from a seat, bed or the floor, then carry on. */
-  private getUp(then: () => void) {
+  private getUp(then: () => void, early = false) {
     const spot = this.interaction;
     this.mode = "leaving";
     this.setStatus(null, null);
@@ -173,8 +190,13 @@ export class CharacterController {
       this.waitFor(length || 0.1, () => leave(yaw + Math.PI));
     };
     if (spot && pose === "seat" && !this.onFloor) {
-      standUp(spot.yaw);
+      if (early) leave(spot.yaw + Math.PI);
+      else standUp(spot.yaw);
     } else if (spot?.edge && pose === "lie" && !this.onFloor) {
+      if (early) {
+        leave(spot.edge.yaw + Math.PI);
+        return;
+      }
       // Sit up on the edge of the bed first, then stand.
       const edge = spot.edge;
       this.setClip("Sitting_Idle_Loop");
@@ -199,7 +221,32 @@ export class CharacterController {
     this.tween = { t: 0, duration, from: this.position.clone(), to, fromYaw: this.yaw, toYaw, done };
   }
 
+  /** A switch: turn to face it, reach out with the real interact animation, and flip it halfway through. */
+  private beginToggle(interaction: Interaction) {
+    this.interaction = interaction;
+    this.actionId = null;
+    this.mode = "settling";
+    this.avatar.setSpeed(1);
+    this.setClip("Idle_Loop");
+    this.startTween(this.position.clone(), interaction.yaw, 0.3, () => {
+      const length = this.avatar.playOnce("Interact") || 0.8;
+      this.clip = "Interact";
+      this.waitFor(length * 0.45, () => {
+        this.onToggle?.(interaction.itemId);
+        this.waitFor(Math.max(0.2, length * 0.55), () => {
+          this.finishActivity();
+          this.mode = "idle";
+          this.setClip("Idle_Loop");
+        });
+      });
+    });
+  }
+
   private beginInteraction(interaction: Interaction) {
+    if (interaction.toggle) {
+      this.beginToggle(interaction);
+      return;
+    }
     const started = this.game.start(interaction.action);
     if (!started.ok) {
       this.game.notice(started.reason);
@@ -222,18 +269,23 @@ export class CharacterController {
     if (def.pose === "seat" && pose) {
       // Step in front of the seat, turn round, and sit down with the real sitting clip.
       this.setClip("Idle_Loop");
+      this.settlePhase = "slide";
       this.startTween(new THREE.Vector3(pose[0], 0, pose[2]), interaction.yaw, SLIDE_TIME, () => {
         this.position.y = pose[1];
+        this.settlePhase = "sit";
         const length = this.avatar.playOnce("Sitting_Enter");
         this.clip = "Sitting_Enter";
-        this.waitFor(length || 0.1, finish);
+        this.waitFor(length || 0.1, () => {
+          this.settlePhase = null;
+          finish();
+        });
       });
       return;
     }
     if (def.pose === "lie" && pose) {
       // Rest the body on the surface using the lowest point of the sleeping pose, so it lies on the mattress, not in it.
       const low = this.avatar.lowestPoint(def.clip) ?? 0;
-      const lie = new THREE.Vector3(pose[0], pose[1] - low + 0.01, pose[2]);
+      const lie = new THREE.Vector3(pose[0], pose[1] - low - 0.02, pose[2]);
       const lieDown = () => {
         this.setClip(def.clip);
         this.startTween(lie, interaction.yaw, 0.9, finish);
@@ -245,13 +297,18 @@ export class CharacterController {
       }
       // Walk up to the side of the bed, sit on its edge with the real sitting clip, then lie back.
       this.setClip("Idle_Loop");
+      this.settlePhase = "slide";
       this.startTween(new THREE.Vector3(edge.pose[0], 0, edge.pose[2]), edge.yaw, SLIDE_TIME, () => {
         this.position.y = edge.pose[1];
+        this.settlePhase = "sit";
         const length = this.avatar.playOnce("Sitting_Enter");
         this.clip = "Sitting_Enter";
         this.waitFor(length || 0.1, () => {
           this.setClip("Sitting_Idle_Loop");
-          this.waitFor(0.3, lieDown);
+          this.waitFor(0.3, () => {
+            this.settlePhase = null;
+            lieDown();
+          });
         });
       });
       return;
@@ -507,7 +564,7 @@ export class CharacterController {
 
   /** The placed item being used right now (so the furniture can react), or null. */
   get usingItem(): string | null {
-    if (!this.interaction) return null;
+    if (!this.interaction || this.interaction.toggle) return null;
     return this.mode === "doing" || this.mode === "settling" ? this.interaction.itemId : null;
   }
 

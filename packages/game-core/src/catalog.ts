@@ -22,10 +22,18 @@ export interface FurnitureDef {
   price: number;
   /** The game action performed with it (see ACTIONS), if any. Decorative pieces have none. */
   action?: string;
+  /** Can be switched on and off by tapping it (a lamp). */
+  toggle?: "light";
 }
 
-const item = (id: string, name: string, category: FurnitureCategory, price: number, action?: string): FurnitureDef =>
-  action ? { id, name, category, price, action } : { id, name, category, price };
+const item = (id: string, name: string, category: FurnitureCategory, price: number, action?: string, toggle?: "light"): FurnitureDef => ({
+  id,
+  name,
+  category,
+  price,
+  ...(action ? { action } : {}),
+  ...(toggle ? { toggle } : {}),
+});
 
 export const FURNITURE: FurnitureDef[] = [
   // ---- Seating
@@ -99,9 +107,9 @@ export const FURNITURE: FurnitureDef[] = [
   item("p_basin", "Washbasin", "bathroom", 52_000, "brush"),
   item("p_shower", "Shower cabin", "bathroom", 140_000, "shower"),
   // ---- Lighting
-  item("desk_lamp_arm_01", "Desk lamp", "lighting", 15_000),
-  item("vintage_oil_lamp", "Oil lamp", "lighting", 8_000),
-  item("p_floor_lamp", "Floor lamp", "lighting", 22_000),
+  item("desk_lamp_arm_01", "Desk lamp", "lighting", 15_000, undefined, "light"),
+  item("vintage_oil_lamp", "Oil lamp", "lighting", 8_000, undefined, "light"),
+  item("p_floor_lamp", "Floor lamp", "lighting", 22_000, undefined, "light"),
   // ---- Decor
   item("wall_clock", "Wall clock", "decor", 8_000),
   item("mantel_clock_01", "Mantel clock", "decor", 26_000),

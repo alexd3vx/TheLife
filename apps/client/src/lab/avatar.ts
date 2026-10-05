@@ -2,8 +2,8 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
-import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, type Look } from "./looks";
-import { readBodyRest, type BodyRest } from "./procedural/bodyRest";
+import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, sexOf, type Look } from "./looks";
+import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import { fabricTexture, type FabricId } from "./procedural/fabrics";
 import { buildGarment, isProceduralGarment } from "./procedural/garments";
 import { buildHair } from "./procedural/hair";
@@ -391,6 +391,7 @@ export class Avatar {
     for (const mesh of skinnedMeshesOf(clone)) {
       const sourceBones = mesh.skeleton.bones;
       const geometry = mesh.geometry.clone();
+      if (kind === "hair" && isRealistic(this.look.body)) this.fitHairToHead(geometry);
       const skinIndex = geometry.getAttribute("skinIndex") as THREE.BufferAttribute;
       const remap = sourceBones.map((bone) => bodyBones.findIndex((b) => b.name === bone.name));
       for (let i = 0; i < skinIndex.count; i++) {
@@ -419,6 +420,23 @@ export class Avatar {
     }
     this.bodyScene.add(group);
     return group;
+  }
+
+  /**
+   * The Quaternius hairstyles were modelled around the stylised head. Moves and scales one onto the realistic head
+   * (box to box, a little larger so tight caps such as the buzz cut cover the scalp instead of sinking into it).
+   */
+  private fitHairToHead(geometry: THREE.BufferGeometry): void {
+    const target = this.bodyRest ? headBox(this.bodyRest) : null;
+    if (!target) return;
+    const source = STYLISED_HEAD_BOX[sexOf(this.look.body)];
+    const sourceSize = source.getSize(new THREE.Vector3());
+    const targetSize = target.getSize(new THREE.Vector3());
+    const scale = new THREE.Vector3(targetSize.x / sourceSize.x, targetSize.y / sourceSize.y, targetSize.z / sourceSize.z).multiplyScalar(1.05);
+    const from = source.getCenter(new THREE.Vector3());
+    const to = target.getCenter(new THREE.Vector3());
+    const matrix = new THREE.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new THREE.Matrix4().makeScale(scale.x, scale.y, scale.z)).multiply(new THREE.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
+    geometry.applyMatrix4(matrix);
   }
 
   /** Hair generated in code and attached rigidly to the head bone. */
@@ -553,6 +571,9 @@ export class Avatar {
   lowestPoint(name: string, time = 0.5): number | null {
     const clip = this.clips.get(name);
     if (!clip || !this.bodyScene) return null;
+    // Start from the bind pose: bones this clip has no tracks for (the sleeping clip drops the legs) must not keep whatever
+    // pose the playing clip left them in, or the measurement describes a body that never exists.
+    this.skeleton?.pose();
     const mixer = new THREE.AnimationMixer(this.bodyScene);
     const action = mixer.clipAction(clip);
     action.play();
@@ -578,6 +599,25 @@ export class Avatar {
     action.stop();
     mixer.uncacheRoot(this.bodyScene);
     return Number.isFinite(lowest) ? lowest - this.root.position.y : null;
+  }
+
+  /** Where the body is right now in the world: lowest skin point and a few joints (for checking poses on furniture). */
+  worldStats(): { lowest: number; head: number; pelvis: number; foot: number; hand: number } | null {
+    if (!this.bodyMesh || !this.skeleton) return null;
+    this.root.updateMatrixWorld(true);
+    const mesh = this.bodyMesh;
+    mesh.skeleton.update();
+    const position = mesh.geometry.getAttribute("position");
+    const point = new THREE.Vector3();
+    const heights: number[] = [];
+    for (let i = 0; i < position.count; i += 2) {
+      mesh.getVertexPosition(i, point);
+      point.applyMatrix4(mesh.matrixWorld);
+      heights.push(point.y);
+    }
+    heights.sort((a, b) => a - b);
+    const y = (name: string) => this.skeleton!.bones.find((b) => b.name === name)?.getWorldPosition(new THREE.Vector3()).y ?? NaN;
+    return { lowest: heights[Math.floor(heights.length * 0.03)]!, head: y("Head"), pelvis: y("pelvis"), foot: y("foot_l"), hand: y("hand_l") };
   }
 
   stop(): void {

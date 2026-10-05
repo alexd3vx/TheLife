@@ -236,7 +236,9 @@ describe("absence and saving", () => {
     for (const def of Object.values(ACTIONS)) {
       expect(def.minutes).toBeGreaterThan(0);
       expect(def.minutesPerSecond).toBeGreaterThan(0);
-      expect(def.minutes / def.minutesPerSecond).toBeLessThan(25); // never more than ~25 real seconds
+      const seconds = def.minutes / def.minutesPerSecond;
+      expect(seconds).toBeLessThan(45); // a long activity is a time-lapse of at most ~45 real seconds
+      expect(seconds).toBeGreaterThanOrEqual(3); // and never so quick it can't be seen
     }
   });
 });

@@ -99,3 +99,14 @@
   .play-controls button { min-height: 40px; padding: 0 12px; font-size: .85rem; }
   .play-toasts { bottom: calc(112px + env(safe-area-inset-bottom)); }
 }
+
+/* Activity card: a progress ring only for the long, time-lapse activities (sleep, work, TV...) */
+.play-banner.is-doing { display: flex; align-items: center; gap: 12px; text-align: left; justify-items: unset; }
+.play-banner-text { display: grid; gap: 2px; }
+.play-ring { width: 40px; height: 40px; flex: none; transform: rotate(-90deg); }
+.play-ring circle { fill: none; stroke-width: 4; stroke-linecap: round; }
+.play-ring-track { stroke: rgba(255, 255, 255, .16); }
+.play-ring-fill { stroke: var(--accent); stroke-dasharray: 1; transition: stroke-dashoffset .5s linear; }
+.play-lapse { color: var(--accent-strong); font-size: .76rem; animation: play-pulse 1.8s ease-in-out infinite; }
+@keyframes play-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .play-lapse { animation: none; } }

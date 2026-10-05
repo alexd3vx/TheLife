@@ -16,6 +16,8 @@ export interface Interaction {
   id: string;
   itemId: string;
   action: string;
+  /** A switch (lamp) rather than an activity: no game action, it just flips the item's on/off state. */
+  toggle?: boolean;
   /** Where to stand to start (and where you stand again afterwards). */
   approach: [number, number];
   /** The direction the character faces while doing it (radians; 0 faces south, +z). */
@@ -39,6 +41,7 @@ export interface DerivedItem {
   /** Catalog category and default action. */
   category: string;
   action?: string;
+  toggle?: "light";
   meta: ModelMeta;
   group: THREE.Object3D;
   /** World box of this item, and of what it stands on (equal when it stands on the floor). */
@@ -131,7 +134,27 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok, boxOf?: (id: st
   for (const item of items) {
     const actionId = itemAction(item);
     const action = actionId ? ACTIONS[actionId] : undefined;
-    if (!actionId || !action) continue;
+    if ((!actionId || !action) && !item.toggle) continue;
+    if (!action) {
+      // A switch: stand in front of it, face it, flip it.
+      const rot = ((item.def.rot ?? 0) * Math.PI) / 180;
+      const f = { x: Math.sin(rot), z: Math.cos(rot) };
+      const r = { x: Math.cos(rot), z: -Math.sin(rot) };
+      const c = item.reach.getCenter(new THREE.Vector3());
+      const gap = (dx: number, dz: number) => extent(item.reach, dx, dz) + STAND_GAP;
+      const approach = firstOk(
+        [
+          [c.x + f.x * gap(f.x, f.z), c.z + f.z * gap(f.x, f.z)],
+          [c.x + r.x * gap(r.x, r.z), c.z + r.z * gap(r.x, r.z)],
+          [c.x - r.x * gap(r.x, r.z), c.z - r.z * gap(r.x, r.z)],
+          [c.x - f.x * gap(f.x, f.z), c.z - f.z * gap(f.x, f.z)],
+        ],
+        ok,
+      );
+      result.set(item.def.id, [{ id: item.def.id, itemId: item.def.id, action: "", toggle: true, approach, yaw: Math.atan2(c.x - approach[0], c.z - approach[1]), at: [c.x, c.z], look: [c.x, Math.min(item.reach.max.y, 1.3), c.z], hint: "Switch on or off" }]);
+      continue;
+    }
+    if (!actionId) continue;
 
     const rot = ((item.def.rot ?? 0) * Math.PI) / 180;
     const f = { x: Math.sin(rot), z: Math.cos(rot) }; // the way the front faces

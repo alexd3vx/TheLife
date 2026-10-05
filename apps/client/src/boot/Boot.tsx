@@ -14,6 +14,9 @@ const FEATURES = [
   { title: "Yours, on your device", text: "Your life saves on this device and the game plays offline." },
 ];
 
+/** The Alexion mark as one stroke, so the fill can trace along it as loading progresses. */
+const EMBLEM_PATH = "M20 84 L50 14 L80 84 M33 62 H67 M8 58 C30 96 70 96 92 58";
+
 const STEPS = ["Finding your assets", "Loading animations", "Setting up your home"];
 
 const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -208,8 +211,19 @@ export function Boot({ children }: { children: ReactNode }) {
                   </>
                 ) : (
                   <>
-                    <div className="boot-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={overall}>
-                      <span style={{ width: `${overall}%` }} />
+                    <div className="boot-emblem" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={overall}>
+                      <svg viewBox="0 0 100 100" aria-hidden="true">
+                        <defs>
+                          <linearGradient id="boot-fill" x1="0" y1="1" x2="1" y2="0">
+                            <stop offset="0" stopColor="#e8782a" />
+                            <stop offset="1" stopColor="#ffd27a" />
+                          </linearGradient>
+                        </defs>
+                        <path className="boot-emblem-track" pathLength="1" d={EMBLEM_PATH} />
+                        <path className="boot-emblem-fill" pathLength="1" d={EMBLEM_PATH} style={{ strokeDashoffset: 1 - overall / 100 }} />
+                        <circle className={`boot-emblem-dot${overall >= 100 ? " is-lit" : ""}`} cx="50" cy="14" r="4" />
+                      </svg>
+                      <span className="boot-emblem-num">{overall}%</span>
                     </div>
                     <div className="boot-status">
                       {phase === "welcome" || phase === "leaving" ? (

@@ -135,27 +135,39 @@ function sphere(centre: THREE.Vector3, r: [number, number, number], bump = 0): T
   return g;
 }
 
-/** Strands hanging from random scalp points (box braids, locs). */
+/**
+ * Strands (box braids, locs): each starts on the scalp, lies along the head's curve down to the ear line, then hangs.
+ * Roots stay clear of the face (|azimuth| > 60 degrees), so nothing falls across the eyes.
+ */
 function strands(h: Head, rng: Rng, o: { count: number; length: number; radius: number; wave: number; spread: number; radial: number }): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < o.count; i++) {
-    const u = rng.range(-Math.PI, Math.PI);
-    const c = Math.cos(u);
-    const vMin = c > 0.2 ? 0.95 - 0.35 * (1 - c) : 0.3;
-    const v = rng.range(vMin, 1.25);
-    const root = scalp(h, u, v, [1.03, 1.03, 1.03]);
-    const out = root.clone().sub(h.c).normalize();
-    const len = o.length * rng.range(0.85, 1.1);
-    const sway = rng.range(-1, 1) * o.wave;
-    const points = [root, root.clone().addScaledVector(out, 0.02)];
-    for (let k = 1; k <= 6; k++) {
-      const t = k / 6;
-      const p = root.clone().addScaledVector(out, 0.02 + 0.045 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.5) * o.spread);
-      p.y -= len * t * (0.9 + 0.2 * Math.sin(t * 2));
-      p.x += Math.sin(t * 6 + sway * 5) * 0.006 * (o.wave * 40);
-      points.push(p);
+    const side = rng.range(0, 1) < 0.5 ? -1 : 1;
+    const u = side * rng.range(1.05, Math.PI); // 60 degrees from straight ahead, round to the back
+    const v0 = rng.range(0.25, 1.3); // where on the head it starts: low at the ears, high near the crown
+    const phase = rng.range(0, Math.PI * 2);
+    const length = o.length * rng.range(0.85, 1.1);
+    const along = h.ry * v0 * 1.05; // length used lying on the scalp
+    const points: THREE.Vector3[] = [];
+    const steps = 9;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const travelled = t * length;
+      if (travelled <= along) {
+        const v = v0 * (1 - travelled / along);
+        points.push(scalp(h, u, v, [1.045 + 0.01 * o.spread, 1.045, 1.045 + 0.01 * o.spread]));
+      } else {
+        const rest = travelled - along;
+        const equator = scalp(h, u, 0, [1.05 + 0.012 * o.spread, 1, 1.05 + 0.012 * o.spread]);
+        const p = equator.clone();
+        p.y -= rest;
+        const flare = Math.min(1, rest / 0.12) * 0.012 * o.spread;
+        p.x += Math.sign(u * 0 + Math.sin(u)) * flare + Math.sin(rest * 24 + phase) * 0.003 * o.wave;
+        p.z += Math.cos(rest * 21 + phase) * 0.003 * o.wave - Math.cos(u) * 0.002;
+        points.push(p);
+      }
     }
-    parts.push(tube(points, o.radius, o.radial, 14, o.length * 6));
+    parts.push(tube(points, o.radius, o.radial, 22, o.length * 6));
   }
   return mergeGeometries(parts, false) ?? new THREE.BufferGeometry();
 }
@@ -185,31 +197,36 @@ function cornrows(h: Head, rng: Rng): THREE.BufferGeometry {
   return mergeGeometries(parts, false) ?? new THREE.BufferGeometry();
 }
 
-/** A wrapped head tie (gele): smooth wrap with folds and a fanned knot on top. */
+/** A wrapped head tie (gele): smooth folded wrap round the head, with a big soft knot tilted to one side on top. */
 function headWrap(h: Head): THREE.BufferGeometry {
-  const base = cap(h, { scale: [1.1, 1.08, 1.1], front: 0.78, side: 0.05, back: -0.25, bump: 0.002, uRepeat: 3 });
+  const base = cap(h, { scale: [1.07, 1.06, 1.07], front: 0.8, side: 0.1, back: -0.15, bump: 0.0015, uRepeat: 3 });
   const pos = base.getAttribute("position");
   for (let i = 0; i < pos.count; i++) {
     const p = new THREE.Vector3().fromBufferAttribute(pos, i);
     const radial = p.clone().sub(h.c);
-    const fold = Math.sin(Math.atan2(radial.x, radial.z) * 5 + radial.y * 70) * 0.006;
+    // soft diagonal folds, like cloth pulled across the head
+    const fold = Math.sin(radial.x * 70 + radial.y * 45 + radial.z * 30) * 0.004;
     p.addScaledVector(radial.normalize(), fold);
     pos.setXYZ(i, p.x, p.y, p.z);
   }
   base.computeVertexNormals();
 
   const parts: THREE.BufferGeometry[] = [base];
-  // A fan of tall folded flaps standing up from the crown, like a gele.
-  for (let i = 0; i < 7; i++) {
-    const k = i - 3;
-    const lift = h.ry * (1.15 + 0.5 * (1 - Math.abs(k) / 3.2));
-    const flap = sphere(
-      new THREE.Vector3(h.c.x + k * h.rx * 0.5, h.c.y + lift, h.c.z - h.rz * 0.1 + Math.abs(k) * 0.004),
-      [h.rx * 0.3, h.ry * (0.85 - Math.abs(k) * 0.07), h.rz * 0.34],
-      0.05,
-    );
-    parts.push(flap);
+  // A rolled band across the forehead and round the back, lifted a little at the front.
+  const band: THREE.Vector3[] = [];
+  for (let k = 0; k <= 36; k++) {
+    const u = (k / 36) * Math.PI * 2;
+    const tilt = 0.16 * Math.cos(u - 0.5); // higher at the front-right, lower at the back-left
+    band.push(scalp(h, u, 0.62 + tilt, [1.085, 1.075, 1.085]));
   }
+  band.push(band[0]!.clone());
+  parts.push(tube(band, 0.018, 8, 72, 4));
+  // The knot: two soft lobes and a centre fold, tipped toward the right.
+  const knotC = new THREE.Vector3(h.c.x + h.rx * 0.28, h.c.y + h.ry * 1.12, h.c.z + h.rz * 0.05);
+  const lobe = (dx: number, dy: number, rx: number, ry: number) => sphere(new THREE.Vector3(knotC.x + dx, knotC.y + dy, knotC.z), [rx, ry, h.rz * 0.3], 0.06);
+  parts.push(lobe(h.rx * 0.34, h.ry * 0.12, h.rx * 0.34, h.ry * 0.3));
+  parts.push(lobe(-h.rx * 0.3, h.ry * 0.05, h.rx * 0.3, h.ry * 0.26));
+  parts.push(lobe(h.rx * 0.02, h.ry * 0.14, h.rx * 0.16, h.ry * 0.22));
   return mergeGeometries(parts, false) ?? base;
 }
 
@@ -243,7 +260,7 @@ export function buildHair(rest: BodyRest, id: string, seed = 5): HairResult | nu
     }
     case "p_braids": {
       const under = cap(h, { scale: [1.03, 1.05, 1.04], front: 0.85, side: 0.3, back: -0.1, bump: 0 });
-      const braids = strands(h, rng, { count: 52, length: 0.34, radius: 0.0075, wave: 0.2, spread: 1, radial: 5 });
+      const braids = strands(h, rng, { count: 80, length: 0.38, radius: 0.0072, wave: 0.15, spread: 1, radial: 5 });
       geometry = mergeGeometries([under, braids], false) ?? under;
       texture = "strand";
       repeat = [1, 1];
@@ -251,7 +268,7 @@ export function buildHair(rest: BodyRest, id: string, seed = 5): HairResult | nu
     }
     case "p_locs": {
       const under = cap(h, { scale: [1.03, 1.05, 1.04], front: 0.85, side: 0.3, back: -0.1, bump: 0 });
-      const locs = strands(h, rng, { count: 44, length: 0.3, radius: 0.0105, wave: 0.6, spread: 1.3, radial: 6 });
+      const locs = strands(h, rng, { count: 56, length: 0.3, radius: 0.0105, wave: 0.5, spread: 1.2, radial: 6 });
       geometry = mergeGeometries([under, locs], false) ?? under;
       texture = "strand";
       repeat = [1, 1];

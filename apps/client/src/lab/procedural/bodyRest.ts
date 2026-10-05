@@ -46,3 +46,23 @@ export function jointPos(rest: BodyRest, name: string): THREE.Vector3 {
   if (!v) throw new Error(`Skeleton has no bone "${name}"`);
   return v;
 }
+
+/** The box around the skin the Head bone moves (the skull, face and jaw), in the mesh's local space. */
+export function headBox(rest: BodyRest): THREE.Box3 | null {
+  const head = rest.boneIndex.get("Head");
+  if (head === undefined) return null;
+  const position = rest.geometry.getAttribute("position");
+  const box = new THREE.Box3();
+  const point = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    if (rest.vertexBone[i] !== head) continue;
+    box.expandByPoint(point.fromBufferAttribute(position, i));
+  }
+  return box.isEmpty() ? null : box;
+}
+
+/** The same box for the stylised (Superhero) bodies the Quaternius hairstyles were modelled for. */
+export const STYLISED_HEAD_BOX: Record<"male" | "female", THREE.Box3> = {
+  male: new THREE.Box3(new THREE.Vector3(-0.091, 1.577, -0.106), new THREE.Vector3(0.091, 1.81, 0.115)),
+  female: new THREE.Box3(new THREE.Vector3(-0.089, 1.538, -0.113), new THREE.Vector3(0.089, 1.767, 0.112)),
+};

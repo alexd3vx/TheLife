@@ -35,6 +35,8 @@ export interface PlayRuntime {
     /** Placed items with what tapping them does (for the showroom tests). */
     items(): { id: string; furniture: string; action: string | null; seats: number; x: number; z: number; animated: boolean; approach: [number, number] | null; pose: [number, number, number] | null; topY: number }[];
     setHour(hour: number): void;
+    /** Is this lamp (or other switch) on? */
+    isOn(id: string): boolean;
     /** Runs the simulation faster than real time (tests on slow machines). */
     setSpeed(scale: number): void;
     /** Points the camera at a placed item. */
@@ -98,7 +100,11 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         notice: () => {},
         needs: () => ({ hunger: 100, energy: 100, hygiene: 100, bladder: 100, fun: 100 }),
       };
-  const controller = new CharacterController(avatar, world.nav, bridge, events.onStatus);
+  /** Items switched on by the player (lamps). */
+  const switchedOn = new Set<string>();
+  const controller = new CharacterController(avatar, world.nav, bridge, events.onStatus, (id) => {
+    if (!switchedOn.delete(id)) switchedOn.add(id);
+  });
   controller.place(layout.start.x, layout.start.z, layout.start.yaw);
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.3, 200);
@@ -247,7 +253,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   const placedById = new Map(world.items.map((i) => [i.def.id, i]));
   /** Everything that reacts to the character using one item: the item itself, and what it's linked to (a TV when you sit on the sofa). */
   function usingSet(): Set<string> {
-    const set = new Set<string>();
+    const set = new Set<string>(switchedOn);
     const id = controller.usingItem;
     if (!id) return set;
     set.add(id);
@@ -359,6 +365,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       setHour(hour) {
         showroomHour = hour;
       },
+      isOn: (id) => switchedOn.has(id),
       setSpeed(scale) {
         timeScale = scale;
       },
