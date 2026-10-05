@@ -56,6 +56,17 @@ Current library: 78 assets, ~5.3 MB total, all within budget.
 - The pack's bare-skin pieces (hands/forearms in a different skin texture) are dropped at build time; our own body shows there.
 - Per-piece triangle budget is 10,000 (long sleeves and boots are detailed). A full outfit is ~15–20k triangles on top of a ~15k body, so crowds will need a lower-detail path (Stage 3).
 
+## Procedural hair and clothing (made in code)
+
+The free packs have no African hairstyles and no modern clothing, so these are generated at runtime from the body itself (`apps/client/src/lab/procedural/`). No download, no licence, a few KB of code.
+
+- **Hair** (`hair.ts`): Low fade, Afro, Afro puffs, Cornrows, Box braids, Locs, Top bun, Head wrap. The cranium is measured from the body's own head vertices, so styles fit both bodies; hair is attached rigidly to the Head bone. Tinted by hair colour (the wrap takes any colour).
+- **Garments** (`garments.ts`, `geometryClip.ts`): T-shirt, Tank top, Long sleeve, Kaftan, Shorts, Trousers, Sneakers. Each is cut out of the body mesh with clean straight plane cuts (hems, sleeve ends, round neckline), pushed outward a few mm, and shares the body's skeleton and skin weights, so it deforms and animates with the body.
+- **Fabrics** (`fabrics.ts`): Plain, Stripes, Ankara print, Denim: tileable greyscale patterns tinted by the garment colour.
+- Per-garment colour and fabric are independent for top and bottom.
+
+Limits: garments are body-hugging plus a few mm (kaftan is looser but follows the legs, so it reads as a short dress); no skirts or long flowing garments (need cloth simulation or a skinned mesh made by an artist); braids/locs are rigid on the head, so they don't swing and may touch the shoulders; sneakers are a simple shell without a separate sole.
+
 ## Character system
 
 One shared 65-bone skeleton. A person is assembled from parts that are all bound to the body's skeleton **by bone name** at runtime (`apps/client/src/lab/avatar.ts`):

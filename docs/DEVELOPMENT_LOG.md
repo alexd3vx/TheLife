@@ -2,6 +2,12 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — African hairstyles and modern clothing (procedural)
+- Hair generated in code and rigidly attached to the head: low fade, afro, afro puffs, cornrows, box braids, locs, top bun, head wrap. Fits both bodies by measuring the body's own head.
+- Garments cut from the body mesh with plane clipping (`geometryClip.ts`): T-shirt, tank top, long sleeve, kaftan, shorts, trousers, sneakers. They share the body skeleton, so they animate correctly. Fabrics: plain, stripes, ankara print, denim, tinted by any of 13 colours.
+- Bugs found and fixed through browser testing: bone-based selection gave ragged shoulder/sleeve edges (replaced by pure plane cuts); a flat neck cut tore the shoulders (now a round neckline); face triangles leaked into the garment under the chin (head slab removed).
+- Known limits: no skirts/long flowing clothes, rigid braids, simple sneakers, wrap is a stylised fan. Still to do: Stage 2 (sit/sleep/eat animations), then the map.
+
 ## 2026-10-05 — Clothing in the Asset Lab
 - Added the CC0 Quaternius "Modular Character Outfits - Fantasy" (Peasant, Ranger; male/female). Pipeline now builds 20 clothing parts + shared textures (108 assets, 7.6 MB, all in budget; clothing budget 10k tris/piece).
 - Avatar: clothing attaches like hair (re-bound by bone name). Covered body triangles are removed at runtime so skin never pokes through. Sleeves follow the top; hood and shoulder guards optional.

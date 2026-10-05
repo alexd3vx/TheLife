@@ -3,8 +3,14 @@ import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { readBodyRest, type BodyRest } from "./procedural/bodyRest";
+import { fabricTexture, type FabricId } from "./procedural/fabrics";
+import { buildGarment, isProceduralGarment } from "./procedural/garments";
+import { buildHair } from "./procedural/hair";
+import { hairTexture } from "./procedural/hairTextures";
 
-type PartKind = "hair" | "clothing";
+/** hair/clothing come from glTF files; proc-* are generated in code from the body. */
+type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment";
 
 /** Body areas (by bone) that a garment covers; those triangles are removed from the skin mesh so skin never pokes through. */
 const COVERED_BONES: Record<string, string[]> = {
@@ -46,6 +52,7 @@ export class Avatar {
   private bodyMesh: THREE.SkinnedMesh | null = null;
   private originalIndex: ArrayLike<number> | null = null;
   private vertexBone: Uint16Array | null = null;
+  private bodyRest: BodyRest | null = null;
   private partRoots = new Map<string, THREE.Object3D>();
   private mixer: THREE.AnimationMixer | null = null;
   private currentAction: THREE.AnimationAction | null = null;
@@ -135,7 +142,9 @@ export class Avatar {
     if (patch.brows !== undefined) this.applyBuiltInBrows();
     if (patch.outfitVariant !== undefined || patch.topColor !== undefined || patch.bottomColor !== undefined || patch.shoesColor !== undefined) {
       await this.applyOutfitTextures();
+      this.applyProceduralMaterials();
     }
+    if (patch.topFabric !== undefined || patch.bottomFabric !== undefined) this.applyProceduralMaterials();
     await this.syncParts();
   }
 
@@ -172,7 +181,7 @@ export class Avatar {
     const tint = new THREE.Color(swatch.color);
     for (const brow of this.builtInBrows) eachMaterial(brow, (m) => m.color.copy(tint));
     for (const part of this.partRoots.values()) {
-      if (part.userData.kind === "hair") eachMaterial(part, (m) => m.color.copy(tint));
+      if (part.userData.kind === "hair" || part.userData.kind === "proc-hair") eachMaterial(part, (m) => m.color.copy(tint));
     }
   }
 
@@ -181,6 +190,7 @@ export class Avatar {
   private prepareBodyMask(): void {
     this.originalIndex = null;
     this.vertexBone = null;
+    this.bodyRest = null;
     const mesh = this.bodyMesh;
     if (!mesh || !mesh.geometry.index) return;
     // The geometry is shared with the loader cache, so edit our own copy.
@@ -204,6 +214,7 @@ export class Avatar {
       dominant[v] = best;
     }
     this.vertexBone = dominant;
+    this.bodyRest = readBodyRest(mesh, mesh.geometry.clone(), dominant);
   }
 
   private updateBodyMask(): void {
@@ -211,13 +222,10 @@ export class Avatar {
     if (!mesh || !this.skeleton || !this.originalIndex || !this.vertexBone) return;
 
     const hiddenBoneNames = new Set<string>();
-    const covered = (slot: string, on: boolean) => {
-      if (on) for (const name of COVERED_BONES[slot] ?? []) hiddenBoneNames.add(name);
-    };
-    covered("top", this.partRoots.has("top"));
-    covered("sleeves", this.partRoots.has("sleeves"));
-    covered("bottom", this.partRoots.has("bottom"));
-    covered("shoes", this.partRoots.has("shoes"));
+    for (const [slot, part] of this.partRoots) {
+      const covers = (part.userData.covers as string[] | undefined) ?? COVERED_BONES[slot] ?? [];
+      for (const name of covers) hiddenBoneNames.add(name);
+    }
 
     const hidden = new Set<number>();
     this.skeleton.bones.forEach((bone, i) => {
@@ -248,16 +256,17 @@ export class Avatar {
     const { body, top, bottom, shoes, hood, pauldrons } = this.look;
     const clothing = (outfit: string | null, slot: string) => {
       if (!outfit) return null;
+      if (isProceduralGarment(outfit)) return slot === "top" || slot === "bottom" || slot === "shoes" ? { id: outfit, kind: "proc-garment" as const } : null;
       const id = `${body}_${outfit}_${slot}`;
       return this.find(id) ? { id, kind: "clothing" as const } : null;
     };
-    const hair = (id: string | null) => (id ? { id, kind: "hair" as const } : null);
+    const hair = (id: string | null) => (id ? { id, kind: id.startsWith("p_") ? ("proc-hair" as const) : ("hair" as const) } : null);
     return {
       hair: hair(this.look.hair),
       facial: hair(this.look.beard ? "beard" : null),
       brows: hair(this.look.brows),
       top: clothing(top, "top"),
-      sleeves: clothing(top, "sleeves"),
+      sleeves: isProceduralGarment(top) ? null : clothing(top, "sleeves"),
       bottom: clothing(bottom, "bottom"),
       shoes: clothing(shoes, "shoes"),
       hood: hood ? clothing("ranger", "hood") : null,
@@ -283,11 +292,14 @@ export class Avatar {
     }
     this.applyHairColor();
     await this.applyOutfitTextures();
+    this.applyProceduralMaterials();
     this.updateBodyMask();
   }
 
   private async buildPart(id: string, kind: PartKind): Promise<THREE.Object3D | null> {
     if (!this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
+    if (kind === "proc-hair") return this.buildProceduralHair(id);
+    if (kind === "proc-garment") return this.buildProceduralGarment(id);
     const record = this.asset(id);
     const gltf = await loadGLTF(assetUrl(record.file));
     const clone = SkeletonUtils.clone(gltf.scene);
@@ -329,6 +341,69 @@ export class Avatar {
     }
     this.bodyScene.add(group);
     return group;
+  }
+
+  /** Hair generated in code and attached rigidly to the head bone. */
+  private buildProceduralHair(id: string): THREE.Object3D | null {
+    const rest = this.bodyRest;
+    const headBone = this.skeleton?.bones.find((b) => b.name === "Head");
+    if (!rest || !headBone) return null;
+    const result = buildHair(rest, id);
+    if (!result) return null;
+    const material = new THREE.MeshStandardMaterial({
+      map: hairTexture(result.texture, result.repeat),
+      roughness: result.texture === "wrap" ? 0.7 : 0.95,
+      side: THREE.DoubleSide,
+    });
+    material.bumpMap = material.map;
+    material.bumpScale = result.texture === "wrap" ? 0.6 : 2.5;
+    const mesh = new THREE.Mesh(result.geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    const group = new THREE.Group();
+    group.userData.assetId = id;
+    group.userData.kind = "proc-hair";
+    group.add(mesh);
+    headBone.add(group);
+    return group;
+  }
+
+  /** A garment cut from the body mesh, so it shares the body's skeleton and deforms with it. */
+  private buildProceduralGarment(id: string): THREE.Object3D | null {
+    if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
+    const result = buildGarment(this.bodyRest, id);
+    if (!result) return null;
+    const material = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+    const skinned = new THREE.SkinnedMesh(result.geometry, material);
+    skinned.frustumCulled = false;
+    skinned.castShadow = true;
+    skinned.receiveShadow = true;
+    skinned.bind(this.skeleton, this.bodyMesh.bindMatrix);
+    const group = new THREE.Group();
+    group.userData.assetId = id;
+    group.userData.kind = "proc-garment";
+    group.userData.slot = result.slot;
+    group.userData.covers = result.covers;
+    group.add(skinned);
+    this.bodyScene.add(group);
+    return group;
+  }
+
+  /** Fabric pattern and colour for procedural garments. */
+  private applyProceduralMaterials(): void {
+    for (const part of this.partRoots.values()) {
+      if (part.userData.kind !== "proc-garment") continue;
+      const slot = part.userData.slot as string;
+      const fabric = (slot === "bottom" ? this.look.bottomFabric : slot === "top" ? this.look.topFabric : "plain") as FabricId;
+      const colour = CLOTH_COLORS.find((c) => c.id === this.colourFor(slot));
+      const texture = fabricTexture(fabric);
+      eachMaterial(part, (material) => {
+        material.map = texture;
+        material.color.set(colour?.color ?? "#ffffff");
+        material.needsUpdate = true;
+      });
+    }
   }
 
   /** Which colour setting a garment slot follows. Sleeves, hood and shoulder guards match the top. */

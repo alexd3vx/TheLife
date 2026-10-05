@@ -59,6 +59,13 @@ export const CLOTH_COLORS: Swatch[] = [
   { id: "grey", label: "Grey", color: "#8b8f96" },
 ];
 
+export const FABRIC_OPTIONS = [
+  { id: "plain", label: "Plain" },
+  { id: "stripes", label: "Stripes" },
+  { id: "ankara", label: "Ankara print" },
+  { id: "denim", label: "Denim" },
+] as const;
+
 export type Sex = "male" | "female";
 
 export interface Look {
@@ -80,23 +87,27 @@ export interface Look {
   topColor: string | null;
   bottomColor: string | null;
   shoesColor: string | null;
+  topFabric: string;
+  bottomFabric: string;
 }
 
 export const DEFAULT_LOOK: Look = {
   body: "male",
   skinTone: "deep",
-  hair: "hair_buzzed",
+  hair: "p_fade",
   hairColor: "black",
   beard: false,
   brows: null,
   eyeColor: "brown",
-  top: "peasant",
-  bottom: "peasant",
-  shoes: "peasant",
+  top: "p_tee",
+  bottom: "p_trousers",
+  shoes: "p_sneakers",
   hood: false,
   pauldrons: false,
   outfitVariant: "a",
   topColor: "sky",
   bottomColor: "khaki",
   shoesColor: "black",
+  topFabric: "plain",
+  bottomFabric: "plain",
 };

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Avatar } from "./avatar";
 import { loadGLTF } from "./loaders";
-import { CLOTH_COLORS, DEFAULT_LOOK, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { CLOTH_COLORS, DEFAULT_LOOK, EYE_COLORS, FABRIC_OPTIONS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { PROC_BOTTOMS, PROC_SHOES, PROC_TOPS } from "./procedural/garments";
+import { PROC_HAIR } from "./procedural/hair";
 import { assetUrl, loadManifest, type AssetManifest, type AssetRecord } from "./manifest";
 import { createViewer, LIGHTING_LABELS, type LightingName, type Viewer, type ViewerStats } from "./viewer";
 import "./lab.css";
@@ -150,17 +152,19 @@ export default function LabPage() {
   const randomise = useCallback(() => {
     const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
     const body = pick(["male", "female"] as const);
-    const hairs = (manifest?.assets ?? []).filter((a) => a.slot === "hair");
+    const hairs = [...PROC_HAIR, ...(manifest?.assets ?? []).filter((a) => a.slot === "hair")];
     updateLook({
       body,
       skinTone: pick(SKIN_TONES).id,
-      hair: Math.random() < 0.12 ? null : pick(hairs).id,
+      hair: Math.random() < 0.08 ? null : pick(hairs).id,
       hairColor: pick(HAIR_COLORS).id,
       beard: body === "male" && Math.random() < 0.35,
       eyeColor: pick(EYE_COLORS).id,
-      top: pick([null, "peasant", "ranger"] as const),
-      bottom: pick([null, "peasant", "ranger"] as const),
-      shoes: pick([null, "peasant", "ranger"] as const),
+      top: pick(["p_tee", "p_tank", "p_long", "p_kaftan", "peasant", "ranger"] as const),
+      bottom: pick(["p_shorts", "p_trousers", "peasant", "ranger"] as const),
+      shoes: pick(["p_sneakers", "peasant", "ranger"] as const),
+      topFabric: pick(FABRIC_OPTIONS).id,
+      bottomFabric: pick(FABRIC_OPTIONS).id,
       hood: Math.random() < 0.15,
       pauldrons: Math.random() < 0.15,
       outfitVariant: pick(["a", "b"] as const),
@@ -326,6 +330,11 @@ function CharacterControls(props: CharacterControlsProps) {
           <button aria-pressed={look.hair === null} onClick={() => onLook({ hair: null })}>
             None
           </button>
+          {PROC_HAIR.map((hair) => (
+            <button key={hair.id} aria-pressed={look.hair === hair.id} onClick={() => onLook({ hair: hair.id })}>
+              {hair.label}
+            </button>
+          ))}
           {hairStyles.map((hair) => (
             <button key={hair.id} aria-pressed={look.hair === hair.id} onClick={() => onLook({ hair: hair.id })}>
               {hair.label}
@@ -382,23 +391,42 @@ function CharacterControls(props: CharacterControlsProps) {
         <h3>Clothing</h3>
         {(
           [
-            ["top", "Top"],
-            ["bottom", "Bottom"],
-            ["shoes", "Shoes"],
+            ["top", "Top", PROC_TOPS],
+            ["bottom", "Bottom", PROC_BOTTOMS],
+            ["shoes", "Shoes", PROC_SHOES],
           ] as const
-        ).map(([slot, label]) => (
+        ).map(([slot, label, procedural]) => (
           <div key={slot}>
             <h4>{label}</h4>
             <div className="lab-chips">
               <button aria-pressed={look[slot] === null} onClick={() => onLook({ [slot]: null })}>
                 None
               </button>
+              {procedural.map((item) => (
+                <button key={item.id} aria-pressed={look[slot] === item.id} onClick={() => onLook({ [slot]: item.id })}>
+                  {item.label}
+                </button>
+              ))}
               {outfitIds.map((id) => (
                 <button key={id} aria-pressed={look[slot] === id} onClick={() => onLook({ [slot]: id })}>
                   {outfits[id]?.label ?? id}
                 </button>
               ))}
             </div>
+            {slot !== "shoes" && (
+              <div className="lab-chips">
+                {FABRIC_OPTIONS.map((fabric) => (
+                  <button
+                    key={fabric.id}
+                    className="lab-chip-small"
+                    aria-pressed={look[`${slot}Fabric`] === fabric.id}
+                    onClick={() => onLook({ [`${slot}Fabric`]: fabric.id })}
+                  >
+                    {fabric.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="lab-swatches lab-swatches-small">
               <button
                 className="lab-swatch lab-swatch-original"

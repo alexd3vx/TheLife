@@ -77,3 +77,4 @@
 
 .lab .lab-swatches-small .lab-swatch { width: 28px; height: 28px; }
 .lab .lab-swatch-original { font-size: .8rem; background: var(--surface-2); color: var(--text-muted); }
+.lab .lab-chips .lab-chip-small { min-height: 30px; font-size: .78rem; padding: 0 9px; }
