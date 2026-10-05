@@ -22,16 +22,17 @@ const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, Promise<THREE.Texture>>();
 
 /** Loads an image the way glTF textures are stored (no vertical flip, sRGB). */
-export function loadGltfTexture(url: string): Promise<THREE.Texture> {
-  let pending = textureCache.get(url);
+export function loadGltfTexture(url: string, colorSpace: string = THREE.SRGBColorSpace): Promise<THREE.Texture> {
+  const key = `${colorSpace}|${url}`;
+  let pending = textureCache.get(key);
   if (!pending) {
     pending = textureLoader.loadAsync(url).then((texture) => {
       texture.flipY = false;
-      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.colorSpace = colorSpace;
       texture.anisotropy = 8;
       return texture;
     });
-    textureCache.set(url, pending);
+    textureCache.set(key, pending);
   }
   return pending;
 }

@@ -26,6 +26,7 @@ fetch_kenney() { # slug zip-url
 # Quaternius (CC0)
 fetch_itch quaternius universal-base-characters base-characters
 fetch_itch quaternius universal-animation-library animation-library
+fetch_itch quaternius modular-character-outfits-fantasy outfits
 
 # Kenney (CC0)
 fetch_kenney furniture-kit "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip"

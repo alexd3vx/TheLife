@@ -74,3 +74,6 @@
   .lab-footer .lab-field { grid-column: 1 / -1; }
   .lab-buttons { grid-column: 1 / -1; }
 }
+
+.lab .lab-swatches-small .lab-swatch { width: 28px; height: 28px; }
+.lab .lab-swatch-original { font-size: .8rem; background: var(--surface-2); color: var(--text-muted); }

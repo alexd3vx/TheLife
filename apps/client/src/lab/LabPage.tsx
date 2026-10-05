@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Avatar } from "./avatar";
 import { loadGLTF } from "./loaders";
-import { DEFAULT_LOOK, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { CLOTH_COLORS, DEFAULT_LOOK, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
 import { assetUrl, loadManifest, type AssetManifest, type AssetRecord } from "./manifest";
 import { createViewer, LIGHTING_LABELS, type LightingName, type Viewer, type ViewerStats } from "./viewer";
 import "./lab.css";
@@ -158,6 +158,15 @@ export default function LabPage() {
       hairColor: pick(HAIR_COLORS).id,
       beard: body === "male" && Math.random() < 0.35,
       eyeColor: pick(EYE_COLORS).id,
+      top: pick([null, "peasant", "ranger"] as const),
+      bottom: pick([null, "peasant", "ranger"] as const),
+      shoes: pick([null, "peasant", "ranger"] as const),
+      hood: Math.random() < 0.15,
+      pauldrons: Math.random() < 0.15,
+      outfitVariant: pick(["a", "b"] as const),
+      topColor: pick(CLOTH_COLORS).id,
+      bottomColor: pick(CLOTH_COLORS).id,
+      shoesColor: pick(CLOTH_COLORS).id,
     });
   }, [manifest, updateLook]);
 
@@ -213,6 +222,7 @@ export default function LabPage() {
               look={look}
               hairStyles={hairStyles}
               brows={brows}
+              outfits={manifest?.outfits ?? {}}
               clips={clips}
               clip={clip}
               speed={speed}
@@ -264,6 +274,7 @@ interface CharacterControlsProps {
   look: Look;
   hairStyles: AssetRecord[];
   brows: AssetRecord[];
+  outfits: AssetManifest["outfits"];
   clips: string[];
   clip: string | null;
   speed: number;
@@ -274,7 +285,8 @@ interface CharacterControlsProps {
 }
 
 function CharacterControls(props: CharacterControlsProps) {
-  const { look, hairStyles, brows, clips, clip, speed, onLook, onClip, onSpeed, onRandom } = props;
+  const { look, hairStyles, brows, outfits, clips, clip, speed, onLook, onClip, onSpeed, onRandom } = props;
+  const outfitIds = Object.keys(outfits);
   return (
     <div className="lab-section-stack">
       <section>
@@ -362,6 +374,68 @@ function CharacterControls(props: CharacterControlsProps) {
               style={{ background: swatch.id === "brown" ? "#5b3a1e" : swatch.color }}
               onClick={() => onLook({ eyeColor: swatch.id })}
             />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3>Clothing</h3>
+        {(
+          [
+            ["top", "Top"],
+            ["bottom", "Bottom"],
+            ["shoes", "Shoes"],
+          ] as const
+        ).map(([slot, label]) => (
+          <div key={slot}>
+            <h4>{label}</h4>
+            <div className="lab-chips">
+              <button aria-pressed={look[slot] === null} onClick={() => onLook({ [slot]: null })}>
+                None
+              </button>
+              {outfitIds.map((id) => (
+                <button key={id} aria-pressed={look[slot] === id} onClick={() => onLook({ [slot]: id })}>
+                  {outfits[id]?.label ?? id}
+                </button>
+              ))}
+            </div>
+            <div className="lab-swatches lab-swatches-small">
+              <button
+                className="lab-swatch lab-swatch-original"
+                title="Original colours"
+                aria-label={`${label} original colours`}
+                aria-pressed={look[`${slot}Color`] === null}
+                onClick={() => onLook({ [`${slot}Color`]: null })}
+              >
+                ∅
+              </button>
+              {CLOTH_COLORS.map((swatch) => (
+                <button
+                  key={swatch.id}
+                  className="lab-swatch"
+                  title={swatch.label}
+                  aria-label={`${label} ${swatch.label}`}
+                  aria-pressed={look[`${slot}Color`] === swatch.id}
+                  style={{ background: swatch.color }}
+                  onClick={() => onLook({ [`${slot}Color`]: swatch.id })}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+        <h4>Extras</h4>
+        <label className="lab-check">
+          <input type="checkbox" checked={look.hood} onChange={(e) => onLook({ hood: e.target.checked })} /> Hood
+        </label>
+        <label className="lab-check">
+          <input type="checkbox" checked={look.pauldrons} onChange={(e) => onLook({ pauldrons: e.target.checked })} /> Shoulder guards
+        </label>
+        <h4>Original colour set (when no colour chosen)</h4>
+        <div className="lab-chips">
+          {(outfits[look.top ?? look.bottom ?? outfitIds[0] ?? ""]?.variants ?? [{ id: "a", label: "Set 1" }]).map((v, i) => (
+            <button key={v.id} aria-pressed={look.outfitVariant === v.id} onClick={() => onLook({ outfitVariant: v.id })}>
+              Set {i + 1}
+            </button>
           ))}
         </div>
       </section>

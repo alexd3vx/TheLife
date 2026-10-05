@@ -43,6 +43,22 @@ export const EYE_COLORS: Swatch[] = [
   { id: "grey", label: "Grey", color: "#c9d2dc" },
 ];
 
+export const CLOTH_COLORS: Swatch[] = [
+  { id: "white", label: "White", color: "#f4f1ea" },
+  { id: "black", label: "Black", color: "#26262a" },
+  { id: "navy", label: "Navy", color: "#223a6b" },
+  { id: "sky", label: "Sky blue", color: "#5a9bd8" },
+  { id: "green", label: "Green", color: "#2f8a4c" },
+  { id: "yellow", label: "Yellow", color: "#f0b92a" },
+  { id: "orange", label: "Orange", color: "#e2762a" },
+  { id: "red", label: "Red", color: "#c8372d" },
+  { id: "pink", label: "Pink", color: "#e0679b" },
+  { id: "purple", label: "Purple", color: "#7b45a8" },
+  { id: "teal", label: "Teal", color: "#1f8f8a" },
+  { id: "khaki", label: "Khaki", color: "#b7a56f" },
+  { id: "grey", label: "Grey", color: "#8b8f96" },
+];
+
 export type Sex = "male" | "female";
 
 export interface Look {
@@ -53,6 +69,17 @@ export interface Look {
   beard: boolean;
   brows: string | null;
   eyeColor: string;
+  /** Outfit ids (see manifest.outfits), or null for bare. */
+  top: string | null;
+  bottom: string | null;
+  shoes: string | null;
+  hood: boolean;
+  pauldrons: boolean;
+  outfitVariant: string;
+  /** Garment colours (CLOTH_COLORS ids); null keeps the outfit's own texture colours. */
+  topColor: string | null;
+  bottomColor: string | null;
+  shoesColor: string | null;
 }
 
 export const DEFAULT_LOOK: Look = {
@@ -63,4 +90,13 @@ export const DEFAULT_LOOK: Look = {
   beard: false,
   brows: null,
   eyeColor: "brown",
+  top: "peasant",
+  bottom: "peasant",
+  shoes: "peasant",
+  hood: false,
+  pauldrons: false,
+  outfitVariant: "a",
+  topColor: "sky",
+  bottomColor: "khaki",
+  shoesColor: "black",
 };

@@ -10,6 +10,7 @@ Every third-party asset is CC0 (public domain). Credit is not required but is sh
 |------|--------|---------|-------------|
 | [Universal Base Characters (Standard)](https://quaternius.com/packs/universalbasecharacters.html) | Quaternius | CC0 1.0 | 2 rigged bodies (male/female), 5 hairstyles, beard, 2 eyebrow sets, skin + eye textures |
 | [Universal Animation Library (Standard)](https://quaternius.com/packs/universalanimationlibrary.html) | Quaternius | CC0 1.0 | 43 animation clips on the same skeleton |
+| [Modular Character Outfits - Fantasy (Standard)](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Quaternius | CC0 1.0 | 2 outfits (Peasant, Ranger) × male/female: top, sleeves, bottom, shoes, hood, shoulder guards; shared textures |
 | [Furniture Kit 2.0](https://kenney.nl/assets/furniture-kit) | Kenney | CC0 1.0 | 52 furniture/structure pieces |
 | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 1.0 | 12 vehicles |
 
@@ -46,6 +47,15 @@ What the build does to each model: dedupe/prune, textures → WebP (1024 px for 
 
 Current library: 78 assets, ~5.3 MB total, all within budget.
 
+## Clothing
+
+- Parts come from the Quaternius outfits pack (same skeleton as the base characters) and are attached exactly like hair: re-bound to the body skeleton by bone name.
+- **No poke-through:** when a garment is worn, the body triangles it covers (chosen by dominant bone: torso, hips/legs, feet, upper arms) are removed from the skin mesh at runtime.
+- **Textures are shipped once per outfit**, not per part. Parts are exported without textures and the shared set is applied at runtime (base colour, normal, ORM).
+- **Any colour:** each outfit also has a neutral (greyscale, brightened) base texture; Top / Bottom / Shoes can be tinted with 13 colours while keeping stitching and folds. Sleeves, hood and shoulder guards follow the top colour.
+- The pack's bare-skin pieces (hands/forearms in a different skin texture) are dropped at build time; our own body shows there.
+- Per-piece triangle budget is 10,000 (long sleeves and boots are detailed). A full outfit is ~15–20k triangles on top of a ~15k body, so crowds will need a lower-detail path (Stage 3).
+
 ## Character system
 
 One shared 65-bone skeleton. A person is assembled from parts that are all bound to the body's skeleton **by bone name** at runtime (`apps/client/src/lab/avatar.ts`):
@@ -66,11 +76,13 @@ One shared 65-bone skeleton. A person is assembled from parts that are all bound
 
 - **Skinned meshes + quantization:** glTF-Transform's quantization hides its decompression scale in the skeleton's inverse-bind matrices. Re-binding hair to the body's skeleton lost that, making hair giant. People/hair are therefore compressed without quantization.
 - **Missing textures in the pack:** the Quaternius glTF files reference `T_Hair_1_Normal_png.png` / `T_Eye_Normal_png.png`, which the pack doesn't ship. The build aliases them.
-- **Free pack limits:** the Standard (free) base characters only include the two "Superhero" proportions and 5 hairstyles. No afro, braids, locs or wraps, and no clothes — those are the next assets to create (see below).
+- **Free pack limits:** the Standard (free) base characters only include the two "Superhero" proportions and 5 hairstyles. No afro, braids, locs or wraps. The free outfits are only Peasant and Ranger.
+- **sharp ignores call order:** libvips applies operations in its own fixed order, so a `normalise` after a `linear` undid the brightening. Use one explicit `linear` and verify the result with `sharp(...).stats()`.
+- **The outfit atlas is dark (mean ~56/255)** and relies on scene lighting, so the neutral texture needs a ~3.3× lift for tints to read true.
 
 ## Known gaps / next assets
 
-- **Clothing** (tops, bottoms, dresses, shoes, Nigerian fashion) — none in the free pack.
+- **Modern / Nigerian clothing** — the free outfits are medieval-fantasy (tunic, trousers, boots). Colours help (a tunic reads as a casual shirt), but we still need T-shirts, shorts, dresses, skirts, agbada/kaftan, ankara prints, head wraps, trainers and sandals.
 - **African hairstyles** (afro, braids, locs, twists, fades, head wraps).
 - **Face variety** — one face shape per body today; add bone/shape variation.
 - **Style match** — Kenney props/cars are cartoon low-poly while characters are semi-realistic. Decide on one direction (restyle props with a shared palette/material pass, or source a more realistic kit) before building the map.

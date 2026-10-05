@@ -2,12 +2,20 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
-import { EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
 
-type SkinnedMeshes = THREE.SkinnedMesh[];
+type PartKind = "hair" | "clothing";
 
-function skinnedMeshesOf(root: THREE.Object3D): SkinnedMeshes {
-  const meshes: SkinnedMeshes = [];
+/** Body areas (by bone) that a garment covers; those triangles are removed from the skin mesh so skin never pokes through. */
+const COVERED_BONES: Record<string, string[]> = {
+  top: ["spine_01", "spine_02", "spine_03", "clavicle_l", "clavicle_r"],
+  sleeves: ["upperarm_l", "upperarm_r"],
+  bottom: ["pelvis", "thigh_l", "thigh_r", "calf_l", "calf_r"],
+  shoes: ["foot_l", "foot_r", "ball_l", "ball_r", "ball_leaf_l", "ball_leaf_r"],
+};
+
+function skinnedMeshesOf(root: THREE.Object3D): THREE.SkinnedMesh[] {
+  const meshes: THREE.SkinnedMesh[] = [];
   root.traverse((child) => {
     if ((child as THREE.SkinnedMesh).isSkinnedMesh) meshes.push(child as THREE.SkinnedMesh);
   });
@@ -19,9 +27,16 @@ function materialsOf(mesh: THREE.Mesh): THREE.MeshStandardMaterial[] {
   return list.filter((m): m is THREE.MeshStandardMaterial => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial);
 }
 
+function eachMaterial(root: THREE.Object3D, fn: (material: THREE.MeshStandardMaterial) => void) {
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh) for (const material of materialsOf(mesh)) fn(material);
+  });
+}
+
 /**
  * A customisable, animatable person built from separate glTF parts that all share one skeleton:
- * body (skin, eyes, brows) + hair + facial hair. Parts are bound to the body's skeleton by bone name,
+ * body (skin, eyes, brows) + hair + clothing. Parts are bound to the body's skeleton by bone name,
  * so any animation clip made for that skeleton plays on every combination.
  */
 export class Avatar {
@@ -29,6 +44,8 @@ export class Avatar {
   private bodyScene: THREE.Object3D | null = null;
   private skeleton: THREE.Skeleton | null = null;
   private bodyMesh: THREE.SkinnedMesh | null = null;
+  private originalIndex: ArrayLike<number> | null = null;
+  private vertexBone: Uint16Array | null = null;
   private partRoots = new Map<string, THREE.Object3D>();
   private mixer: THREE.AnimationMixer | null = null;
   private currentAction: THREE.AnimationAction | null = null;
@@ -53,8 +70,12 @@ export class Avatar {
     return [...this.clips.keys()];
   }
 
+  private find(id: string): AssetRecord | undefined {
+    return this.manifest.assets.find((a) => a.id === id);
+  }
+
   private asset(id: string): AssetRecord {
-    const record = this.manifest.assets.find((a) => a.id === id);
+    const record = this.find(id);
     if (!record) throw new Error(`Unknown asset: ${id}`);
     return record;
   }
@@ -82,6 +103,7 @@ export class Avatar {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     }
+    this.prepareBodyMask();
 
     this.mixer = new THREE.AnimationMixer(this.bodyScene);
     this.currentAction = null;
@@ -111,34 +133,32 @@ export class Avatar {
     if (patch.eyeColor !== undefined) this.applyEyes();
     if (patch.hairColor !== undefined) this.applyHairColor();
     if (patch.brows !== undefined) this.applyBuiltInBrows();
-    if (patch.hair !== undefined || patch.beard !== undefined || patch.brows !== undefined) await this.syncParts();
+    if (patch.outfitVariant !== undefined || patch.topColor !== undefined || patch.bottomColor !== undefined || patch.shoesColor !== undefined) {
+      await this.applyOutfitTextures();
+    }
+    await this.syncParts();
   }
+
+  // ------------------------------------------------------------------ skin, eyes, brows
 
   private async applySkin(): Promise<void> {
     if (!this.bodyScene) return;
     const tone = SKIN_TONES.find((t) => t.id === this.look.skinTone) ?? SKIN_TONES[0]!;
     const lightMap = tone.map === "light" ? await loadGltfTexture(assetUrl(`characters/skin_${this.look.body}_light.webp`)) : null;
-    this.bodyScene.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      for (const material of materialsOf(mesh)) {
-        if (!/superhero/i.test(material.name)) continue;
-        material.userData.darkMap ??= material.map;
-        material.map = lightMap ?? (material.userData.darkMap as THREE.Texture | null);
-        material.color.set(tone.tint);
-        material.needsUpdate = true;
-      }
+    eachMaterial(this.bodyScene, (material) => {
+      if (!/superhero/i.test(material.name)) return;
+      material.userData.darkMap ??= material.map;
+      material.map = lightMap ?? (material.userData.darkMap as THREE.Texture | null);
+      material.color.set(tone.tint);
+      material.needsUpdate = true;
     });
   }
 
   private applyEyes(): void {
+    if (!this.bodyScene) return;
     const swatch = EYE_COLORS.find((s) => s.id === this.look.eyeColor) ?? EYE_COLORS[0]!;
-    this.bodyScene?.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      for (const material of materialsOf(mesh)) {
-        if (/eye/i.test(material.name)) material.color.set(swatch.color);
-      }
+    eachMaterial(this.bodyScene, (material) => {
+      if (/eye/i.test(material.name)) material.color.set(swatch.color);
     });
   }
 
@@ -147,65 +167,135 @@ export class Avatar {
     for (const brow of this.builtInBrows) brow.visible = !hidden;
   }
 
-  private hairTint(): THREE.Color {
+  private applyHairColor(): void {
     const swatch = HAIR_COLORS.find((s) => s.id === this.look.hairColor) ?? HAIR_COLORS[0]!;
-    return new THREE.Color(swatch.color);
+    const tint = new THREE.Color(swatch.color);
+    for (const brow of this.builtInBrows) eachMaterial(brow, (m) => m.color.copy(tint));
+    for (const part of this.partRoots.values()) {
+      if (part.userData.kind === "hair") eachMaterial(part, (m) => m.color.copy(tint));
+    }
   }
 
-  private applyHairColor(): void {
-    const tint = this.hairTint();
-    for (const brow of this.builtInBrows) {
-      brow.traverse((c) => {
-        const mesh = c as THREE.Mesh;
-        if (mesh.isMesh) for (const m of materialsOf(mesh)) m.color.copy(tint);
-      });
+  // ------------------------------------------------------------------ hiding covered skin
+
+  private prepareBodyMask(): void {
+    this.originalIndex = null;
+    this.vertexBone = null;
+    const mesh = this.bodyMesh;
+    if (!mesh || !mesh.geometry.index) return;
+    // The geometry is shared with the loader cache, so edit our own copy.
+    mesh.geometry = mesh.geometry.clone();
+    const index = mesh.geometry.index!;
+    this.originalIndex = index.array.slice();
+
+    const skinIndex = mesh.geometry.getAttribute("skinIndex") as THREE.BufferAttribute;
+    const skinWeight = mesh.geometry.getAttribute("skinWeight") as THREE.BufferAttribute;
+    const dominant = new Uint16Array(skinIndex.count);
+    for (let v = 0; v < skinIndex.count; v++) {
+      let best = 0;
+      let bestWeight = -1;
+      for (let k = 0; k < 4; k++) {
+        const w = skinWeight.getComponent(v, k);
+        if (w > bestWeight) {
+          bestWeight = w;
+          best = skinIndex.getComponent(v, k);
+        }
+      }
+      dominant[v] = best;
     }
-    for (const part of this.partRoots.values()) {
-      part.traverse((c) => {
-        const mesh = c as THREE.Mesh;
-        if (mesh.isMesh) for (const m of materialsOf(mesh)) m.color.copy(tint);
-      });
-    }
+    this.vertexBone = dominant;
   }
+
+  private updateBodyMask(): void {
+    const mesh = this.bodyMesh;
+    if (!mesh || !this.skeleton || !this.originalIndex || !this.vertexBone) return;
+
+    const hiddenBoneNames = new Set<string>();
+    const covered = (slot: string, on: boolean) => {
+      if (on) for (const name of COVERED_BONES[slot] ?? []) hiddenBoneNames.add(name);
+    };
+    covered("top", this.partRoots.has("top"));
+    covered("sleeves", this.partRoots.has("sleeves"));
+    covered("bottom", this.partRoots.has("bottom"));
+    covered("shoes", this.partRoots.has("shoes"));
+
+    const hidden = new Set<number>();
+    this.skeleton.bones.forEach((bone, i) => {
+      if (hiddenBoneNames.has(bone.name)) hidden.add(i);
+    });
+
+    const source = this.originalIndex;
+    const kept: number[] = [];
+    for (let i = 0; i < source.length; i += 3) {
+      const a = source[i]!;
+      const b = source[i + 1]!;
+      const c = source[i + 2]!;
+      const isHidden = hidden.has(this.vertexBone[a]!) && hidden.has(this.vertexBone[b]!) && hidden.has(this.vertexBone[c]!);
+      if (!isHidden) kept.push(a, b, c);
+    }
+    const ArrayType = source instanceof Uint32Array ? Uint32Array : Uint16Array;
+    mesh.geometry.setIndex(new THREE.BufferAttribute(new ArrayType(kept), 1));
+  }
+
+  // ------------------------------------------------------------------ attached parts (hair, clothing)
 
   private clearParts(): void {
     for (const part of this.partRoots.values()) part.parent?.remove(part);
     this.partRoots.clear();
   }
 
-  private wantedParts(): Record<string, string | null> {
+  private wantedParts(): Record<string, { id: string; kind: PartKind } | null> {
+    const { body, top, bottom, shoes, hood, pauldrons } = this.look;
+    const clothing = (outfit: string | null, slot: string) => {
+      if (!outfit) return null;
+      const id = `${body}_${outfit}_${slot}`;
+      return this.find(id) ? { id, kind: "clothing" as const } : null;
+    };
+    const hair = (id: string | null) => (id ? { id, kind: "hair" as const } : null);
     return {
-      hair: this.look.hair,
-      facial: this.look.beard ? "beard" : null,
-      brows: this.look.brows,
+      hair: hair(this.look.hair),
+      facial: hair(this.look.beard ? "beard" : null),
+      brows: hair(this.look.brows),
+      top: clothing(top, "top"),
+      sleeves: clothing(top, "sleeves"),
+      bottom: clothing(bottom, "bottom"),
+      shoes: clothing(shoes, "shoes"),
+      hood: hood ? clothing("ranger", "hood") : null,
+      acc: pauldrons ? clothing("ranger", "acc") : null,
     };
   }
 
-  /** Makes the attached hair/beard/brows match `look`. */
+  /** Makes the attached parts match `look`. */
   private async syncParts(): Promise<void> {
     const wanted = this.wantedParts();
     const token = this.loadToken;
-    for (const [slot, id] of Object.entries(wanted)) {
+    for (const [slot, want] of Object.entries(wanted)) {
       const current = this.partRoots.get(slot);
-      if (current && current.userData.assetId === id) continue;
+      if (current && current.userData.assetId === want?.id) continue;
       if (current) {
         current.parent?.remove(current);
         this.partRoots.delete(slot);
       }
-      if (!id) continue;
-      const part = await this.buildPart(id);
+      if (!want) continue;
+      const part = await this.buildPart(want.id, want.kind);
       if (token !== this.loadToken || !part) return;
       this.partRoots.set(slot, part);
     }
     this.applyHairColor();
+    await this.applyOutfitTextures();
+    this.updateBodyMask();
   }
 
-  private async buildPart(id: string): Promise<THREE.Object3D | null> {
+  private async buildPart(id: string, kind: PartKind): Promise<THREE.Object3D | null> {
     if (!this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
-    const gltf = await loadGLTF(assetUrl(this.asset(id).file));
+    const record = this.asset(id);
+    const gltf = await loadGLTF(assetUrl(record.file));
     const clone = SkeletonUtils.clone(gltf.scene);
     const group = new THREE.Group();
     group.userData.assetId = id;
+    group.userData.kind = kind;
+    group.userData.outfit = record.outfit;
+    group.userData.slot = record.slot;
 
     const bodyBones = this.skeleton.bones;
     for (const mesh of skinnedMeshesOf(clone)) {
@@ -229,8 +319,10 @@ export class Avatar {
       skinned.receiveShadow = true;
       for (const material of materials) {
         material.side = THREE.DoubleSide;
-        material.alphaTest = Math.max(material.alphaTest, 0.35);
-        material.transparent = false;
+        if (kind === "hair") {
+          material.alphaTest = Math.max(material.alphaTest, 0.35);
+          material.transparent = false;
+        }
       }
       skinned.bind(this.skeleton, this.bodyMesh.bindMatrix);
       group.add(skinned);
@@ -238,6 +330,42 @@ export class Avatar {
     this.bodyScene.add(group);
     return group;
   }
+
+  /** Which colour setting a garment slot follows. Sleeves, hood and shoulder guards match the top. */
+  private colourFor(slot: string | undefined): string | null {
+    const { topColor, bottomColor, shoesColor } = this.look;
+    if (slot === "bottom") return bottomColor;
+    if (slot === "shoes") return shoesColor;
+    return topColor;
+  }
+
+  /** Clothing is shipped without textures; each outfit's shared texture set is applied here. */
+  private async applyOutfitTextures(): Promise<void> {
+    const variant = this.look.outfitVariant;
+    for (const part of this.partRoots.values()) {
+      if (part.userData.kind !== "clothing") continue;
+      const outfit = part.userData.outfit as string | undefined;
+      if (!outfit) continue;
+      const colour = CLOTH_COLORS.find((c) => c.id === this.colourFor(part.userData.slot as string | undefined));
+      const [base, normal, orm] = await Promise.all([
+        loadGltfTexture(assetUrl(`clothing/tex_${outfit}_${colour ? "gray" : variant}_base.webp`)),
+        loadGltfTexture(assetUrl(`clothing/tex_${outfit}_normal.webp`), THREE.NoColorSpace),
+        loadGltfTexture(assetUrl(`clothing/tex_${outfit}_orm.webp`), THREE.NoColorSpace),
+      ]);
+      eachMaterial(part, (material) => {
+        material.map = base;
+        material.color.set(colour?.color ?? "#ffffff");
+        material.normalMap = normal;
+        material.roughnessMap = orm;
+        material.metalnessMap = orm;
+        material.roughness = 1;
+        material.metalness = 1;
+        material.needsUpdate = true;
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------ animation
 
   play(name: string, fade = 0.25): boolean {
     const clip = this.clips.get(name);

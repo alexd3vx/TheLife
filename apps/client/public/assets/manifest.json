@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-05T07:33:51.617Z",
+ "generatedAt": "2026-10-05T07:48:09.663Z",
  "credits": {
   "quaternius-ubc": {
    "name": "Universal Base Characters (Standard)",
@@ -12,6 +12,12 @@
    "author": "Quaternius",
    "licence": "CC0 1.0",
    "url": "https://quaternius.com/packs/universalanimationlibrary.html"
+  },
+  "quaternius-outfits": {
+   "name": "Modular Character Outfits - Fantasy (Standard)",
+   "author": "Quaternius",
+   "licence": "CC0 1.0",
+   "url": "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html"
   },
   "kenney-furniture": {
    "name": "Furniture Kit 2.0",
@@ -43,8 +49,40 @@
    "maxTriangles": 8000,
    "maxBytes": 250000
   },
+  "clothing": {
+   "maxTriangles": 10000,
+   "maxBytes": 300000
+  },
   "animation": {
    "maxBytes": 6000000
+  }
+ },
+ "outfits": {
+  "peasant": {
+   "label": "Peasant",
+   "variants": [
+    {
+     "id": "a",
+     "label": "Natural"
+    },
+    {
+     "id": "b",
+     "label": "Dyed"
+    }
+   ]
+  },
+  "ranger": {
+   "label": "Ranger",
+   "variants": [
+    {
+     "id": "a",
+     "label": "Forest"
+    },
+    {
+     "id": "b",
+     "label": "Dusk"
+    }
+   ]
   }
  },
  "assets": [
@@ -209,6 +247,418 @@
    "label": "Eyebrows (shaped)",
    "slot": "brows",
    "credit": "quaternius-ubc"
+  },
+  {
+   "id": "tex_peasant_a_base",
+   "category": "texture",
+   "file": "clothing/tex_peasant_a_base.webp",
+   "bytes": 41790,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_peasant_b_base",
+   "category": "texture",
+   "file": "clothing/tex_peasant_b_base.webp",
+   "bytes": 36220,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_peasant_gray_base",
+   "category": "texture",
+   "file": "clothing/tex_peasant_gray_base.webp",
+   "bytes": 70546,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_peasant_normal",
+   "category": "texture",
+   "file": "clothing/tex_peasant_normal.webp",
+   "bytes": 133186,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_peasant_orm",
+   "category": "texture",
+   "file": "clothing/tex_peasant_orm.webp",
+   "bytes": 54434,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_ranger_a_base",
+   "category": "texture",
+   "file": "clothing/tex_ranger_a_base.webp",
+   "bytes": 59050,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_ranger_b_base",
+   "category": "texture",
+   "file": "clothing/tex_ranger_b_base.webp",
+   "bytes": 47254,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_ranger_gray_base",
+   "category": "texture",
+   "file": "clothing/tex_ranger_gray_base.webp",
+   "bytes": 80998,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_ranger_normal",
+   "category": "texture",
+   "file": "clothing/tex_ranger_normal.webp",
+   "bytes": 148338,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "tex_ranger_orm",
+   "category": "texture",
+   "file": "clothing/tex_ranger_orm.webp",
+   "bytes": 69228,
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_peasant_sleeves",
+   "category": "clothing",
+   "file": "clothing/female_peasant_sleeves.glb",
+   "bytes": 108376,
+   "triangles": 6848,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant sleeves",
+   "slot": "sleeves",
+   "outfit": "peasant",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_peasant_top",
+   "category": "clothing",
+   "file": "clothing/female_peasant_top.glb",
+   "bytes": 107440,
+   "triangles": 2188,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 1,
+   "clipNames": [
+    "Jog_Fwd_Loop"
+   ],
+   "label": "Peasant top",
+   "slot": "top",
+   "outfit": "peasant",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_peasant_shoes",
+   "category": "clothing",
+   "file": "clothing/female_peasant_shoes.glb",
+   "bytes": 53928,
+   "triangles": 2588,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant shoes",
+   "slot": "shoes",
+   "outfit": "peasant",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_peasant_bottom",
+   "category": "clothing",
+   "file": "clothing/female_peasant_bottom.glb",
+   "bytes": 44424,
+   "triangles": 1944,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant bottom",
+   "slot": "bottom",
+   "outfit": "peasant",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_acc",
+   "category": "clothing",
+   "file": "clothing/female_ranger_acc.glb",
+   "bytes": 32808,
+   "triangles": 1376,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger pauldrons",
+   "slot": "acc",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_sleeves",
+   "category": "clothing",
+   "file": "clothing/female_ranger_sleeves.glb",
+   "bytes": 115256,
+   "triangles": 6636,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger sleeves",
+   "slot": "sleeves",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_top",
+   "category": "clothing",
+   "file": "clothing/female_ranger_top.glb",
+   "bytes": 123412,
+   "triangles": 4570,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger top",
+   "slot": "top",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_shoes",
+   "category": "clothing",
+   "file": "clothing/female_ranger_shoes.glb",
+   "bytes": 170968,
+   "triangles": 9172,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger shoes",
+   "slot": "shoes",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_hood",
+   "category": "clothing",
+   "file": "clothing/female_ranger_hood.glb",
+   "bytes": 53296,
+   "triangles": 2136,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger hood",
+   "slot": "hood",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "female_ranger_bottom",
+   "category": "clothing",
+   "file": "clothing/female_ranger_bottom.glb",
+   "bytes": 36792,
+   "triangles": 1204,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger bottom",
+   "slot": "bottom",
+   "outfit": "ranger",
+   "sex": "female",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_peasant_sleeves",
+   "category": "clothing",
+   "file": "clothing/male_peasant_sleeves.glb",
+   "bytes": 36840,
+   "triangles": 1408,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant sleeves",
+   "slot": "sleeves",
+   "outfit": "peasant",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_peasant_top",
+   "category": "clothing",
+   "file": "clothing/male_peasant_top.glb",
+   "bytes": 88952,
+   "triangles": 3856,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant top",
+   "slot": "top",
+   "outfit": "peasant",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_peasant_shoes",
+   "category": "clothing",
+   "file": "clothing/male_peasant_shoes.glb",
+   "bytes": 52544,
+   "triangles": 2588,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant shoes",
+   "slot": "shoes",
+   "outfit": "peasant",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_peasant_bottom",
+   "category": "clothing",
+   "file": "clothing/male_peasant_bottom.glb",
+   "bytes": 33228,
+   "triangles": 1112,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Peasant bottom",
+   "slot": "bottom",
+   "outfit": "peasant",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_acc",
+   "category": "clothing",
+   "file": "clothing/male_ranger_acc.glb",
+   "bytes": 31804,
+   "triangles": 1376,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger pauldrons",
+   "slot": "acc",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_sleeves",
+   "category": "clothing",
+   "file": "clothing/male_ranger_sleeves.glb",
+   "bytes": 62088,
+   "triangles": 3048,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger sleeves",
+   "slot": "sleeves",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_top",
+   "category": "clothing",
+   "file": "clothing/male_ranger_top.glb",
+   "bytes": 131128,
+   "triangles": 4606,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger top",
+   "slot": "top",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_shoes",
+   "category": "clothing",
+   "file": "clothing/male_ranger_shoes.glb",
+   "bytes": 158028,
+   "triangles": 9172,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger shoes",
+   "slot": "shoes",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_hood",
+   "category": "clothing",
+   "file": "clothing/male_ranger_hood.glb",
+   "bytes": 49772,
+   "triangles": 2136,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger hood",
+   "slot": "hood",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
+  },
+  {
+   "id": "male_ranger_bottom",
+   "category": "clothing",
+   "file": "clothing/male_ranger_bottom.glb",
+   "bytes": 33280,
+   "triangles": 1128,
+   "materials": 1,
+   "textures": 0,
+   "joints": 65,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ranger bottom",
+   "slot": "bottom",
+   "outfit": "ranger",
+   "sex": "male",
+   "credit": "quaternius-outfits"
   },
   {
    "id": "ual1",

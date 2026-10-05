@@ -2,6 +2,13 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Clothing in the Asset Lab
+- Added the CC0 Quaternius "Modular Character Outfits - Fantasy" (Peasant, Ranger; male/female). Pipeline now builds 20 clothing parts + shared textures (108 assets, 7.6 MB, all in budget; clothing budget 10k tris/piece).
+- Avatar: clothing attaches like hair (re-bound by bone name). Covered body triangles are removed at runtime so skin never pokes through. Sleeves follow the top; hood and shoulder guards optional.
+- Colours: neutral greyscale textures let Top / Bottom / Shoes take any of 13 colours (plus the outfit's original colour sets). Randomise now includes outfits and colours.
+- Verified in a browser on male and female characters (walk animation, recolouring). Fixed two bugs found while testing: textures stripped from the parts must be re-applied at runtime; sharp applies operations in its own order, which made the neutral texture far too dark.
+- Honest limits: the outfits are medieval-fantasy shapes, not modern Nigerian fashion; female sleeve bracers show a little skin colour at the edges. Props restyle and more realistic vehicles are still to do.
+
 ## 2026-10-05 — Asset Lab v0 (roadmap stage 1)
 - Chose "adapt free CC0 packs" for characters. Downloaded and verified licences: Quaternius Universal Base Characters + Universal Animation Library, Kenney Furniture Kit + Car Kit (all CC0).
 - New `tools/assets` pipeline: reproducible fetch (`fetch-all.sh`, incl. itch.io free-download flow), `sources.mjs` (what we take + budgets), `build-assets.mjs` (optimise to compressed glTF, enforce budgets, write `manifest.json`). ~330 MB of raw packs become a 5.3 MB game library (78 assets, all in budget).

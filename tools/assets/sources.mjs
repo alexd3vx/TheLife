@@ -14,6 +14,12 @@ export const CREDITS = {
     licence: "CC0 1.0",
     url: "https://quaternius.com/packs/universalanimationlibrary.html",
   },
+  "quaternius-outfits": {
+    name: "Modular Character Outfits - Fantasy (Standard)",
+    author: "Quaternius",
+    licence: "CC0 1.0",
+    url: "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html",
+  },
   "kenney-furniture": {
     name: "Furniture Kit 2.0",
     author: "Kenney",
@@ -34,6 +40,7 @@ export const BUDGETS = {
   hair: { maxTriangles: 6000, maxBytes: 900_000 },
   furniture: { maxTriangles: 4000, maxBytes: 120_000 },
   vehicle: { maxTriangles: 8000, maxBytes: 250_000 },
+  clothing: { maxTriangles: 10000, maxBytes: 300_000 },
   animation: { maxBytes: 6_000_000 },
 };
 
@@ -121,4 +128,39 @@ export const VEHICLES = [
   v("ambulance", "Ambulance"),
   v("police", "Police car"),
   v("garbage-truck", "Garbage truck"),
+];
+
+// Outfits from the Quaternius pack. Each outfit is a set of parts (top/sleeves/bottom/shoes/hood/acc) that can be
+// mixed. Textures are shipped once per outfit and applied at runtime (see build-assets.mjs / avatar.ts).
+export const OUTFITS = {
+  peasant: {
+    label: "Peasant",
+    texturePrefix: "Peasant",
+    variants: [
+      { id: "a", label: "Natural", baseColor: "T_Peasant_BaseColor.png" },
+      { id: "b", label: "Dyed", baseColor: "T_Peasant_2_BaseColor.png" },
+    ],
+    normal: "T_Peasant_Normal.png",
+    orm: "T_Peasant_ORM.png",
+  },
+  ranger: {
+    label: "Ranger",
+    texturePrefix: "Ranger",
+    variants: [
+      { id: "a", label: "Forest", baseColor: "T_Ranger_BaseColor.png" },
+      { id: "b", label: "Dusk", baseColor: "T_Ranger_3_BaseColor.png" },
+    ],
+    normal: "T_Ranger_Normal.png",
+    orm: "T_Ranger_ORM.png",
+  },
+};
+
+// Pack part name -> our slot. "sleeves" always travels with "top".
+export const OUTFIT_PARTS = [
+  { match: /_Body$/, slot: "top", label: "Top" },
+  { match: /_Arms$/, slot: "sleeves", label: "Sleeves" },
+  { match: /_Legs$/, slot: "bottom", label: "Bottom" },
+  { match: /_Feet(_Boots)?$/, slot: "shoes", label: "Shoes" },
+  { match: /_Head_Hood$/, slot: "hood", label: "Hood" },
+  { match: /_Acc_Pauldrons?$/, slot: "acc", label: "Pauldrons" },
 ];

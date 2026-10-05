@@ -24,6 +24,8 @@ export interface AssetRecord {
   label?: string;
   group?: string;
   slot?: string;
+  outfit?: string;
+  sex?: string;
   credit?: string;
   budgetProblems?: string[];
 }
@@ -32,6 +34,7 @@ export interface AssetManifest {
   generatedAt: string;
   credits: Record<string, Credit>;
   budgets: Record<string, Budget>;
+  outfits: Record<string, { label: string; variants: { id: string; label: string }[] }>;
   assets: AssetRecord[];
 }
 

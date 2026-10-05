@@ -9,7 +9,7 @@ import sharp from "sharp";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUDGETS, CREDITS, FURNITURE, HAIR, VEHICLES } from "./sources.mjs";
+import { BUDGETS, CREDITS, FURNITURE, HAIR, OUTFITS, OUTFIT_PARTS, VEHICLES } from "./sources.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SRC = join(root, "assets-src");
@@ -23,7 +23,7 @@ const io = new NodeIO()
   .registerExtensions(ALL_EXTENSIONS)
   .registerDependencies({ "meshopt.encoder": MeshoptEncoder, "meshopt.decoder": MeshoptDecoder });
 
-const manifest = { generatedAt: new Date().toISOString(), credits: CREDITS, budgets: BUDGETS, assets: [] };
+const manifest = { generatedAt: new Date().toISOString(), credits: CREDITS, budgets: BUDGETS, outfits: {}, assets: [] };
 
 function ensure(dir) {
   mkdirSync(dir, { recursive: true });
@@ -134,6 +134,78 @@ for (const hair of HAIR) {
   await write(doc, "hair", hair.id, join(OUT, `hair/${hair.id}.glb`), { label: hair.label, slot: hair.slot, credit: "quaternius-ubc" });
 }
 rmSync(STAGE, { recursive: true, force: true });
+
+// ---------------------------------------------------------------- clothing
+{
+  const outfitRoot = join(SRC, "quaternius/outfits/extracted/Modular Character Outfits - Fantasy[Standard]");
+  const partsDir = join(outfitRoot, "Exports/glTF (Godot-Unreal)/Modular Parts");
+  const texDir = join(outfitRoot, "Textures");
+  if (existsSync(partsDir)) {
+    // Shared textures, one set per outfit.
+    for (const [outfitId, outfit] of Object.entries(OUTFITS)) {
+      const folder = join(texDir, outfit.texturePrefix);
+      ensure(join(OUT, "clothing"));
+      const save = async (srcName, outName, quality) => {
+        const target = join(OUT, `clothing/${outName}.webp`);
+        await sharp(join(folder, srcName)).resize(1024, 1024).webp({ quality }).toFile(target);
+        manifest.assets.push({ id: outName, category: "texture", file: `clothing/${outName}.webp`, bytes: statSync(target).size, credit: "quaternius-outfits" });
+      };
+      for (const variant of outfit.variants) await save(variant.baseColor, `tex_${outfitId}_${variant.id}_base`, 82);
+      // Neutral (greyscale, rebalanced) copy of the first colour set. The game multiplies it by any colour,
+      // so one texture gives every garment colour while keeping the stitching, folds and straps.
+      {
+        const target = join(OUT, `clothing/tex_${outfitId}_gray_base.webp`);
+        await sharp(join(folder, outfit.variants[0].baseColor))
+          .resize(1024, 1024)
+          .greyscale()
+          .linear(3.3, 0) // the pack's atlas is dark (mean ~56/255); lifts it so tinted colours read true
+          .webp({ quality: 85 })
+          .toFile(target);
+        manifest.assets.push({ id: `tex_${outfitId}_gray_base`, category: "texture", file: `clothing/tex_${outfitId}_gray_base.webp`, bytes: statSync(target).size, credit: "quaternius-outfits" });
+      }
+      await save(outfit.normal, `tex_${outfitId}_normal`, 92);
+      await save(outfit.orm, `tex_${outfitId}_orm`, 88);
+      manifest.outfits[outfitId] = { label: outfit.label, variants: outfit.variants.map((v) => ({ id: v.id, label: v.label })) };
+    }
+
+    // Parts. We drop the pack's bare-skin pieces (hands/forearms in a different skin) and keep our own body there.
+    stageCharacterFolder(partsDir);
+    for (const file of readdirSync(partsDir).filter((f) => f.endsWith(".gltf")).sort()) {
+      const name = basename(file, ".gltf"); // e.g. Male_Peasant_Body
+      const [sexRaw, outfitRaw, ...rest] = name.split("_");
+      const outfitId = outfitRaw.toLowerCase();
+      const partName = `_${rest.join("_")}`;
+      const part = OUTFIT_PARTS.find((p) => p.match.test(partName));
+      if (!OUTFITS[outfitId] || !part) {
+        console.warn(`  skipping clothing file ${file}`);
+        continue;
+      }
+      const doc = await io.read(join(STAGE, file));
+      const rootDoc = doc.getRoot();
+      for (const mesh of rootDoc.listMeshes()) {
+        for (const prim of mesh.listPrimitives()) {
+          if (/^MI_Regular/i.test(prim.getMaterial()?.getName() ?? "")) prim.dispose();
+        }
+      }
+      for (const material of rootDoc.listMaterials()) {
+        material.setBaseColorTexture(null).setNormalTexture(null).setMetallicRoughnessTexture(null);
+      }
+      await doc.transform(prune());
+      await optimise(doc, { skinned: true });
+      const sex = sexRaw.toLowerCase();
+      await write(doc, "clothing", `${sex}_${outfitId}_${part.slot}`, join(OUT, `clothing/${sex}_${outfitId}_${part.slot}.glb`), {
+        label: `${OUTFITS[outfitId].label} ${part.label.toLowerCase()}`,
+        slot: part.slot,
+        outfit: outfitId,
+        sex,
+        credit: "quaternius-outfits",
+      });
+    }
+    rmSync(STAGE, { recursive: true, force: true });
+  } else {
+    console.warn("Outfits pack not found in assets-src; skipping clothing. Run fetch-all.sh");
+  }
+}
 
 // ---------------------------------------------------------------- animations
 {
