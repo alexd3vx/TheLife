@@ -116,3 +116,18 @@
 .play-who-middle { border-color: #f2a43a; }
 .play-who-nepo { border-color: #c79bff; }
 @media (max-width: 640px) { .play-who { display: none; } }
+
+/* What a tap offers: walk, run, use */
+.play-menu {
+  position: absolute; z-index: 4; display: grid; gap: 2px; padding: 6px; min-width: 190px; max-width: 260px; border-radius: 16px;
+  background: rgba(20, 17, 15, .9); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  animation: play-menu-in .14s ease-out both; transform-origin: top left;
+}
+@keyframes play-menu-in { from { transform: scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.play-menu-title { padding: 6px 10px 4px; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.play-menu button {
+  all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 0 12px;
+  border-radius: 11px; font-size: .92rem; font-weight: 600; color: var(--text);
+}
+.play-menu button:hover, .play-menu button:focus-visible { background: rgba(242, 164, 58, .22); }
+.play-menu button:active { background: rgba(242, 164, 58, .4); }

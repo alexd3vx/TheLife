@@ -20,6 +20,16 @@ export interface RuntimeEvents {
   /** Hint for the thing under the pointer (desktop hover), or null. */
   onHover(hint: string | null): void;
   onStats(text: string): void;
+  /** What a tap offers (walk, run, use...), or null to close the menu. */
+  onMenu?(menu: TapMenu | null): void;
+}
+
+export interface TapMenu {
+  /** Where on the screen the tap was, in pixels from the top-left of the play area. */
+  x: number;
+  y: number;
+  title: string | null;
+  options: { label: string; icon: string; run(): void }[];
 }
 
 export interface PlayRuntime {
@@ -47,6 +57,8 @@ export interface PlayRuntime {
     focus(id: string, distance?: number): void;
     /** Where the character's body is right now, for checking it sits on the furniture. */
     pose(): { hipsY: number | null };
+    /** Draw calls, triangles and average milliseconds per frame (update vs render), for performance checks. */
+    perf(): { calls: number; triangles: number; geometries: number; textures: number; updateMs: number; renderMs: number; ratio: number; shadowEvery: number };
     state(): CharacterController["state"];
     free(x: number, z: number): boolean;
     session: GameSession | null;
@@ -73,7 +85,11 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return null;
   }
   const small = window.matchMedia("(max-width: 860px)").matches;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2));
+  // Quality adapts to the device: the pixel ratio and shadow refresh rate drop when the frame rate does, and recover when it can.
+  const baseRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  let ratio = baseRatio;
+  renderer.setPixelRatio(ratio);
+  renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -183,27 +199,48 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   }
 
   function handleTap(clientX: number, clientY: number) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const at = { x: clientX - rect.left, y: clientY - rect.top };
+    const close = () => events.onMenu?.(null);
+    /** Shows the options, or (where there is no menu, as in the showroom) just does the first. */
+    const present = (menu: TapMenu) => (events.onMenu ? events.onMenu(menu) : menu.options[0]?.run());
     const picked = interactiveAt(clientX, clientY);
     if (picked) {
-      const interaction = chooseInteraction(picked.item, picked.point);
-      if (interaction) {
-        const ok = controller.tapInteraction(interaction);
-        showMarker(interaction.approach[0], interaction.approach[1], ok);
+      const options = [...world.interactionsFor(picked.item.def.id)].sort(
+        (a, b) => Math.hypot(a.at[0] - picked.point.x, a.at[1] - picked.point.z) - Math.hypot(b.at[0] - picked.point.x, b.at[1] - picked.point.z),
+      );
+      if (options.length) {
+        const menu: TapMenu["options"] = [];
+        options.slice(0, 3).forEach((interaction, i) => {
+          const label = interaction.hint;
+          menu.push({ label, icon: i === 0 ? "✋" : "▫️", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "walk")); } });
+          if (i === 0) menu.push({ label: `Run there: ${label.charAt(0).toLowerCase()}${label.slice(1)}`, icon: "🏃", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "run")); } });
+        });
+        present({ ...at, title: picked.item.catalog.name, options: menu });
         return;
       }
     }
     const point = groundAt(clientX, clientY);
-    if (!point) return;
+    if (!point) return close();
     const area = layout.area;
-    if (point.x < area.minX || point.x > area.maxX || point.z < area.minZ || point.z > area.maxZ) return;
-    const ok = controller.tapGround(point.x, point.z);
-    showMarker(point.x, point.z, ok);
+    if (point.x < area.minX || point.x > area.maxX || point.z < area.minZ || point.z > area.maxZ) return close();
+    const { x, z } = point;
+    showMarker(x, z, controller.canReach(x, z));
+    present({
+      ...at,
+      title: null,
+      options: [
+        { label: "Walk here", icon: "🚶", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
+        { label: "Run here", icon: "🏃", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "run")); } },
+      ],
+    });
   }
 
   // Taps are told apart from camera drags by how far and how long the pointer moved.
   const down = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
   const canvas = renderer.domElement;
   const onDown = (e: PointerEvent) => {
+    events.onMenu?.(null);
     down.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now(), moved: false });
   };
   const onMove = (e: PointerEvent) => {
@@ -265,11 +302,49 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return set;
   }
   let renderEvery = 1;
+  let shadowEvery = 1;
+  let frameNo = 0;
+  let lowFor = 0;
+  let highFor = 0;
+  let updateMs = 0;
+  let renderMs = 0;
+  let timedFrames = 0;
+  function adapt(fps: number) {
+    if (renderEvery > 1 || document.hidden) return;
+    const resize = () => {
+      renderer.setPixelRatio(ratio);
+      const el = renderer.domElement;
+      renderer.setSize(el.clientWidth, el.clientHeight, false);
+    };
+    if (fps < 45) {
+      lowFor += 1;
+      highFor = 0;
+      if (lowFor >= 2) {
+        lowFor = 0;
+        if (ratio > baseRatio * 0.55) {
+          ratio = Math.max(baseRatio * 0.55, ratio * 0.82);
+          resize();
+        } else if (shadowEvery < 4) shadowEvery *= 2;
+      }
+    } else if (fps > 56) {
+      highFor += 1;
+      lowFor = 0;
+      if (highFor >= 6) {
+        highFor = 0;
+        if (shadowEvery > 1) shadowEvery /= 2;
+        else if (ratio < baseRatio) {
+          ratio = Math.min(baseRatio, ratio * 1.12);
+          resize();
+        }
+      }
+    } else lowFor = highFor = 0;
+  }
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.1) * timeScale;
     if (document.hidden) return;
+    const t0 = performance.now();
 
     elapsed += dt;
     if (session) {
@@ -302,12 +377,20 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     m.opacity = Math.max(0, 0.9 - markerAge * 0.7);
     marker.scale.setScalar(1 + Math.min(markerAge, 1.2) * 0.5);
 
+    const t1 = performance.now();
+    frameNo++;
+    if (frameNo % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
     // With the phone open the scene is hidden behind it, so draw it rarely: smoother phone, cooler device.
     if (renderEvery === 1 || frames % renderEvery === 0) renderer.render(world.scene, camera);
+    renderMs += performance.now() - t1;
+    updateMs += t1 - t0;
+    timedFrames++;
     frames++;
     acc += dt;
     if (acc >= 0.5) {
-      events.onStats(`${Math.round(frames / acc)} fps`);
+      const fps = frames / acc;
+      adapt(fps);
+      events.onStats(`${Math.round(fps)} fps`);
       frames = 0;
       acc = 0;
     }
@@ -391,6 +474,14 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         const bone = avatar.root.getObjectByName("pelvis") ?? avatar.root.getObjectByName("Hips") ?? avatar.root.getObjectByName("hips");
         if (!bone) return { hipsY: null };
         return { hipsY: bone.getWorldPosition(new THREE.Vector3()).y };
+      },
+      perf: () => {
+        const r = {
+          calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
+          updateMs: timedFrames ? updateMs / timedFrames : 0, renderMs: timedFrames ? renderMs / timedFrames : 0, ratio, shadowEvery,
+        };
+        updateMs = renderMs = timedFrames = 0;
+        return r;
       },
       avatar,
       scene: world.scene,

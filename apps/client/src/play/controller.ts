@@ -26,6 +26,9 @@ export interface Status {
 
 type Mode = "idle" | "walking" | "settling" | "doing" | "leaving";
 
+/** How the player asked to get there: "auto" runs when it is far. */
+export type Pace = "auto" | "walk" | "run";
+
 const WALK_SPEED = 1.55; // metres per second
 const RUN_SPEED = 3.3;
 const RUN_DISTANCE = 7; // runs when the trip is longer than this
@@ -76,7 +79,7 @@ export class CharacterController {
   private nextGestureAt = 9;
   private clock = 0;
   /** A tap that arrived during a short transition (sitting down, standing up); run once it finishes. */
-  private queued: { target: Point; interaction: Interaction | null } | null = null;
+  private queued: { target: Point; interaction: Interaction | null; pace: Pace } | null = null;
   /** A timed pause (waiting for a one-shot clip like Sitting_Enter to finish). */
   private wait: { left: number; done: () => void } | null = null;
   private tween: { t: number; duration: number; from: THREE.Vector3; to: THREE.Vector3; fromYaw: number; toYaw: number; done: () => void } | null = null;
@@ -99,14 +102,14 @@ export class CharacterController {
   }
 
   /** Walk to a spot on the floor. Returns false if nowhere near it is reachable. */
-  tapGround(x: number, z: number): boolean {
-    return this.go({ x, z }, null);
+  tapGround(x: number, z: number, pace: Pace = "auto"): boolean {
+    return this.go({ x, z }, null, pace);
   }
 
   /** Walk to a piece of furniture and use it. */
-  tapInteraction(interaction: Interaction): boolean {
+  tapInteraction(interaction: Interaction, pace: Pace = "auto"): boolean {
     if (this.mode === "doing" && this.interaction?.id === interaction.id && !this.resting) return true; // already doing it
-    return this.go({ x: interaction.approach[0], z: interaction.approach[1] }, interaction);
+    return this.go({ x: interaction.approach[0], z: interaction.approach[1] }, interaction, pace);
   }
 
   /** Can the character get from here to that spot? (No side effects.) */
@@ -114,7 +117,7 @@ export class CharacterController {
     return !!findPath(this.nav, { x: this.position.x, z: this.position.z }, { x, z });
   }
 
-  private go(target: Point, interaction: Interaction | null): boolean {
+  private go(target: Point, interaction: Interaction | null, pace: Pace = "auto"): boolean {
     const begin = () => {
       const route = findPath(this.nav, { x: this.position.x, z: this.position.z }, target);
       if (!route || route.length === 0) {
@@ -124,7 +127,7 @@ export class CharacterController {
       }
       this.path = route;
       this.pending = interaction;
-      this.running = pathLength({ x: this.position.x, z: this.position.z }, route) > RUN_DISTANCE;
+      this.running = pace === "run" || (pace === "auto" && pathLength({ x: this.position.x, z: this.position.z }, route) > RUN_DISTANCE);
       this.mode = "walking";
       this.setStatus(null, null);
       return true;
@@ -146,7 +149,7 @@ export class CharacterController {
     }
     if (this.mode === "settling" || this.mode === "leaving") {
       if (!findPath(this.nav, { x: target.x, z: target.z }, { x: target.x, z: target.z })) return false;
-      this.queued = { target, interaction };
+      this.queued = { target, interaction, pace };
       return true;
     }
 
@@ -345,7 +348,7 @@ export class CharacterController {
     if (this.queued && !this.tween && !this.wait && (this.mode === "doing" || this.mode === "idle")) {
       const next = this.queued;
       this.queued = null;
-      this.go(next.target, next.interaction);
+      this.go(next.target, next.interaction, next.pace);
     }
     this.apply();
   }

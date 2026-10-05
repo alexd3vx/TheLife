@@ -294,6 +294,12 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     remaining = next;
   }
 
+  // Small things (cups, lamps, plants' leaves, books) barely show a shadow, so they skip the shadow pass: fewer draw calls per frame.
+  for (const item of items) {
+    const size = item.bounds.getSize(new THREE.Vector3());
+    if (Math.max(size.x, size.y, size.z) < 0.45) item.group.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = false) : undefined));
+  }
+
   // Only things you'd bump into block walking: not rugs, wall-hung pieces, fans or things on tables.
   for (const item of items) {
     const b = item.bounds;

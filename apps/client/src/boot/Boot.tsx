@@ -26,6 +26,27 @@ const skipSplash = () => new URLSearchParams(window.location.search).get("splash
 /** Alexion Studios splash, then the loading screen (downloads the game once, finds it on the device after), then the game. */
 export function Boot({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>(skipSplash() ? "done" : "brand");
+  // The emblem, the percentage and the megabytes all read one eased value, so they can never disagree.
+  const targetRef = useRef(0);
+  const shownRef = useRef(0);
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const cur = shownRef.current;
+      const target = targetRef.current;
+      if (target > cur) {
+        shownRef.current = Math.min(target, cur + Math.max(14 * dt, (target - cur) * 2.5 * dt));
+        setShown(shownRef.current);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [synced, setSynced] = useState(false);
   const [step, setStep] = useState(0);
@@ -113,6 +134,10 @@ export function Boot({ children }: { children: ReactNode }) {
       }
       if (!alive) return;
       setStep(STEPS.length);
+      // Let the emblem and the counter finish filling together before saying welcome.
+      targetRef.current = 100;
+      for (let i = 0; i < 40 && alive && shownRef.current < 99.5; i++) await sleep(75);
+      if (!alive) return;
       setPhase("welcome");
     })();
     return () => {
@@ -122,7 +147,7 @@ export function Boot({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (phase !== "welcome") return;
-    const timer = window.setTimeout(() => setPhase("leaving"), reduceMotion() ? 600 : 1200);
+    const timer = window.setTimeout(() => setPhase("leaving"), reduceMotion() ? 1200 : 2600);
     return () => window.clearTimeout(timer);
   }, [phase]);
 
@@ -151,6 +176,8 @@ export function Boot({ children }: { children: ReactNode }) {
   const percent = progress && progress.toDownload > 0 ? Math.min(100, Math.round((progress.loaded / progress.toDownload) * 100)) : null;
   const downloading = progress !== null && progress.toDownload > 0 && !synced;
   const overall = phase === "welcome" || phase === "leaving" ? 100 : downloading && percent !== null ? percent : Math.round(((step + (synced ? 1 : 0)) / (STEPS.length + 1)) * 100);
+  targetRef.current = Math.max(targetRef.current, overall);
+  const shownPct = Math.round(shown);
 
   return (
     <>
@@ -220,7 +247,7 @@ export function Boot({ children }: { children: ReactNode }) {
                   </>
                 ) : (
                   <>
-                    <div className="boot-emblem" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={overall}>
+                    <div className="boot-emblem" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={shownPct}>
                       <svg viewBox="0 0 100 100" aria-hidden="true">
                         <defs>
                           <linearGradient id="boot-fill" x1="0" y1="1" x2="1" y2="0">
@@ -229,10 +256,10 @@ export function Boot({ children }: { children: ReactNode }) {
                           </linearGradient>
                         </defs>
                         <path className="boot-emblem-track" pathLength="1" d={EMBLEM_PATH} />
-                        <path className="boot-emblem-fill" pathLength="1" d={EMBLEM_PATH} style={{ strokeDashoffset: 1 - overall / 100 }} />
-                        <circle className={`boot-emblem-dot${overall >= 100 ? " is-lit" : ""}`} cx="50" cy="14" r="4" />
+                        <path className="boot-emblem-fill" pathLength="1" d={EMBLEM_PATH} style={{ strokeDashoffset: 1 - shown / 100 }} />
+                        <circle className={`boot-emblem-dot${shown >= 99.5 ? " is-lit" : ""}`} cx="50" cy="14" r="4" />
                       </svg>
-                      <span className="boot-emblem-num">{overall}%</span>
+                      <span className="boot-emblem-num">{shownPct}%</span>
                     </div>
                     <div className="boot-status">
                       {phase === "welcome" || phase === "leaving" ? (
@@ -241,7 +268,7 @@ export function Boot({ children }: { children: ReactNode }) {
                         <>
                           <span>Downloading game assets</span>
                           <span className="boot-num">
-                            {formatMB(progress!.loaded)} of {formatMB(progress!.toDownload)}
+                            {formatMB((progress!.toDownload * shown) / 100)} of {formatMB(progress!.toDownload)}
                           </span>
                         </>
                       ) : (

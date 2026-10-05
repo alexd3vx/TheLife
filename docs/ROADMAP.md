@@ -48,8 +48,10 @@ Direction: a **Project Zomboid-style realism sim without zombies**: detailed pro
 3b. **Character creator with nepo/lapo background (done, Oct 2026).**
 4. **Phones (each its own brand):** several phone models, each with a different UI and design, named after our own game (no real-world trademarks); apps likewise.
 5. **Houses of many types:** multi-storey duplex and mansion (upstairs/downstairs, stairs), garages that come with a house type, trees and gardens outside instead of bare grass, a farm plot where the player plants and harvests.
-6. **The map (the biggest piece):** a big district with many buildings, moving cars, planes and more, streamed in by chunk and level of detail so it stays fast on phones. Given its size it gets its own planning step first.
+6. **The map (the biggest piece; plan in `MAP_PLAN.md`):** a big district with many buildings, moving cars, planes and more, streamed in by chunk and level of detail so it stays fast on phones. Given its size it gets its own planning step first.
 7. **Deeper survival-sim mechanics:** cooking with a pot and real ingredients, many foods, light switches, generator and solar power with NEPA-style cuts, a TV that plays, a laptop. More detail and realism in needs, crafting, farming and consequences.
+
+Arrival scene (owner idea, after the map and multiplayer): a new character arrives by bus (lapo), taxi (middle) or private jet (nepo) at the airport or bus park, where the character is created, then goes to rent a house.
 
 Phone plan (built; see GAMEPLAY_SYSTEMS.md "The phone") (decided with the owner): full-screen phone UI opened from a HUD button (phone-shaped frame on desktop, full screen on phones), smooth like a real app; brand family "Life" (LifePhone Go/Plus/Max; LifeChat, LifePay, LifeShop, LifeJobs, LifeNews, LifeMaps); first apps: messages and calls (written NPC chats), bank and wallet (balance, history, pay rent and bills, transfers, loans and savings), shop and delivery, jobs, news and maps; phones differ by look, apps, battery, speed, screen, price and charger type; battery drains, chargers and plugs differ, power cuts, generator, solar, power banks; no camera or social feed yet. Later idea: AI-generated assets that players can preview and download. The earlier "7." item continues: more detail and realism in needs, crafting, farming and consequences.
 

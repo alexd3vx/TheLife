@@ -56,7 +56,7 @@
 .boot-emblem svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .boot-emblem path { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
 .boot-emblem-track { stroke: var(--surface-2); }
-.boot-emblem-fill { stroke: url(#boot-fill); stroke-dasharray: 1; transition: stroke-dashoffset .6s cubic-bezier(.3, .1, .2, 1); filter: drop-shadow(0 0 6px rgba(242, 164, 58, .55)); }
+.boot-emblem-fill { stroke: url(#boot-fill); stroke-dasharray: 1; filter: drop-shadow(0 0 6px rgba(242, 164, 58, .55)); }
 .boot-emblem-dot { fill: var(--surface-2); transition: fill .4s, filter .4s; }
 .boot-emblem-dot.is-lit { fill: #ffd27a; filter: drop-shadow(0 0 8px rgba(255, 210, 122, .9)); }
 .boot-emblem-num { position: absolute; left: 0; right: 0; bottom: -32px; text-align: center; margin-top: 0; font-variant-numeric: tabular-nums; font-size: .95rem; font-weight: 600; color: var(--accent-strong); }
@@ -64,7 +64,7 @@
 .boot-num { font-variant-numeric: tabular-nums; color: var(--text); }
 .boot-note { margin: 0; font-size: .82rem; color: var(--text-muted); }
 .boot-error { margin: 0; color: var(--danger); }
-.boot-welcome { margin: 0 auto; font-family: var(--font-display); font-size: 1.5rem; color: var(--accent-strong); animation: boot-welcome 1s ease both; }
+.boot-welcome { margin: 0 auto; font-family: var(--font-display); font-size: 1.5rem; color: var(--accent-strong); animation: boot-welcome 1.4s cubic-bezier(.2, .8, .2, 1) both; }
 .boot-dotsline::after { content: ""; animation: boot-dots 1.2s steps(4) infinite; }
 
 @keyframes boot-welcome { from { opacity: 0; transform: scale(.92); letter-spacing: .2em; } to { opacity: 1; transform: none; letter-spacing: .02em; } }

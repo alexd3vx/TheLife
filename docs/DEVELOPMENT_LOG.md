@@ -2,6 +2,13 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Phone redesign, tap menu, performance, loader
+- **Phone redesign:** a lock screen (swipe up or tap), a home screen per model (Go: green, flat, three-button bar and a drop notch; Plus: gradient wallpaper, glass dock, punch-hole camera; Max: dark glass, widget, dynamic island), custom line icons instead of emoji, app-style screens with bottom tabs (LifePay: card, quick actions, send, save and borrow, activity; LifeShop: product cards; LifeChat: messenger bubbles; news hero card; a drawn map with a bottom sheet; a battery gauge). On PC the phone is now a framed handset beside the game (full screen only on small touch screens), with a "Playtest" switch to try Go, Plus and Max.
+- **Tap menu:** tapping the floor offers Walk here / Run here; tapping furniture offers its uses plus a run-there version.
+- **Performance (reported 15 fps on PC):** the pixel ratio is capped at 1.5, small items no longer cast shadows, shadows refresh every frame only when the device can afford it, and the game now adapts: below 45 fps it lowers the resolution (down to 55%), then refreshes shadows less often; it climbs back when there is headroom. The scene is drawn rarely while the phone covers it. `__play.perf()` (dev) reports draw calls, triangles and per-frame cost. A typical frame is about 220 draw calls and 266k triangles including the shadow pass.
+- **Loader:** the emblem, the percentage and the megabytes now read one eased value (they used to disagree because the emblem's path lengths are uneven), the loader waits for the fill before "Welcome", and the welcome stays about 2.6 s.
+- **Map plan:** `docs/MAP_PLAN.md` (neighbourhood first, scenery plus rides, real-time shared clock with offline sleep, cutaway interiors).
+
 ## 2026-10-05 — The phone, traits chosen at creation, boot fix
 - **Traits:** creation now has a third step where the player chooses their own strengths (2, or 3 with one weakness); backgrounds only set money and family.
 - **Boot fix:** a staging script had emptied the asset manifest in the hosted build, which showed "Could not reach the game files". The staging is fixed and the boot never blocks on the device cache.

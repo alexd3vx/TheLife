@@ -4,7 +4,7 @@ import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
 import type { HudSnapshot } from "./gameSession";
 import PhoneUI from "../phone/PhoneUI";
-import { startPlay, type PlayRuntime } from "./runtime";
+import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
 
 interface Toast {
@@ -47,6 +47,7 @@ export default function PlayPage() {
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(null);
+  const [menu, setMenu] = useState<TapMenu | null>(null);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
@@ -64,7 +65,7 @@ export default function PlayPage() {
     let disposed = false;
     loadManifest()
       .then((manifest) =>
-        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway }),
+        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu }),
       )
       .then((runtime) => {
         if (disposed) {
@@ -222,6 +223,18 @@ export default function PlayPage() {
           New game
         </button>
       </div>
+
+      {menu && (
+        <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (containerRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, Math.min(menu.y + 10, (containerRef.current?.clientHeight ?? 600) - 60 - menu.options.length * 46)) }}>
+          {menu.title && <div className="play-menu-title">{menu.title}</div>}
+          {menu.options.map((o, i) => (
+            <button key={i} role="menuitem" onClick={() => { o.run(); setMenu(null); }}>
+              <span aria-hidden="true">{o.icon}</span>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {hud && !phoneOpen && (
         <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => { setPhoneApp(null); setPhoneOpen(true); }} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
