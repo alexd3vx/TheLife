@@ -144,13 +144,14 @@ function roomFloor(b: MeshBuilder, room: PlanRoom, y: number) {
  * The inside of a building: floors, walls with doors and windows, stairs, furniture. The ground floor goes into `ground`
  * (part of the chunk) and everything above it into `cap`, which can be hidden to look inside.
  */
-export function addInterior(ground: MeshBuilder, cap: MeshBuilder, lot: Lot, plan: BuildingPlan, outside: THREE.Color): void {
+export function addInterior(ground: MeshBuilder, cap: MeshBuilder, lot: Lot, plan: BuildingPlan, outside: THREE.Color, lotNo: number): void {
   const f = lot.footprint;
   const storey = plan.storey;
   // The ground floor: a floor slab under the whole building.
   ground.box(f.minX, -0.2, f.minZ, f.maxX, 0.0, f.maxZ, C("#9a9387"), 0.9);
   for (let k = 0; k < plan.floors; k++) {
     const b = k === 0 ? ground : cap;
+    if (k > 0) cap.setLot(lotNo * 8 + k); // so the roof cutaway can hide floors above the one the player is on
     const y0 = k * storey;
     const top = k + 1 < plan.floors ? y0 + storey - 0.2 : y0 + storey;
     if (k > 0) {

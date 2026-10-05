@@ -86,13 +86,18 @@ export class CharacterController {
 
   constructor(
     private readonly avatar: Avatar,
-    private readonly nav: NavGrid,
+    private nav: NavGrid,
     private readonly game: GameBridge,
     private readonly onStatus: (status: Status) => void,
     private readonly onToggle?: (itemId: string) => void,
   ) {
     this.apply();
     this.setClip("Idle_Loop");
+  }
+
+  /** Swaps the walking grid (a different floor of a building has its own). */
+  setNav(nav: NavGrid) {
+    this.nav = nav;
   }
 
   place(x: number, z: number, yaw: number) {

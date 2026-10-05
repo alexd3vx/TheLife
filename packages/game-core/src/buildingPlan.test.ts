@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WALL_THICKNESS, generateDistrict, generatePlan, hasInterior, planBlockers, type Lot, type Rect } from "./index.js";
+import { WALL_THICKNESS, climbStep, generateDistrict, generatePlan, hasInterior, planBlockers, type Lot, type Rect } from "./index.js";
 
 const d = generateDistrict(1);
 const lots = d.lots.filter(hasInterior);
@@ -110,7 +110,69 @@ describe("building plans", () => {
     expect(failures).toEqual([]);
   });
 
-  it("has stairs wherever there is more than one floor (not for shops' offices)", () => {
-    for (const lot of lots.filter((l) => l.kind !== "shop" && l.floors > 1)) expect(generatePlan(lot).stairs.length, lot.id).toBe(lot.floors - 1);
+  it("has one flight of stairs between each pair of floors, inside the building", () => {
+    for (const lot of lots.filter((l) => l.floors > 1)) {
+      const plan = generatePlan(lot);
+      expect(plan.stairs.map((s) => s.floor), lot.id).toEqual([...Array(lot.floors - 1).keys()]);
+      for (const s of plan.stairs) {
+        expect(s.rect.minX, lot.id).toBeGreaterThan(lot.footprint.minX);
+        expect(s.rect.maxX, lot.id).toBeLessThan(lot.footprint.maxX);
+        expect(s.rect.minZ, lot.id).toBeGreaterThan(lot.footprint.minZ);
+        expect(s.rect.maxZ, lot.id).toBeLessThan(lot.footprint.maxZ);
+      }
+    }
+  });
+
+  it("lets a person climb: from the top of each flight they can reach every room on the floor above", () => {
+    const failures: string[] = [];
+    for (const lot of lots.filter((l) => l.floors > 1).slice(0, 80)) {
+      const plan = generatePlan(lot);
+      for (const s of plan.stairs) {
+        const floor = s.floor + 1;
+        const step = climbStep(s.climbs);
+        const r = s.rect;
+        // A spot just beyond the top end of the flight (on the upper floor).
+        const top = { x: (r.minX + r.maxX) / 2 + step.x * ((r.maxX - r.minX) / 2 + 0.6), z: (r.minZ + r.maxZ) / 2 + step.z * ((r.maxZ - r.minZ) / 2 + 0.6) };
+        const f = lot.footprint;
+        const cell = 0.5;
+        const w = Math.ceil((f.maxX - f.minX) / cell) + 2;
+        const h = Math.ceil((f.maxZ - f.minZ) / cell) + 2;
+        const ox = f.minX - cell, oz = f.minZ - cell;
+        const blockers = planBlockers(plan, floor);
+        const blocked = new Uint8Array(w * h);
+        for (let cz = 0; cz < h; cz++) for (let cx = 0; cx < w; cx++) {
+          const x = ox + (cx + 0.5) * cell, z = oz + (cz + 0.5) * cell;
+          if (x < f.minX + 0.1 || x > f.maxX - 0.1 || z < f.minZ + 0.1 || z > f.maxZ - 0.1 || blockers.some((q) => x > q.minX - 0.25 && x < q.maxX + 0.25 && z > q.minZ - 0.25 && z < q.maxZ + 0.25)) blocked[cz * w + cx] = 1;
+        }
+        const at = (x: number, z: number) => Math.floor((z - oz) / cell) * w + Math.floor((x - ox) / cell);
+        const startIndex = at(top.x, top.z);
+        if (blocked[startIndex]) {
+          failures.push(`${lot.id} floor ${floor}: top of the stairs is blocked`);
+          continue;
+        }
+        const seen = new Uint8Array(w * h);
+        const queue = [startIndex];
+        seen[startIndex] = 1;
+        for (let head = 0; head < queue.length; head++) {
+          const i = queue[head]!;
+          const x = i % w, z = Math.floor(i / w);
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+            const nx = x + dx, nz = z + dz;
+            if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+            const j = nz * w + nx;
+            if (!blocked[j] && !seen[j]) {
+              seen[j] = 1;
+              queue.push(j);
+            }
+          }
+        }
+        for (const room of plan.rooms.filter((q) => q.floor === floor)) {
+          let any = false;
+          for (let z = room.rect.minZ + cell / 2; z < room.rect.maxZ && !any; z += cell) for (let x = room.rect.minX + cell / 2; x < room.rect.maxX; x += cell) if (seen[at(x, z)]) { any = true; break; }
+          if (!any) failures.push(`${lot.id} floor ${floor} ${room.kind}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });

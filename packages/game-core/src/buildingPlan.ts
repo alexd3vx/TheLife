@@ -103,7 +103,7 @@ export function generatePlan(lot: Lot): BuildingPlan {
   const shop = lot.kind === "shop";
   const garageW = lot.garage && W > 11 ? 3.6 : 0;
   const mainW = W - garageW;
-  const vf = Math.max(3.6, Math.min(D * 0.52, D - 3.2)); // where the front band ends
+  const vf = Math.max(4.8, Math.min(D * 0.52, D - 3.2)); // where the front band ends
 
   /** A wall in local coordinates. `along` is "u" (runs across, at depth `at`) or "v" (runs inward, at width `at`). */
   const wall = (floor: number, along: "u" | "v", at: number, from: number, to: number, exterior: boolean, openings: { kind: OpeningKind; centre: number; width?: number }[] = []) => {
@@ -139,7 +139,7 @@ export function generatePlan(lot: Lot): BuildingPlan {
     wall(0, "u", D, 0, W, true, [{ kind: "window", centre: W * 0.5 }]);
     wall(0, "u", vs, 0, W, false, [{ kind: "door", centre: W * 0.8 }]);
     for (const at of [0, W]) wall(0, "v", at, 0, D, true, [{ kind: "window", centre: vs * 0.5 }, { kind: "window", centre: vs + (D - vs) * 0.5 }]);
-    for (let k = 0; k < 3; k++) furniture.push({ kind: "shelf", floor: 0, rect: m.box(1.2, W * 0.6, 2.2 + k * 1.6, 2.7 + k * 1.6), height: 1.6 });
+    for (let k = 0; k < 3; k++) furniture.push({ kind: "shelf", floor: 0, rect: m.box(2.4, W * 0.6, 2.2 + k * 1.6, 2.7 + k * 1.6), height: 1.6 });
     furniture.push({ kind: "counter", floor: 0, rect: m.box(W * 0.62, W * 0.62 + 2.4, 1.2, 1.9), height: 1 });
     for (let k = 0; k < 3; k++) furniture.push({ kind: "crate", floor: 0, rect: m.box(1 + k * 1.3, 1.9 + k * 1.3, vs + 0.5, vs + 1.4), height: 0.7 });
   } else {
@@ -172,30 +172,44 @@ export function generatePlan(lot: Lot): BuildingPlan {
     furniture.push({ kind: "toilet", floor: 0, rect: m.box(bW + 0.25, bW + 0.85, D - 0.8, D - 0.25), height: 0.7 });
     furniture.push({ kind: "shower", floor: 0, rect: m.box(mainW - 0.95, mainW - 0.25, D - 0.95, D - 0.25), height: 2 });
     if (garageW) furniture.push({ kind: "car", floor: 0, rect: m.box(mainW + 0.7, W - 0.7, 1.4, 5.8), height: 1.5 });
-    // A staircase up, in the living room against the back wall.
-    if (floors > 1) stairs.push({ rect: m.box(0.3, 1.3, vf - 3.4, vf - 0.4), floor: 0, climbs: lot.facing === 0 ? 2 : lot.facing === 2 ? 0 : lot.facing === 1 ? 3 : 1 });
   }
 
-  // ---- upper floors: two bedrooms at the front, a landing and bathroom behind (the shop's upstairs is an office).
+  // ---- the first flight of stairs: against the left wall, climbing toward the back, ending at a landing in front of the back wall.
+  const toBack: Facing = lot.facing === 0 ? 2 : lot.facing === 2 ? 0 : lot.facing === 1 ? 3 : 1;
+  const toRight: Facing = lot.facing === 0 || lot.facing === 2 ? 1 : 2; // +u in the world
+  if (floors > 1) stairs.push({ rect: m.box(0.3, 1.5, vf - 4.2, vf - 1.2), floor: 0, climbs: toBack });
+
+  // ---- upper floors: a stair hall at the front-left, two bedrooms beside it, a landing and bathroom behind (a shop's upstairs is an office).
+  const hallW = 1.8;
   for (let fl = 1; fl < floors; fl++) {
     const uw = W;
     const half = uw / 2;
-    room(`bed${fl}a`, "bedroom", fl, 0, half, 0, vf);
+    room(`stairs${fl}`, "hall", fl, 0, hallW, 0, vf);
+    room(`bed${fl}a`, "bedroom", fl, hallW, half, 0, vf);
     room(`bed${fl}b`, "bedroom", fl, half, uw, 0, vf);
     room(`hall${fl}`, "hall", fl, 0, uw * 0.65, vf, D);
     room(`bath${fl}`, "bath", fl, uw * 0.65, uw, vf, D);
-    wall(fl, "u", 0, 0, uw, true, [{ kind: "window", centre: half * 0.5 }, { kind: "window", centre: half * 1.5 }]);
+    wall(fl, "u", 0, 0, uw, true, [{ kind: "window", centre: (hallW + half) / 2 }, { kind: "window", centre: half * 1.5 }]);
     wall(fl, "u", D, 0, uw, true, [{ kind: "window", centre: uw * 0.3 }, { kind: "window", centre: uw * 0.82, width: 0.8 }]);
     for (const at of [0, uw]) wall(fl, "v", at, 0, D, true, [{ kind: "window", centre: vf * 0.5 }, { kind: "window", centre: vf + (D - vf) * 0.5, width: 1 }]);
-    // Both bedrooms open onto the landing (the back-left part); the bathroom opens off the landing through the side wall.
-    wall(fl, "u", vf, 0, uw, false, [{ kind: "door", centre: half * 0.5 }, { kind: "door", centre: (half + uw * 0.65) / 2 }]);
+    // The stair hall opens straight onto the landing; each bedroom has its own door onto the landing.
+    wall(fl, "u", vf, 0, uw, false, [
+      { kind: "door", centre: 0.9 },
+      { kind: "door", centre: (hallW + half) / 2 },
+      { kind: "door", centre: (half + uw * 0.65) / 2 },
+    ]);
+    wall(fl, "v", hallW, 0, vf, false);
     wall(fl, "v", half, 0, vf, false);
     wall(fl, "v", uw * 0.65, vf, D, false, [{ kind: "door", centre: (vf + D) / 2, width: 1.1 }]);
-    furniture.push({ kind: "bed", floor: fl, rect: m.box(0.4, 2.4, vf - 2.2, vf - 0.3), height: 0.55 }, { kind: "bed", floor: fl, rect: m.box(half + 0.4, half + 2.4, vf - 2.2, vf - 0.3), height: 0.55 });
-    furniture.push({ kind: "wardrobe", floor: fl, rect: m.box(half - 1.5, half - 0.3, 0.2, 0.8), height: 2 }, { kind: "wardrobe", floor: fl, rect: m.box(uw - 1.5, uw - 0.3, 0.2, 0.8), height: 2 });
+    furniture.push({ kind: "bed", floor: fl, rect: m.box(hallW + 0.4, hallW + 2.4, 0.3, 2.3), height: 0.55 }, { kind: "bed", floor: fl, rect: m.box(half + 0.4, half + 2.4, 0.3, 2.3), height: 0.55 });
+    furniture.push({ kind: "wardrobe", floor: fl, rect: m.box(half - 0.7, half - 0.15, 3.0, 4.4), height: 2 }, { kind: "wardrobe", floor: fl, rect: m.box(uw - 0.7, uw - 0.15, 3.0, 4.4), height: 2 });
     furniture.push({ kind: "toilet", floor: fl, rect: m.box(uw - 0.9, uw - 0.3, D - 0.9, D - 0.3), height: 0.7 });
-    if (fl + 1 < floors && !shop) stairs.push({ rect: m.box(0.3, 1.3, vf + 0.3, vf + 3.3), floor: fl, climbs: lot.facing === 0 ? 0 : lot.facing === 2 ? 2 : lot.facing === 1 ? 1 : 3 });
-    if (shop) furniture.push({ kind: "desk", floor: fl, rect: m.box(uw * 0.1, uw * 0.1 + 1.6, vf + 1.2, vf + 2), height: 0.75 });
+    // Higher flights run along the landing, climbing to the right.
+    if (fl + 1 < floors) {
+      const run = Math.min(3, uw * 0.65 - hallW - 1.7);
+      stairs.push({ rect: m.box(hallW + 0.1, hallW + 0.1 + run, vf + 1.6, vf + 2.8), floor: fl, climbs: toRight });
+    }
+    if (shop) furniture.push({ kind: "desk", floor: fl, rect: m.box(uw - 3.2, uw - 1.6, vf + 2.2, vf + 3), height: 0.75 });
   }
 
   const inside = m.at(frontDoorU, 1.4);
@@ -212,12 +226,31 @@ export function generatePlan(lot: Lot): BuildingPlan {
   };
 }
 
-/** The solid pieces of a plan's ground floor that block walking: wall segments between the openings, and furniture. */
-export function planBlockers(plan: BuildingPlan): Rect[] {
+/** Which way a flight climbs, as a unit step in the world. */
+export function climbStep(climbs: Facing): { x: number; z: number } {
+  return climbs === 0 ? { x: 0, z: -1 } : climbs === 1 ? { x: 1, z: 0 } : climbs === 2 ? { x: 0, z: 1 } : { x: -1, z: 0 };
+}
+
+/** Where along a flight a point is: 0 at the bottom end, 1 at the top end (null if it is not on the flight). */
+export function stairProgress(s: PlanStairs, x: number, z: number, margin = 0): number | null {
+  const r = s.rect;
+  if (x < r.minX - margin || x > r.maxX + margin || z < r.minZ - margin || z > r.maxZ + margin) return null;
+  const step = climbStep(s.climbs);
+  const length = step.x !== 0 ? r.maxX - r.minX : r.maxZ - r.minZ;
+  const along = step.x !== 0 ? (step.x > 0 ? x - r.minX : r.maxX - x) : step.z > 0 ? z - r.minZ : r.maxZ - z;
+  return Math.max(0, Math.min(1, along / length));
+}
+
+/**
+ * The solid pieces on one floor that block walking: wall segments between the openings, furniture, and the rails round
+ * stairs. A flight that starts on this floor is closed at its top end and along its sides (you enter at the bottom); the
+ * hole of the flight coming up from below is closed along its sides and bottom end (you step off at the top).
+ */
+export function planBlockers(plan: BuildingPlan, floor = 0): Rect[] {
   const out: Rect[] = [];
   const t = WALL_THICKNESS / 2;
   for (const w of plan.walls) {
-    if (w.floor !== 0) continue;
+    if (w.floor !== floor) continue;
     const alongX = w.a.z === w.b.z;
     const length = alongX ? w.b.x - w.a.x : w.b.z - w.a.z;
     const open = w.openings.filter((o) => o.kind !== "window").sort((p, q) => p.t0 - q.t0);
@@ -232,6 +265,31 @@ export function planBlockers(plan: BuildingPlan): Rect[] {
     }
     segment(at, length);
   }
-  for (const item of plan.furniture) if (item.floor === 0) out.push(item.rect);
+  for (const item of plan.furniture) if (item.floor === floor) out.push(item.rect);
+  const rail = (s: PlanStairs, closeTop: boolean, closeBottom: boolean) => {
+    const r = s.rect;
+    const step = climbStep(s.climbs);
+    const gap = 0.15;
+    const th = 0.1;
+    if (step.x === 0) {
+      out.push(rect(r.minX - gap - th, r.minX - gap, r.minZ, r.maxZ), rect(r.maxX + gap, r.maxX + gap + th, r.minZ, r.maxZ));
+      const top = step.z > 0 ? r.maxZ : r.minZ;
+      const bottom = step.z > 0 ? r.minZ : r.maxZ;
+      const end = (z: number, dir: number) => rect(r.minX - gap, r.maxX + gap, dir > 0 ? z + gap : z - gap - th, dir > 0 ? z + gap + th : z - gap);
+      if (closeTop) out.push(end(top, step.z));
+      if (closeBottom) out.push(end(bottom, -step.z));
+    } else {
+      out.push(rect(r.minX, r.maxX, r.minZ - gap - th, r.minZ - gap), rect(r.minX, r.maxX, r.maxZ + gap, r.maxZ + gap + th));
+      const top = step.x > 0 ? r.maxX : r.minX;
+      const bottom = step.x > 0 ? r.minX : r.maxX;
+      const end = (x: number, dir: number) => rect(dir > 0 ? x + gap : x - gap - th, dir > 0 ? x + gap + th : x - gap, r.minZ - gap, r.maxZ + gap);
+      if (closeTop) out.push(end(top, step.x));
+      if (closeBottom) out.push(end(bottom, -step.x));
+    }
+  };
+  for (const s of plan.stairs) {
+    if (s.floor === floor) rail(s, true, false);
+    if (s.floor === floor - 1) rail(s, false, true);
+  }
   return out;
 }

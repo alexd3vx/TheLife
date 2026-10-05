@@ -28,12 +28,15 @@ export const lampMaterial = new THREE.MeshStandardMaterial({ vertexColors: true,
  * Roofs and upper floors of buildings with interiors. Every vertex carries its building's number, and one shared value
  * (`capHide`) says which building to hide, so the roof comes off the building the player is standing in.
  */
-export const capHide = { value: -1 };
+export const capHideLot = { value: -1 };
+/** The floor the player is on; floors above it are hidden in that building. */
+export const capHideLevel = { value: 0 };
 function patchHide(material: THREE.Material) {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uHideLot = capHide;
+    shader.uniforms.uHideLot = capHideLot;
+    shader.uniforms.uHideLevel = capHideLevel;
     shader.vertexShader = `attribute float lotId;\nvarying float vLotId;\n${shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLotId = lotId;")}`;
-    shader.fragmentShader = `uniform float uHideLot;\nvarying float vLotId;\n${shader.fragmentShader.replace("void main() {", "void main() {\nif (abs(vLotId - uHideLot) < 0.5) discard;")}`;
+    shader.fragmentShader = `uniform float uHideLot;\nuniform float uHideLevel;\nvarying float vLotId;\n${shader.fragmentShader.replace("void main() {", "void main() {\nfloat hideLot = floor(vLotId / 8.0 + 0.001);\nfloat hideFloor = vLotId - hideLot * 8.0;\nif (abs(hideLot - uHideLot) < 0.5 && hideFloor > uHideLevel + 0.5) discard;")}`;
   };
   material.customProgramCacheKey = () => "cap-hide";
 }
@@ -91,8 +94,9 @@ function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
   }
   if (lod === 0 && hasInterior(lot)) {
     // A real interior: ground floor in the chunk mesh, upper floors and roof in the hideable cap.
-    cap.setLot(Number(lot.id.slice(1)));
-    addInterior(b, cap, lot, generatePlan(lot), WALLS[lot.colour % WALLS.length]!);
+    const lotNo = Number(lot.id.slice(1));
+    addInterior(b, cap, lot, generatePlan(lot), WALLS[lot.colour % WALLS.length]!, lotNo);
+    cap.setLot(lotNo * 8 + lot.floors); // the roof counts as the floor above the top storey
     addRoof(cap, lot, height, lod);
     return;
   }

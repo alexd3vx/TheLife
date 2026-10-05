@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { blockRectCentres, createNavGrid } from "@thelife/shared";
-import { walkBlockers, hasInterior, generatePlan, DISTRICT_HALF } from "@thelife/game-core";
+import { blockOutside, blockRectCentres, createNavGrid, isFree, type NavGrid } from "@thelife/shared";
+import { walkBlockers, hasInterior, generatePlan, climbStep, planBlockers, stairProgress, DISTRICT_HALF, type BuildingPlan, type Lot, type PlanStairs } from "@thelife/game-core";
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
@@ -10,7 +10,7 @@ import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
-import { buildGroundDetail, capHide } from "./chunkBuilder";
+import { buildGroundDetail, capHideLevel, capHideLot } from "./chunkBuilder";
 import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 
@@ -53,7 +53,11 @@ export interface MapRuntime {
     lookAt(x: number, z: number, height?: number, back?: number): void;
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
+    simulate(seconds: number): void;
+    navFree(x: number, z: number): boolean;
     landmarks: import("@thelife/game-core").Landmark[];
+    plan(id: string): import("@thelife/game-core").BuildingPlan;
+    floor(): { level: number; y: number; lot: string | null };
     houses(): { id: string; floors: number; garage: boolean; facing: number; inside: { x: number; z: number }; kind: string }[];
     state(): CharacterController["state"];
     night(): boolean;
@@ -156,6 +160,83 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   };
   const controller = new CharacterController(avatar, nav, bridge, () => {}, () => {});
   controller.place(district.spawn.x, district.spawn.z, district.spawn.yaw);
+
+  // ---- floors: the ground is the district grid; each upper floor of a building has its own small grid. Stairs are ramps:
+  // the player's height follows the flight, and the grid is swapped when they reach the top or the bottom.
+  const groundNav = nav;
+  const planCache = new Map<string, BuildingPlan>();
+  const planOf = (lot: Lot) => {
+    let p = planCache.get(lot.id);
+    if (!p) planCache.set(lot.id, (p = generatePlan(lot)));
+    return p;
+  };
+  const levelGrids = new Map<string, NavGrid>();
+  const levelGrid = (lot: Lot, level: number): NavGrid => {
+    const key = `${lot.id}:${level}`;
+    let g = levelGrids.get(key);
+    if (!g) {
+      const f = lot.footprint;
+      g = createNavGrid({ minX: f.minX - 1, maxX: f.maxX + 1, minZ: f.minZ - 1, maxZ: f.maxZ + 1 }, 0.5);
+      blockOutside(g, f, 0.15);
+      for (const r of planBlockers(planOf(lot), level)) blockRectCentres(g, r, 0.25);
+      levelGrids.set(key, g);
+    }
+    return g;
+  };
+  let floorLot: Lot | null = null;
+  let floorLevel = 0;
+  const flightsHere = (): PlanStairs[] => (floorLot ? planOf(floorLot).stairs.filter((s) => s.floor === floorLevel || s.floor === floorLevel - 1) : []);
+  /** Updates which floor the player is on and how high they stand. Returns the height in metres. */
+  function updateFloor(): number {
+    const px = controller.position.x, pz = controller.position.z;
+    const inside = interiorLots.find((l) => px > l.footprint.minX - 0.3 && px < l.footprint.maxX + 0.3 && pz > l.footprint.minZ - 0.3 && pz < l.footprint.maxZ + 0.3) ?? null;
+    if (inside !== floorLot) {
+      floorLot = inside;
+      floorLevel = 0;
+      controller.setNav(groundNav);
+    }
+    if (!floorLot) {
+      capHideLot.value = -1;
+      return 0;
+    }
+    const plan = planOf(floorLot);
+    capHideLot.value = Number(floorLot.id.slice(1));
+    capHideLevel.value = floorLevel;
+    for (const s of flightsHere()) {
+      const t = stairProgress(s, px, pz);
+      if (t === null) continue;
+      const up = s.floor === floorLevel; // a flight starting on this floor climbs from here; otherwise this is the hole of the flight below
+      const step = climbStep(s.climbs);
+      const r = s.rect;
+      const half = Math.max(r.maxX - r.minX, r.maxZ - r.minZ) / 2;
+      const centre = { x: (r.minX + r.maxX) / 2, z: (r.minZ + r.maxZ) / 2 };
+      if (up && t >= 0.7) {
+        floorLevel = s.floor + 1;
+        controller.setNav(levelGrid(floorLot, floorLevel));
+        controller.tapGround(centre.x + step.x * (half + 0.9), centre.z + step.z * (half + 0.9), "walk"); // step off onto the landing
+      } else if (!up && t <= 0.3) {
+        floorLevel = s.floor;
+        controller.setNav(s.floor === 0 ? groundNav : levelGrid(floorLot, s.floor));
+        controller.tapGround(centre.x - step.x * (half + 0.9), centre.z - step.z * (half + 0.9), "walk");
+      }
+      return (s.floor + t) * plan.storey;
+    }
+    return floorLevel * plan.storey;
+  }
+  /** If a tap landed on a flight that starts (or ends) on this floor, walk its whole length. */
+  function stairTarget(x: number, z: number): { x: number; z: number } | null {
+    for (const s of flightsHere()) {
+      if (stairProgress(s, x, z, 0.6) === null) continue;
+      const step = climbStep(s.climbs);
+      const r = s.rect;
+      const half = Math.max(r.maxX - r.minX, r.maxZ - r.minZ) / 2;
+      const centre = { x: (r.minX + r.maxX) / 2, z: (r.minZ + r.maxZ) / 2 };
+      const up = s.floor === floorLevel;
+      const sign = up ? 1 : -1;
+      return { x: centre.x + sign * step.x * (half - 0.35), z: centre.z + sign * step.z * (half - 0.35) };
+    }
+    return null;
+  }
   streamer.prime(district.spawn.x, district.spawn.z);
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.3, 700);
@@ -183,7 +264,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(marker);
   let markerAge = 9;
   const showMarker = (x: number, z: number, ok: boolean) => {
-    marker.position.set(x, 0.06, z);
+    marker.position.set(x, controller.position.y + 0.06, z);
     marker.visible = true;
     (marker.material as THREE.MeshBasicMaterial).color.set(ok ? "#7dffb5" : "#ff6b5e");
     markerAge = 0;
@@ -230,9 +311,11 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       });
       return;
     }
+    plane.constant = -controller.position.y - 0.02; // taps land on the floor the player is on
     const point = groundAt(clientX, clientY);
     if (!point || Math.abs(point.x) > DISTRICT_HALF || Math.abs(point.z) > DISTRICT_HALF) return events.onMenu(null);
-    const { x, z } = point;
+    const stairs = stairTarget(point.x, point.z);
+    const { x, z } = stairs ?? point;
     showMarker(x, z, controller.canReach(x, z));
     events.onMenu({
       x: clientX - rect.left,
@@ -316,10 +399,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     controller.update(dt);
     avatar.update(dt);
     streamer.update(controller.position.x, controller.position.z);
-    // Take the roof off the building the player is standing in, so its rooms can be seen.
-    const px = controller.position.x, pz = controller.position.z;
-    const inside = interiorLots.find((l) => px > l.footprint.minX - 0.3 && px < l.footprint.maxX + 0.3 && pz > l.footprint.minZ - 0.3 && pz < l.footprint.maxZ + 0.3);
-    capHide.value = inside ? Number(inside.id.slice(1)) : -1;
+    // Take the roof (and any floors above the player's) off the building they are standing in, and follow the stairs up and down.
+    controller.position.y = updateFloor();
 
     // Shadows follow the player, snapped to the shadow-map texels so they don't shimmer.
     const texel = (span * 2) / shadowSize;
@@ -327,7 +408,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     sun.target.position.copy(shadowFocus);
     sun.position.copy(shadowFocus).add(SUN_OFFSET);
 
-    followTarget.set(controller.position.x, 0.9, controller.position.z);
+    followTarget.set(controller.position.x, 0.9 + controller.position.y, controller.position.z);
     const shift = followTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 4));
     controls.target.add(shift);
     camera.position.add(shift);
@@ -453,7 +534,17 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       },
       tapGround: (x, z) => controller.tapGround(x, z),
       streamer,
+      /** Runs the character for this many seconds at once (for tests on slow machines). */
+      simulate: (seconds: number) => {
+        for (let t = 0; t < seconds; t += 0.05) {
+          controller.position.y = updateFloor();
+          controller.update(0.05);
+        }
+      },
+      navFree: (x: number, z: number) => isFree(groundNav, x, z),
       landmarks: district.landmarks,
+      plan: (id: string) => planOf(district.lots.find((l) => l.id === id)!),
+      floor: () => ({ level: floorLevel, y: controller.position.y, lot: floorLot?.id ?? null }),
       houses: () => interiorLots.map((l) => ({ id: l.id, floors: l.floors, garage: l.garage, facing: l.facing, inside: generatePlan(l).inside, kind: l.kind })),
       state: () => controller.state,
       night: () => night,
