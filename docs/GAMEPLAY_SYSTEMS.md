@@ -2,6 +2,19 @@
 
 How the life simulation works. The rules live in `packages/game-core` (pure TypeScript, unit-tested, no rendering) so the same code runs offline in the browser now and on the authoritative server later. The play screen (`apps/client/src/play`) only draws the result and moves the character.
 
+## Who you are: character and background
+
+New life = `#/create` (the first time you press Play, and after "New game"): **1 Look** (body, skin tone, hair, eyes, clothes, with a live 3D preview) then **2 Background**. The background is *rolled* (a short slot-machine spin over **Lapo / Middle / Nepo**, one re-roll) from 11 written backgrounds in `packages/game-core/src/profile.ts`, weighted so rich is rare. It sets, with a name from the matching region:
+
+| | Lapo (poor) | Middle | Nepo (rich) |
+|---|---|---|---|
+| Starting money | ₦4,000-15,000 | ₦40,000-110,000 | ₦350,000-1,000,000 |
+| Rent | ₦14,000 a week | ₦14,000 a week | none (family house) |
+| Allowance | none | none | ₦50,000-70,000 a week from a parent |
+| Phone | basic, cracked | mid | flagship |
+
+It also gives a few traits (descriptive for now) and a skill head-start. It is saved with the game (old saves without one go through the creator). The phone feature builds on the phone tier.
+
 ## The loop
 
 NEED → DECISION (tap something) → ACTION (time passes, the body animates) → RESULT (needs, money, skills change) → CONSEQUENCE (warnings, rent, collapsing) → NEW OPPORTUNITY.
@@ -55,6 +68,8 @@ Actions refuse to start with a clear reason: "You're not hungry", "The fridge is
 | Shower | shower | 15 min | hygiene full |
 | Brush teeth | bathroom sink, mirror | 3 min | hygiene +8 |
 
+Activities are slow enough to watch (a night's sleep is about 28 real seconds, a shower 10) and show a progress ring only when they are long enough to need one.
+
 Cancelling an activity keeps the effects so far (and the ingredients used), but a cooked meal is only made if you finish.
 
 Skills grow by doing: computer skill raises work pay by 8% per level.
@@ -88,6 +103,12 @@ The controller (`play/controller.ts`) adds life on top of the clips:
 - **Blinking** every few seconds.
 - **Body language from needs:** while standing idle the character yawns and stretches when tired, rubs their stomach when hungry, fidgets when they need the toilet.
 - **Getting into bed:** walk to the side, sit on the edge with the real sitting clip, lie back; getting up reverses it.
+
+## Switches
+
+Lamps (desk, oil, floor) are switched on and off by tapping them: the character walks over, reaches out with the real interact animation and flips the switch halfway through. The state is the item's "on" flag; the lamp light eases in. Ceiling lights and power (cuts, generator, solar) are planned.
+
+Tapping elsewhere while sitting down (before you are fully seated) takes the activity back and you get up straight away instead of finishing it first.
 
 ## Furniture and prices
 

@@ -321,7 +321,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     },
     newGame() {
       clearGameSave();
-      location.reload();
+      window.location.hash = "#/create";
     },
     dispose() {
       stopped = true;

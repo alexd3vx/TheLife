@@ -2,11 +2,13 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "./auth/AuthProvider";
 import { AuthPage } from "./ui/AuthPage";
 import { HomePlaceholder } from "./ui/HomePlaceholder";
+import { LIFE_CHANGED, hasLife } from "./play/gameSession";
 
 // The lab is a developer tool, so it only downloads when someone opens #/lab.
 const LabPage = lazy(() => import("./lab/LabPage"));
 const PlayPage = lazy(() => import("./play/PlayPage"));
 const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
+const CreatorPage = lazy(() => import("./creator/CreatorPage"));
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(window.location.hash);
@@ -18,9 +20,21 @@ function useHashRoute(): string {
   return hash;
 }
 
+/** Re-renders when a new life is started (the hash may not change: #/play stays #/play). */
+function useLifeTick(): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((n) => n + 1);
+    window.addEventListener(LIFE_CHANGED, bump);
+    return () => window.removeEventListener(LIFE_CHANGED, bump);
+  }, []);
+  return tick;
+}
+
 export function App() {
   const { status } = useAuth();
   const hash = useHashRoute();
+  useLifeTick();
 
   if (hash.startsWith("#/lab")) {
     return (
@@ -33,6 +47,14 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <ShowroomPage />
+      </Suspense>
+    );
+  }
+  // First time (or after "New game"): make a character and roll a background before playing.
+  if (hash.startsWith("#/create") || (hash.startsWith("#/play") && !hasLife())) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <CreatorPage />
       </Suspense>
     );
   }

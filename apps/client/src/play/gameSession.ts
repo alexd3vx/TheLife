@@ -12,6 +12,7 @@ import {
   speedFactor,
   type GameState,
   type NeedId,
+  type Profile,
   type SimEvent,
 } from "@thelife/game-core";
 import type { GameBridge } from "./controller";
@@ -30,6 +31,10 @@ export interface HudSnapshot {
   meals: number;
   rentOwed: number;
   rentPerWeek: number;
+  /** Weekly money from family, if any. */
+  allowance: number;
+  /** Who the player is. */
+  profile: Profile | null;
   /** Days until the next rent is due. */
   rentInDays: number;
   /** `seconds` is how long it takes in real time; short activities don't need a progress display. */
@@ -54,6 +59,29 @@ function readSave(): SavedGame | null {
   } catch {
     return null;
   }
+}
+
+/** Starts a brand new life from a rolled background (replaces any earlier save). */
+export function beginLife(profile: Profile): void {
+  try {
+    const payload: SavedGame = { state: createGameState(profile), savedAt: Date.now() };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+  } catch {
+    // Storage blocked: the game still starts, it just won't be remembered.
+  }
+  window.dispatchEvent(new Event(LIFE_CHANGED)); // lets the app re-check "has a character been made?"
+}
+
+export const LIFE_CHANGED = "thelife-life-changed";
+
+/** Has the player made a character? Saves from before backgrounds existed have no profile and go through the creator. */
+export function hasLife(): boolean {
+  return readSave()?.state.profile != null;
+}
+
+/** Who the player is, for the HUD. */
+export function savedProfile(): Profile | null {
+  return readSave()?.state.profile ?? null;
 }
 
 export function clearGameSave(): void {
@@ -148,7 +176,9 @@ export class GameSession implements GameBridge {
       portions: s.inventory.portions,
       meals: s.inventory.meals,
       rentOwed: s.rentOwed,
-      rentPerWeek: ECONOMY.rentPerWeek,
+      rentPerWeek: s.profile ? s.profile.rentPerWeek : ECONOMY.rentPerWeek,
+      allowance: s.profile?.weeklyAllowance ?? 0,
+      profile: s.profile,
       rentInDays: daysToRent === 0 && clock.hour < ECONOMY.rentHour ? 0 : daysToRent === 0 ? ECONOMY.rentDay : daysToRent,
       action: act ? { label: ACTIONS[act.def.id]?.label ?? act.def.label, progress: Math.min(1, act.done / act.def.minutes), seconds: act.def.minutes / act.def.minutesPerSecond } : null,
       skills: Object.entries(s.skills).map(([id, xp]) => ({ id, level: skillLevel(xp) })),

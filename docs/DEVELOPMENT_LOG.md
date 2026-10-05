@@ -2,6 +2,17 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Fixes from playtest, character creator with nepo/lapo backgrounds
+- **White textures in the hosted build (root cause found):** reproduced the playtest artifact's Content Security Policy locally; it refuses `fetch(blob:)`, which three.js uses to decode a model's embedded textures, so every furniture model, vehicle and character lost its textures silently. Textures now load through an image element (`lab/loaders.ts`). Verified under the strict policy.
+- **Sleep position:** the lying height was measured with the legs still posed from the walking clip, so the body floated about 13 cm above the mattress; the measurement now starts from the bind pose and the body sinks 2 cm into the mattress.
+- **Hair:** Quaternius styles fitted to the realistic head; box braids and locs rebuilt (they hung across the face and looked like tangled sticks); head wrap rebuilt; three Quaternius styles that render bald hidden.
+- **Loading:** the progress bar is now the Alexion emblem tracing itself and lighting its dot at 100%.
+- **Pacing:** activities run about 2.5x slower (sleep about 28 s, work 30 s), the progress ring only appears for activities of 10 s or more, with a "time is passing quickly" note.
+- **Interaction:** tapping away while still sitting down now cancels the activity and gets up at once (before, it finished sitting first and then walked off); lamps are switchable; the oil lamp moved somewhere reachable.
+- **Character creator and backgrounds (nepo/lapo):** `#/create`: look step with live preview, then a rolled background (11 written ones across lapo, middle, nepo) that sets money, rent, allowance, phone tier, traits and a name; saved in the game state; HUD shows the name and background; nepos pay no rent and get a weekly allowance. 7 new tests.
+- Found while testing: `Sim.advance` stops when an action ends mid-way (callers must loop); the app and absence code already do.
+- Limits: the nepo/lapo traits are labels only for now; no collision or bumping between the character and furniture beyond path-finding (walking routes avoid furniture, the short sit and stand moves do not); the surroundings are still an empty yard (map stage); most furniture is still display-only until the cooking, laundry and other systems arrive.
+
 ## 2026-10-05 — Realistic characters, animation director, texture fix
 - **Furniture textures:** the cause of slow and missing textures was memory, not file size: every model carried 1024 px colour, normal and roughness maps, 658 MB on the graphics card if all were loaded (phones fail and drop textures). Textures are now sized by object (all models 307 MB, the house 120 MB), a build budget enforces 10 MB per piece, textures are uploaded before play starts, and a model that fails to load is retried and replaced by a plain box instead of breaking the room.
 - **New realistic characters:** found the Blender Foundation's CC0 Human Base Meshes, downloaded headless Blender, and wrote a rigging script (`tools/assets/blender/make_body.py`): realistic male and female bodies skinned to the existing 65-bone skeleton by copying weights from a posed Quaternius mesh, A-pose baked in as the bind pose, so all existing animations work. Added realistic skin, eyes with iris and pupil, eyebrows and blinking eyelids. Lab has Realistic/Stylised and Male/Female choices and a Face close-up. Looks saved before this move to the realistic bodies.

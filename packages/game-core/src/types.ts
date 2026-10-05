@@ -23,6 +23,8 @@ export interface Ledger {
   nextId: number;
 }
 
+import type { Profile } from "./profile.js";
+
 export interface Inventory {
   /** Raw food portions from the shop. */
   portions: number;
@@ -45,6 +47,10 @@ export interface GameState {
   rentOwed: number;
   /** Game day number on which rent was last charged. */
   lastRentDay: number;
+  /** Who the player is and the background that set their start. Null in saves from before backgrounds existed. */
+  profile: Profile | null;
+  /** Game day number on which the family allowance was last paid. */
+  lastAllowanceDay: number;
   /** Needs that already triggered their "low" warning, so each warning fires once per dip. */
   warned: Partial<Record<NeedId, boolean>>;
   stats: { daysSurvived: number; totalEarned: number; totalSpent: number; timesPassedOut: number };

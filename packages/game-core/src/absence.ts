@@ -38,6 +38,7 @@ export function simulateAbsence(state: GameState, realMinutesAway: number): Abse
   for (const event of sim.drainEvents()) if (event.kind !== "info" || /rent/i.test(event.text)) lines.push(event.text);
   const spent = moneyBefore - sim.money;
   if (spent > 0) lines.push(`₦${spent.toLocaleString()} went on bills.`);
+  if (spent < 0) lines.push(`₦${(-spent).toLocaleString()} came in.`);
   if (state.rentOwed > 0) lines.push(`You still owe ₦${state.rentOwed.toLocaleString()} in rent.`);
   void ECONOMY;
   return { gameMinutes: minutes, lines };

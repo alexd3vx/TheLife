@@ -45,10 +45,13 @@ Direction: a **Project Zomboid-style realism sim without zombies**: detailed pro
 1. **Furniture (done):** realistic furniture, naira-priced catalog, showroom test page.
 2. **Launch experience and updates (done, Oct 2026):** loving intro splash (Alexion Studios brand), feature highlights, a first-run download of assets into the browser cache with a progress bar, then "Finding assets... loading animations... welcome" on later visits (fast, no re-download). Update system: the game checks its version, and when a new one is released players see "New update, tap to reload"; no maintenance windows. (Service worker + versioned asset manifest.)
 3. **More realistic animation and a better-posed new character (first pass done, Oct 2026):** more life animations (transitions, hand poses, expressions), a new base character with better poses, then build content on it.
+3b. **Character creator with nepo/lapo background (done, Oct 2026).**
 4. **Phones (each its own brand):** several phone models, each with a different UI and design, named after our own game (no real-world trademarks); apps likewise.
 5. **Houses of many types:** multi-storey duplex and mansion (upstairs/downstairs, stairs), garages that come with a house type, trees and gardens outside instead of bare grass, a farm plot where the player plants and harvests.
 6. **The map (the biggest piece):** a big district with many buildings, moving cars, planes and more, streamed in by chunk and level of detail so it stays fast on phones. Given its size it gets its own planning step first.
-7. **Deeper survival-sim mechanics:** more detail and realism in needs, crafting, farming and consequences.
+7. **Deeper survival-sim mechanics:** cooking with a pot and real ingredients, many foods, light switches, generator and solar power with NEPA-style cuts, a TV that plays, a laptop. More detail and realism in needs, crafting, farming and consequences.
+
+Phone plan (decided with the owner): full-screen phone UI opened from a HUD button (phone-shaped frame on desktop, full screen on phones), smooth like a real app; brand family "Life" (LifePhone Go/Plus/Max; LifeChat, LifePay, LifeShop, LifeJobs, LifeNews, LifeMaps); first apps: messages and calls (written NPC chats), bank and wallet (balance, history, pay rent and bills, transfers, loans and savings), shop and delivery, jobs, news and maps; phones differ by look, apps, battery, speed, screen, price and charger type; battery drains, chargers and plugs differ, power cuts, generator, solar, power banks; no camera or social feed yet. Later idea: AI-generated assets that players can preview and download. The earlier "7." item continues: more detail and realism in needs, crafting, farming and consequences.
 
 ## Later phases (from the project brief)
 

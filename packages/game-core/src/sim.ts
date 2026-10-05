@@ -1,6 +1,7 @@
 import { ACTIONS, ECONOMY, skillPayMultiplier } from "./actions";
 import { MINT, PLAYER, SINK, balance, createLedger, transfer } from "./ledger";
 import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./needs";
+import type { Profile } from "./profile";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
 const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped"
@@ -13,19 +14,21 @@ const WARNINGS: Record<NeedId, string> = {
   fun: "You're bored.",
 };
 
-export function createGameState(): GameState {
+export function createGameState(profile: Profile | null = null): GameState {
   const ledger = createLedger();
-  transfer(ledger, MINT, PLAYER, ECONOMY.startingMoney, "Starting money", 0);
+  transfer(ledger, MINT, PLAYER, profile?.startingMoney ?? ECONOMY.startingMoney, "Starting money", 0);
   return {
     version: 1,
     minute: 8 * 60, // Day 1, 08:00
     needs: createNeeds(),
     ledger,
     inventory: { portions: 3, meals: 0 },
-    skills: {},
+    skills: profile ? { ...profile.skills } : {},
     incomeCarry: 0,
     rentOwed: 0,
     lastRentDay: 0,
+    profile,
+    lastAllowanceDay: 0,
     warned: {},
     stats: { daysSurvived: 0, totalEarned: 0, totalSpent: 0, timesPassedOut: 0 },
   };
@@ -259,12 +262,20 @@ export class Sim {
     const s = this.state;
     const day = Math.floor(s.minute / DAY_MINUTES) + 1;
     const hourOfDay = (s.minute % DAY_MINUTES) / 60;
-    const due = day % ECONOMY.rentDay === 0 && day > s.lastRentDay && hourOfDay >= ECONOMY.rentHour;
+    const rent = s.profile ? s.profile.rentPerWeek : ECONOMY.rentPerWeek; // nepo: the family house, no rent
+    const payday = day % ECONOMY.rentDay === 0 && hourOfDay >= ECONOMY.rentHour;
+    const due = rent > 0 && payday && day > s.lastRentDay;
 
+    // Family allowance arrives on the same weekly day.
+    if (s.profile && s.profile.weeklyAllowance > 0 && payday && day > s.lastAllowanceDay) {
+      s.lastAllowanceDay = day;
+      transfer(s.ledger, MINT, PLAYER, s.profile.weeklyAllowance, `Allowance from ${s.profile.allowanceFrom || "family"}`, s.minute);
+      this.emit("good", `${s.profile.allowanceFrom || "Family"} sent your allowance: ₦${s.profile.weeklyAllowance.toLocaleString()}.`);
+    }
     if (due) {
       s.lastRentDay = day;
-      s.rentOwed += ECONOMY.rentPerWeek;
-      this.emit("warn", `Rent is due: ₦${ECONOMY.rentPerWeek.toLocaleString()}.`);
+      s.rentOwed += rent;
+      this.emit("warn", `Rent is due: ₦${rent.toLocaleString()}.`);
     }
     if (s.rentOwed > 0 && this.money > 0) {
       const pay = Math.min(this.money, s.rentOwed);
@@ -277,7 +288,7 @@ export class Sim {
       s.rentOwed += ECONOMY.lateFee;
       this.emit("bad", `You couldn't cover the rent. ₦${s.rentOwed.toLocaleString()} is owed, including a late fee.`);
     }
-    if (s.rentOwed >= ECONOMY.rentPerWeek * 2 && !this.evictionWarned) {
+    if (rent > 0 && s.rentOwed >= rent * 2 && !this.evictionWarned) {
       this.evictionWarned = true;
       this.emit("bad", "Your landlord has sent an eviction warning.");
     }

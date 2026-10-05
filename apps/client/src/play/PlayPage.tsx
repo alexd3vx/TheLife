@@ -111,6 +111,11 @@ export default function PlayPage() {
             <span className="play-money">{naira(hud.money)}</span>
           </div>
         )}
+        {hud?.profile && (
+          <span className={`play-who play-who-${hud.profile.tier}`} title={hud.profile.title}>
+            {hud.profile.firstName} {hud.profile.surname}
+          </span>
+        )}
         <span className="play-fps">{stats}</span>
       </div>
 
@@ -140,8 +145,9 @@ export default function PlayPage() {
           <span>🛒 {hud.portions} {hud.portions === 1 ? "portion" : "portions"}</span>
           <span>🍲 {hud.meals} {hud.meals === 1 ? "meal" : "meals"}</span>
           <span className={hud.rentOwed > 0 ? "play-bad" : ""}>
-            🏠 {hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
+            🏠 {hud.rentPerWeek === 0 ? "Family house, no rent" : hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
           </span>
+          {hud.allowance > 0 && <span>💸 {naira(hud.allowance)} a week from {hud.profile?.allowanceFrom || "family"}</span>}
           {hud.skills.map((skill) => (
             <span key={skill.id}>
               🎓 {skill.id} {skill.level}

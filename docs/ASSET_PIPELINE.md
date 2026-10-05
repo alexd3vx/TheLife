@@ -64,6 +64,10 @@ How (`tools/assets/blender/make_body.py`, run headless by `build-bodies.sh`; Ble
 
 At runtime (`lab/avatar.ts`): skin tone is a colour plus a procedural pore texture (`procedural/skinTexture.ts`); eyes are painted from the iris marks; **eyelids** (skin-coloured caps on the head bone) give random blinks; the head turns toward a look target. Garments are cut from the body mesh as before, now using planes square to each arm (works for T-pose or A-pose) and a signed-distance neckline; body skin is hidden only under triangles a garment wholly covers.
 
+**Hair:** the Quaternius hairstyles are fitted to the realistic head (box to box, slightly enlarged). Three of them (Buzzed fine, Long, Buns) render bald-topped in our pipeline and are hidden until replaced; the procedural styles were rebuilt: box braids and locs now start on the scalp, follow the head down to the ears and hang (never across the face), and the head wrap is a folded wrap with a side knot.
+
+**Hosted builds and textures:** three.js normally decodes textures inside a model by fetching a `blob:` URL, which strict Content Security Policies (like the playtest artifact's) refuse, so every model silently turned white. `lab/loaders.ts` now loads them through an image element instead. To test a build against such a policy, serve it with `connect-src 'self'`.
+
 Limits: 23k triangles per body (budget raised to 26k; a lower-detail version is needed for crowds); the Quaternius fantasy outfits do not fit the realistic bodies (modern procedural clothes only); fingers do not animate; the bodies are 1.82 m (male) and 1.78 m (female) to match the skeleton.
 
 ## Realistic furniture (Poly Haven + code)

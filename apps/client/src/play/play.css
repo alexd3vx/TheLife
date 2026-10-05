@@ -110,3 +110,9 @@
 .play-lapse { color: var(--accent-strong); font-size: .76rem; animation: play-pulse 1.8s ease-in-out infinite; }
 @keyframes play-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .play-lapse { animation: none; } }
+
+.play-who { padding: 8px 12px; border-radius: 12px; min-height: 40px; display: inline-flex; align-items: center; font-size: .85rem; font-weight: 600; background: rgba(20, 17, 15, .72); backdrop-filter: blur(8px); border: 1px solid transparent; white-space: nowrap; }
+.play-who-lapo { border-color: #6fdcb4; }
+.play-who-middle { border-color: #f2a43a; }
+.play-who-nepo { border-color: #c79bff; }
+@media (max-width: 640px) { .play-who { display: none; } }
