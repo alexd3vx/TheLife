@@ -33,7 +33,7 @@ export interface PlayRuntime {
     tapGround(x: number, z: number): boolean;
     tapItem(id: string): boolean;
     /** Placed items with what tapping them does (for the showroom tests). */
-    items(): { id: string; furniture: string; action: string | null; seats: number; x: number; z: number; animated: boolean; approach: [number, number] | null }[];
+    items(): { id: string; furniture: string; action: string | null; seats: number; x: number; z: number; animated: boolean; approach: [number, number] | null; pose: [number, number, number] | null; topY: number }[];
     setHour(hour: number): void;
     /** Runs the simulation faster than real time (tests on slow machines). */
     setSpeed(scale: number): void;
@@ -44,6 +44,7 @@ export interface PlayRuntime {
     state(): CharacterController["state"];
     free(x: number, z: number): boolean;
     session: GameSession | null;
+    avatar: Avatar;
     canReach(interactionId: string): boolean;
     teleport(x: number, z: number): void;
     setView(azimuthDeg: number, polarDeg: number, distance: number): void;
@@ -117,6 +118,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     controls.update();
   }
   resetView();
+  await world.prewarm(renderer, camera);
 
   // ---- target marker
   const marker = new THREE.Mesh(
@@ -348,6 +350,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
             z: i.def.z,
             animated: i.instance.animated,
             approach: own[0]?.approach ?? null,
+            pose: own[0]?.pose ?? null,
+            topY: i.bounds.max.y,
           };
         }),
       setHour(hour) {
@@ -369,6 +373,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         if (!bone) return { hipsY: null };
         return { hipsY: bone.getWorldPosition(new THREE.Vector3()).y };
       },
+      avatar,
       state: () => controller.state,
       free: (x, z) => isFree(world.nav, x, z),
       get session() {

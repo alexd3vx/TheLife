@@ -104,7 +104,35 @@ function normalise(raw: THREE.Object3D, meta: ModelMeta): { object: THREE.Group;
   return { object, box: final, size: final.getSize(new THREE.Vector3()) };
 }
 
+/** A plain box in the item's real size, used if a model can't be loaded, so one bad download never breaks the room. */
+function placeholder(id: string, manifest: AssetManifest): FurnitureInstance {
+  const record = manifest.assets.find((a) => a.id === id);
+  const [w = 0.6, h = 0.6, d = 0.6] = record?.sizeMetres ?? [];
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: "#9b8f84", roughness: 0.9 }));
+  mesh.position.y = h / 2;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const object = new THREE.Group();
+  object.add(mesh);
+  object.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(object);
+  return { id, object, size: box.getSize(new THREE.Vector3()), box, meta: metaFor(id), animated: false, update() {} };
+}
+
+/** Loads a piece, trying twice (a dropped connection), and falls back to a plain box rather than failing. */
 export async function createFurniture(id: string, manifest: AssetManifest): Promise<FurnitureInstance> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await buildFurniture(id, manifest);
+    } catch (error) {
+      console.warn(`furniture: could not load "${id}" (attempt ${attempt + 1})`, error);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+  return placeholder(id, manifest);
+}
+
+async function buildFurniture(id: string, manifest: AssetManifest): Promise<FurnitureInstance> {
   const meta = metaFor(id);
   const animators: Animator[] = [];
   let raw: THREE.Object3D;

@@ -63,8 +63,8 @@ const raycaster = new THREE.Raycaster();
 const DOWN = new THREE.Vector3(0, -1, 0);
 
 /**
- * Height of the surface you'd actually sit or lie on near x, z: the lowest of a small grid of top-down samples, so a
- * pillow or folded blanket on part of the seat doesn't lift the character onto it.
+ * Height of the surface you'd actually sit or lie on near x, z: the middle of a small grid of top-down samples, so a
+ * pillow on part of the seat, or the seam between two cushions, doesn't move the character up or down.
  */
 export function supportHeight(object: THREE.Object3D, x: number, z: number, fromY: number, spread = 0.15): number | null {
   const heights: number[] = [];
@@ -74,7 +74,9 @@ export function supportHeight(object: THREE.Object3D, x: number, z: number, from
       if (h !== null) heights.push(h);
     }
   }
-  return heights.length ? Math.min(...heights) : null;
+  if (!heights.length) return null;
+  heights.sort((a, b) => a - b);
+  return heights[Math.floor((heights.length - 1) / 2)]!; // the middle sample: robust to a seam or a pillow
 }
 
 /** Height of the topmost surface of an object at x, z (metres), or null if nothing is there. */

@@ -20,6 +20,12 @@ export const CREDITS = {
     licence: "CC0 1.0",
     url: "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html",
   },
+  "blender-hbm": {
+    name: "Human Base Meshes (realistic bodies)",
+    author: "Blender Studio / Blender Foundation",
+    licence: "CC0 1.0",
+    url: "https://studio.blender.org/projects/human-base-meshes/",
+  },
   polyhaven: {
     name: "Poly Haven models",
     author: "Poly Haven contributors",
@@ -42,12 +48,12 @@ export const CREDITS = {
 
 // Per-asset limits (mid-range phone target). Characters are the heavy ones; props must stay light.
 export const BUDGETS = {
-  character: { maxTriangles: 20000, maxBytes: 1_800_000 },
+  character: { maxTriangles: 26000, maxBytes: 1_800_000 },
   hair: { maxTriangles: 6000, maxBytes: 900_000 },
   furniture: { maxTriangles: 4000, maxBytes: 120_000 },
   vehicle: { maxTriangles: 8000, maxBytes: 250_000 },
   clothing: { maxTriangles: 10000, maxBytes: 300_000 },
-  realistic: { maxTriangles: 14000, maxBytes: 1_100_000 },
+  realistic: { maxTriangles: 14000, maxBytes: 1_100_000, maxTextureMB: 10 },
   animation: { maxBytes: 6_000_000 },
 };
 

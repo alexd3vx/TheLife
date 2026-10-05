@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { jointPos, type BodyRest } from "./bodyRest";
-import { buildGeometry, clipPlane, extractTriangles, type Triangle } from "./geometryClip";
+import { buildGeometry, clipField, clipPlane, extractTriangles, type Triangle } from "./geometryClip";
 
 export interface GarmentChoice {
   id: string;
@@ -23,6 +23,8 @@ export interface GarmentResult {
   geometry: THREE.BufferGeometry;
   /** Bones whose skin triangles can be hidden because this garment fully covers them. */
   covers: string[];
+  /** Indices of the body's triangles (in index-buffer order) that lie wholly under the garment, so their skin can be hidden. */
+  coveredTriangles: Set<number>;
   slot: "top" | "bottom" | "shoes";
 }
 
@@ -43,28 +45,59 @@ const both = (name: string) => [`${name}_l`, `${name}_r`];
  */
 function cutNeckline(triangles: Triangle[], rest: BodyRest, radius: number, drop: number): Triangle[] {
   const neck = jointPos(rest, "neck_01");
-  return triangles.filter((tri) => {
-    const cx = (tri[0].p[0] + tri[1].p[0] + tri[2].p[0]) / 3;
-    const cy = (tri[0].p[1] + tri[1].p[1] + tri[2].p[1]) / 3;
-    const cz = (tri[0].p[2] + tri[1].p[2] + tri[2].p[2]) / 3;
-    const maxY = Math.max(tri[0].p[1], tri[1].p[1], tri[2].p[1]);
-    if (maxY > neck.y + 0.11) return false;
-    const distance = Math.hypot(cx - neck.x, cz - neck.z);
-    const inNeck = distance < radius && cy > neck.y - drop;
-    const inHead = Math.abs(cx - neck.x) < 0.115 && cy > neck.y + 0.035; // jaw, chin and face sit above the collar line, and stick out forwards
-    return !(inNeck || inHead);
+  // A signed distance to the kept region: positive outside the three removed zones (above the shoulders, the neck
+  // cylinder, and the jaw/face box), so the cut follows a clean line even where the body mesh is coarse.
+  return clipField(triangles, (p) => {
+    const aboveShoulders = neck.y + 0.11 - p[1];
+    const inNeck = Math.max(Math.hypot(p[0] - neck.x, p[2] - neck.z) - radius, neck.y - drop - p[1]);
+    const inHead = Math.max(Math.abs(p[0] - neck.x) - 0.115, neck.y + 0.035 - p[1]);
+    return Math.min(aboveShoulders, inNeck, inHead);
   });
 }
 
-/** Keep |x| <= limit (cuts both arms at the same distance from the body's centre line). */
-function limitWidth(triangles: Triangle[], limit: number) {
-  return clipPlane(clipPlane(triangles, [-1, 0, 0], limit), [1, 0, 0], limit);
+const ARM_BONE = /^(upperarm|lowerarm|hand|index|middle|ring|pinky|thumb)/;
+
+/** Bone indices of one arm (shoulder joint to fingertips), for telling arm triangles from body triangles. */
+function armBones(rest: BodyRest, side: "l" | "r"): Set<number> {
+  const out = new Set<number>();
+  for (const [name, index] of rest.boneIndex) if (name.endsWith(`_${side}`) && ARM_BONE.test(name)) out.add(index);
+  return out;
 }
 
-function armX(rest: BodyRest, from: string, to: string, t: number) {
-  const a = Math.abs(jointPos(rest, `${from}_l`).x);
-  const b = Math.abs(jointPos(rest, `${to}_l`).x);
-  return a + (b - a) * t;
+function armWeight(v: Triangle[number], bones: Set<number>): number {
+  let total = 0;
+  for (let k = 0; k < 4; k++) if (bones.has(v.si[k]!)) total += v.sw[k]!;
+  return total;
+}
+
+const isArmTriangle = (tri: Triangle, bones: Set<number>) => tri.every((v) => armWeight(v, bones) > 0.5);
+
+/**
+ * Cuts both sleeves with a plane square to the arm, `t` of the way from joint `from` to joint `to` (0 = the shoulder
+ * end, 1 = the far end). Works whatever pose the body is in: T-pose arms stick out sideways, A-pose arms hang down.
+ * Only triangles that belong to the arm are cut, so the torso is never touched.
+ */
+function cutSleeves(triangles: Triangle[], rest: BodyRest, from: string, to: string, t: number): Triangle[] {
+  let out = triangles;
+  for (const side of ["l", "r"] as const) {
+    const bones = armBones(rest, side);
+    const a = jointPos(rest, `${from}_${side}`);
+    const b = jointPos(rest, `${to}_${side}`);
+    const dir = b.clone().sub(a).normalize();
+    const q = a.clone().lerp(b, t);
+    const arm = out.filter((tri) => isArmTriangle(tri, bones));
+    const body = out.filter((tri) => !isArmTriangle(tri, bones));
+    const kept = clipPlane(arm, [-dir.x, -dir.y, -dir.z], dir.dot(q));
+    out = [...body, ...kept];
+  }
+  return out;
+}
+
+/** Drops the arms completely (trousers and shorts: in an A-pose the hands hang beside the hips). */
+function withoutArms(triangles: Triangle[], rest: BodyRest): Triangle[] {
+  const left = armBones(rest, "l");
+  const right = armBones(rest, "r");
+  return triangles.filter((tri) => !tri.some((v) => armWeight(v, left) > 0.5 || armWeight(v, right) > 0.5));
 }
 
 const SPECS: Record<string, Spec> = {
@@ -76,7 +109,7 @@ const SPECS: Record<string, Spec> = {
       const hem = jointPos(rest, "pelvis").y + 0.1;
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.085, 0.03);
-      return limitWidth(out, armX(rest, "upperarm", "lowerarm", 0.5));
+      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.5);
     },
   },
   p_tank: {
@@ -87,7 +120,7 @@ const SPECS: Record<string, Spec> = {
       const hem = jointPos(rest, "pelvis").y + 0.1;
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.12, 0.09);
-      return limitWidth(out, Math.abs(jointPos(rest, "upperarm_l").x) - 0.03);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", -0.1);
     },
   },
   p_long: {
@@ -98,7 +131,7 @@ const SPECS: Record<string, Spec> = {
       const hem = jointPos(rest, "pelvis").y + 0.1;
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.085, 0.03);
-      return limitWidth(out, armX(rest, "lowerarm", "hand", 0.7));
+      return cutSleeves(out, rest, "lowerarm", "hand", 0.7);
     },
   },
   p_kaftan: {
@@ -111,7 +144,7 @@ const SPECS: Record<string, Spec> = {
       const hem = thigh + (calf - thigh) * 0.55;
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.085, 0.03);
-      return limitWidth(out, armX(rest, "lowerarm", "hand", 0.15));
+      return cutSleeves(out, rest, "lowerarm", "hand", 0.15);
     },
   },
   p_shorts: {
@@ -123,7 +156,7 @@ const SPECS: Record<string, Spec> = {
       const calf = jointPos(rest, "calf_l").y;
       const waist = jointPos(rest, "pelvis").y + 0.17;
       const hem = thigh + (calf - thigh) * 0.5;
-      return clipPlane(clipPlane(tris, [0, -1, 0], waist), [0, 1, 0], -hem);
+      return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -hem);
     },
   },
   p_trousers: {
@@ -133,7 +166,7 @@ const SPECS: Record<string, Spec> = {
     cut(tris, rest) {
       const waist = jointPos(rest, "pelvis").y + 0.17;
       const ankle = jointPos(rest, "foot_l").y + 0.035;
-      return clipPlane(clipPlane(tris, [0, -1, 0], waist), [0, 1, 0], -ankle);
+      return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
     },
   },
   p_sneakers: {
@@ -142,7 +175,7 @@ const SPECS: Record<string, Spec> = {
     covers: [...both("foot"), ...both("ball"), ...both("ball_leaf")],
     cut(tris, rest) {
       const top = jointPos(rest, "foot_l").y + 0.075;
-      return clipPlane(tris, [0, -1, 0], top);
+      return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
     },
     adjust(p) {
       // Thicker sole: pull the underside down a little.
@@ -159,9 +192,16 @@ export function buildGarment(rest: BodyRest, id: string): GarmentResult | null {
   const spec = SPECS[id];
   if (!spec) return null;
   // The cut planes alone define each garment's area (bone boundaries are ragged, planes are clean).
-  let triangles = extractTriangles(rest.geometry, () => true);
-  triangles = spec.cut(triangles, rest);
+  const all = extractTriangles(rest.geometry, () => true);
+  const order = new Map<Triangle, number>(all.map((tri, i) => [tri, i]));
+  const triangles = spec.cut(all, rest);
   if (triangles.length === 0) return null;
+  // Whole triangles come through the cuts as the same objects; those are exactly the ones under the garment.
+  const coveredTriangles = new Set<number>();
+  for (const tri of triangles) {
+    const id = order.get(tri);
+    if (id !== undefined) coveredTriangles.add(id);
+  }
   const geometry = buildGeometry(triangles, { offset: spec.offset, uvScale: 3.2, ...(spec.adjust ? { adjust: spec.adjust } : {}) });
-  return { geometry, covers: spec.covers, slot: spec.slot };
+  return { geometry, covers: [], coveredTriangles, slot: spec.slot };
 }

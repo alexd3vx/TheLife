@@ -55,9 +55,12 @@ function mix(a: Vertex, b: Vertex, t: number): Vertex {
   };
 }
 
-/** Keeps the part of each triangle where  axis·p + offset >= 0 , cutting triangles that straddle the plane. */
-export function clipPlane(triangles: Triangle[], axis: [number, number, number], offset: number): Triangle[] {
-  const dist = (v: Vertex) => axis[0] * v.p[0] + axis[1] * v.p[1] + axis[2] * v.p[2] + offset;
+/**
+ * Keeps the part of each triangle where `field(p) >= 0`, cutting triangles that straddle the boundary along the line
+ * where the field (interpolated along each edge) crosses zero. A signed distance works best.
+ */
+export function clipField(triangles: Triangle[], field: (p: [number, number, number]) => number): Triangle[] {
+  const dist = (v: Vertex) => field(v.p);
   const out: Triangle[] = [];
   for (const tri of triangles) {
     const d = [dist(tri[0]), dist(tri[1]), dist(tri[2])] as const;
@@ -81,6 +84,11 @@ export function clipPlane(triangles: Triangle[], axis: [number, number, number],
     for (let i = 1; i + 1 < polygon.length; i++) out.push([polygon[0]!, polygon[i]!, polygon[i + 1]!]);
   }
   return out;
+}
+
+/** Keeps the part of each triangle where  axis·p + offset >= 0 , cutting triangles that straddle the plane. */
+export function clipPlane(triangles: Triangle[], axis: [number, number, number], offset: number): Triangle[] {
+  return clipField(triangles, (p) => axis[0] * p[0] + axis[1] * p[1] + axis[2] * p[2] + offset);
 }
 
 export interface BuildOptions {

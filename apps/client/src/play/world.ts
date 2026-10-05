@@ -34,6 +34,8 @@ export interface World {
   updateFurniture(dt: number, time: number, using: ReadonlySet<string>): void;
   /** Lights one item (hover); null clears. */
   highlight(itemId: string | null): void;
+  /** Uploads every texture to the graphics card and compiles shaders now, so nothing stalls once play starts. */
+  prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): Promise<void>;
   /** Fades the walls between the camera and the house so you can always see in. */
   updateWalls(camera: THREE.Camera, delta: number): void;
   /** Sun, sky and house lights for a time of day (hours, 0-24). */
@@ -408,9 +410,33 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   }
   setTimeOfDay(9);
 
+  async function prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
+    const textures = new Set<THREE.Texture>();
+    scene.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const m = material as THREE.MeshStandardMaterial;
+        for (const t of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.aoMap, m.emissiveMap]) if (t) textures.add(t);
+      }
+    });
+    // A few at a time, so the page keeps responding while the graphics card takes them in.
+    const list = [...textures];
+    for (let i = 0; i < list.length; i += 6) {
+      for (const t of list.slice(i, i + 6)) renderer.initTexture(t);
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    }
+    try {
+      await renderer.compileAsync(scene, camera);
+    } catch {
+      // shader pre-compilation is an optimisation only
+    }
+  }
+
   return {
     scene,
     layout,
+    prewarm,
     nav,
     items,
     pickables,

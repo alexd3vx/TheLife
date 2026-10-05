@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Avatar } from "./avatar";
 import { loadGLTF } from "./loaders";
-import { CLOTH_COLORS, EYE_COLORS, FABRIC_OPTIONS, HAIR_COLORS, SKIN_TONES, loadSavedLook, saveLook, type Look } from "./looks";
+import { CLOTH_COLORS, EYE_COLORS, FABRIC_OPTIONS, HAIR_COLORS, SKIN_TONES, loadSavedLook, saveLook, type Look, bodyFor, isRealistic, sexOf } from "./looks";
 import { PROC_BOTTOMS, PROC_SHOES, PROC_TOPS } from "./procedural/garments";
 import { PROC_HAIR } from "./procedural/hair";
 import { assetUrl, loadManifest, type AssetManifest, type AssetRecord } from "./manifest";
@@ -156,28 +156,31 @@ export default function LabPage() {
 
   const randomise = useCallback(() => {
     const pick = <T,>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)] as T;
-    const body = pick(["male", "female"] as const);
+    const realistic = look.body.startsWith("real");
+    const body = bodyFor(pick(["male", "female"] as const), realistic);
+    const outfits = realistic ? (["p_tee", "p_tank", "p_long", "p_kaftan"] as const) : (["p_tee", "p_tank", "p_long", "p_kaftan", "peasant", "ranger"] as const);
     const hairs = [...PROC_HAIR, ...(manifest?.assets ?? []).filter((a) => a.slot === "hair")];
     updateLook({
       body,
       skinTone: pick(SKIN_TONES).id,
       hair: Math.random() < 0.08 ? null : pick(hairs).id,
       hairColor: pick(HAIR_COLORS).id,
-      beard: body === "male" && Math.random() < 0.35,
+      beard: sexOf(body) === "male" && Math.random() < 0.35,
       eyeColor: pick(EYE_COLORS).id,
-      top: pick(["p_tee", "p_tank", "p_long", "p_kaftan", "peasant", "ranger"] as const),
-      bottom: pick(["p_shorts", "p_trousers", "peasant", "ranger"] as const),
-      shoes: pick(["p_sneakers", "peasant", "ranger"] as const),
+      top: pick(outfits),
+      bottom: pick(realistic ? (["p_shorts", "p_trousers"] as const) : (["p_shorts", "p_trousers", "peasant", "ranger"] as const)),
+      shoes: pick(realistic ? (["p_sneakers"] as const) : (["p_sneakers", "peasant", "ranger"] as const)),
       topFabric: pick(FABRIC_OPTIONS).id,
       bottomFabric: pick(FABRIC_OPTIONS).id,
-      hood: Math.random() < 0.15,
-      pauldrons: Math.random() < 0.15,
+      hood: !realistic && Math.random() < 0.15,
+      pauldrons: !realistic && Math.random() < 0.15,
+      brows: null,
       outfitVariant: pick(["a", "b"] as const),
       topColor: pick(CLOTH_COLORS).id,
       bottomColor: pick(CLOTH_COLORS).id,
       shoesColor: pick(CLOTH_COLORS).id,
     });
-  }, [manifest, updateLook]);
+  }, [manifest, updateLook, look.body]);
 
   const savePng = useCallback(() => {
     const url = viewerRef.current?.screenshot();
@@ -274,6 +277,7 @@ export default function LabPage() {
           </label>
           <div className="lab-buttons">
             <button onClick={() => viewerRef.current?.resetCamera()}>Reset view</button>
+            <button onClick={() => viewerRef.current?.closeUp(0.93, 0.22)}>Face</button>
             <button onClick={savePng}>Save PNG</button>
           </div>
         </div>
@@ -305,8 +309,21 @@ function CharacterControls(props: CharacterControlsProps) {
         <h3>Body</h3>
         <div className="lab-segment">
           {(["male", "female"] as const).map((sex) => (
-            <button key={sex} aria-pressed={look.body === sex} onClick={() => onLook({ body: sex, beard: sex === "male" ? look.beard : false })}>
+            <button key={sex} aria-pressed={sexOf(look.body) === sex} onClick={() => onLook({ body: bodyFor(sex, isRealistic(look.body)), beard: sex === "male" ? look.beard : false })}>
               {sex === "male" ? "Male" : "Female"}
+            </button>
+          ))}
+        </div>
+        <div className="lab-segment">
+          {([true, false] as const).map((realistic) => (
+            <button key={String(realistic)} aria-pressed={isRealistic(look.body) === realistic} onClick={() => onLook({
+                  body: bodyFor(sexOf(look.body), realistic),
+                  brows: null,
+                  hood: false,
+                  pauldrons: false,
+                  ...(realistic ? { top: look.top?.startsWith("p_") ? look.top : "p_tee", bottom: look.bottom?.startsWith("p_") ? look.bottom : "p_trousers", shoes: look.shoes?.startsWith("p_") ? look.shoes : "p_sneakers" } : {}),
+                })}>
+              {realistic ? "Realistic" : "Stylised"}
             </button>
           ))}
         </div>
@@ -373,7 +390,7 @@ function CharacterControls(props: CharacterControlsProps) {
           <button aria-pressed={look.brows === null} onClick={() => onLook({ brows: null })}>
             Default brows
           </button>
-          {brows.map((brow) => (
+          {(isRealistic(look.body) ? [] : brows).map((brow) => (
             <button key={brow.id} aria-pressed={look.brows === brow.id} onClick={() => onLook({ brows: brow.id })}>
               {brow.label}
             </button>
@@ -415,7 +432,7 @@ function CharacterControls(props: CharacterControlsProps) {
                   {item.label}
                 </button>
               ))}
-              {outfitIds.map((id) => (
+              {(isRealistic(look.body) ? [] : outfitIds).map((id) => (
                 <button key={id} aria-pressed={look[slot] === id} onClick={() => onLook({ [slot]: id })}>
                   {outfits[id]?.label ?? id}
                 </button>

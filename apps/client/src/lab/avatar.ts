@@ -2,12 +2,13 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
-import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
+import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, type Look } from "./looks";
 import { readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import { fabricTexture, type FabricId } from "./procedural/fabrics";
 import { buildGarment, isProceduralGarment } from "./procedural/garments";
 import { buildHair } from "./procedural/hair";
 import { hairTexture } from "./procedural/hairTextures";
+import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
@@ -104,7 +105,8 @@ export class Avatar {
     this.root.add(this.bodyScene);
 
     const meshes = skinnedMeshesOf(this.bodyScene);
-    this.bodyMesh = meshes.find((m) => materialsOf(m).some((mat) => /superhero/i.test(mat.name))) ?? meshes[0] ?? null;
+    // The skin is the biggest skinned mesh (the rest are eyes and brows).
+    this.bodyMesh = meshes.reduce<THREE.SkinnedMesh | null>((best, m) => (!best || m.geometry.getAttribute("position").count > best.geometry.getAttribute("position").count ? m : best), null);
     this.skeleton = this.bodyMesh?.skeleton ?? null;
     this.builtInBrows = meshes.filter((m) => materialsOf(m).some((mat) => /hair/i.test(mat.name)));
     for (const mesh of meshes) {
@@ -167,6 +169,23 @@ export class Avatar {
   private async applySkin(): Promise<void> {
     if (!this.bodyScene) return;
     const tone = SKIN_TONES.find((t) => t.id === this.look.skinTone) ?? SKIN_TONES[0]!;
+    if (isRealistic(this.look.body)) {
+      // No photo texture: the skin tone is the colour, with a fine procedural surface on top.
+      const detail = skinTextures();
+      const body = this.bodyMesh;
+      if (body) {
+        for (const material of materialsOf(body)) {
+          material.map = detail.map;
+          material.normalMap = detail.normal;
+          material.normalScale.set(0.35, 0.35);
+          material.color.set(tone.base);
+          material.roughness = 0.62;
+          material.metalness = 0;
+          material.needsUpdate = true;
+        }
+      }
+      return;
+    }
     const lightMap = tone.map === "light" ? await loadGltfTexture(assetUrl(`characters/skin_${this.look.body}_light.webp`)) : null;
     eachMaterial(this.bodyScene, (material) => {
       if (!/superhero/i.test(material.name)) return;
@@ -181,7 +200,42 @@ export class Avatar {
     if (!this.bodyScene) return;
     const swatch = EYE_COLORS.find((s) => s.id === this.look.eyeColor) ?? EYE_COLORS[0]!;
     eachMaterial(this.bodyScene, (material) => {
-      if (/eye/i.test(material.name)) material.color.set(swatch.color);
+      if (/eye/i.test(material.name)) material.color.set(isRealistic(this.look.body) ? "#ffffff" : swatch.color);
+    });
+    if (isRealistic(this.look.body)) this.paintRealisticEyes(swatch.color);
+  }
+
+  /** The realistic eyes mark their iris and pupil in vertex colours; paint them white, the chosen iris colour and near-black. */
+  private paintRealisticEyes(irisColour: string): void {
+    const iris = new THREE.Color(irisColour === "#ffffff" ? "#5a3a22" : irisColour).multiplyScalar(0.8);
+    const sclera = new THREE.Color("#ece8e2");
+    const pupil = new THREE.Color("#0b0a0a");
+    this.bodyScene?.traverse((child) => {
+      const mesh = child as THREE.SkinnedMesh;
+      if (!mesh.isSkinnedMesh || !materialsOf(mesh).some((m) => /eye/i.test(m.name))) return;
+      const geometry = mesh.geometry;
+      const mask = (geometry.userData.eyeMask as Float32Array | undefined) ?? (() => {
+        const source = geometry.getAttribute("color") as THREE.BufferAttribute;
+        const copy = new Float32Array(source.count * 2);
+        for (let i = 0; i < source.count; i++) {
+          copy[i * 2] = source.getX(i);
+          copy[i * 2 + 1] = source.getY(i);
+        }
+        geometry.userData.eyeMask = copy;
+        return copy;
+      })();
+      const count = mask.length / 2;
+      const colours = new Float32Array(count * 3);
+      const c = new THREE.Color();
+      for (let i = 0; i < count; i++) {
+        c.copy(sclera);
+        if (mask[i * 2]! > 0.5) c.copy(iris);
+        if (mask[i * 2 + 1]! > 0.5) c.copy(pupil);
+        colours[i * 3] = c.r;
+        colours[i * 3 + 1] = c.g;
+        colours[i * 3 + 2] = c.b;
+      }
+      geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
     });
   }
 
@@ -246,13 +300,20 @@ export class Avatar {
       if (hiddenBoneNames.has(bone.name)) hidden.add(i);
     });
 
+    // Garments cut from the body also say exactly which body triangles lie wholly beneath them.
+    const covered = new Set<number>();
+    for (const part of this.partRoots.values()) {
+      const triangles = part.userData.coveredTriangles as Set<number> | undefined;
+      if (triangles) for (const id of triangles) covered.add(id);
+    }
+
     const source = this.originalIndex;
     const kept: number[] = [];
     for (let i = 0; i < source.length; i += 3) {
       const a = source[i]!;
       const b = source[i + 1]!;
       const c = source[i + 2]!;
-      const isHidden = hidden.has(this.vertexBone[a]!) && hidden.has(this.vertexBone[b]!) && hidden.has(this.vertexBone[c]!);
+      const isHidden = covered.has(i / 3) || (hidden.has(this.vertexBone[a]!) && hidden.has(this.vertexBone[b]!) && hidden.has(this.vertexBone[c]!));
       if (!isHidden) kept.push(a, b, c);
     }
     const ArrayType = source instanceof Uint32Array ? Uint32Array : Uint16Array;
@@ -399,6 +460,7 @@ export class Avatar {
     group.userData.kind = "proc-garment";
     group.userData.slot = result.slot;
     group.userData.covers = result.covers;
+    group.userData.coveredTriangles = result.coveredTriangles;
     group.add(skinned);
     this.bodyScene.add(group);
     return group;

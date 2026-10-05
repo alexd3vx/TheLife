@@ -73,6 +73,8 @@ export interface Viewer {
   setTurntable(on: boolean): void;
   addFrameCallback(callback: (delta: number) => void): void;
   resetCamera(): void;
+  /** Looks at the subject at `height` (0 = feet, 1 = top), from `zoom` times the full-body distance (smaller = closer). */
+  closeUp(height: number, zoom: number): void;
   screenshot(): string;
   onStats(callback: (stats: ViewerStats) => void): void;
   dispose(): void;
@@ -182,6 +184,17 @@ export function createViewer(container: HTMLElement): Viewer | null {
     controls.update();
   }
 
+  function closeUp(height: number, zoom: number) {
+    if (!subject) return;
+    const box = new THREE.Box3().setFromObject(subject);
+    const size = box.getSize(new THREE.Vector3());
+    const target = new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y + size.y * height, (box.min.z + box.max.z) / 2);
+    const distance = (Math.max(size.y, 0.3) / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.5 * zoom;
+    controls.target.copy(target);
+    camera.position.set(target.x + distance * 0.35, target.y + size.y * 0.02, target.z + distance * 0.94);
+    controls.update();
+  }
+
   function resize() {
     const { clientWidth, clientHeight } = container;
     if (!clientWidth || !clientHeight) return;
@@ -251,6 +264,7 @@ export function createViewer(container: HTMLElement): Viewer | null {
       callbacks.push(callback);
     },
     resetCamera,
+    closeUp,
     screenshot: () => renderer.domElement.toDataURL("image/png"),
     onStats(callback) {
       statsListener = callback;

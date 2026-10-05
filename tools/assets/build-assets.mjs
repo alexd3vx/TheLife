@@ -39,7 +39,14 @@ function stats(doc) {
       triangles += (idx ? idx.getCount() : prim.getAttribute("POSITION").getCount()) / 3;
     }
   }
+  // Memory the textures take once on the graphics card (RGBA plus mipmaps), which is what slows phones down, not file size.
+  let textureBytes = 0;
+  for (const texture of rootDoc.listTextures()) {
+    const size = texture.getSize();
+    if (size) textureBytes += size[0] * size[1] * 4 * 1.33;
+  }
   return {
+    textureMB: Math.round((textureBytes / 1e6) * 10) / 10,
     triangles: Math.round(triangles),
     materials: rootDoc.listMaterials().length,
     textures: rootDoc.listTextures().length,
@@ -67,12 +74,14 @@ async function write(doc, category, id, outPath, extra = {}) {
 
 // Skinned parts (bodies, hair) must keep raw float positions: quantization hides its decompression scale in the
 // skeleton's inverse-bind matrices, and we re-bind hair to the body's skeleton at runtime.
-async function optimise(doc, { textureSize = 1024, quality = 80, skinned = false } = {}) {
+// `dataTextureSize` (normal, roughness/metal maps) can be smaller than the colour map: it is far less visible.
+async function optimise(doc, { textureSize = 1024, dataTextureSize = textureSize, quality = 80, skinned = false } = {}) {
   doc.setLogger(new Logger(Logger.Verbosity.WARN));
+  // Skinned parts keep every attribute (the realistic bodies' texture coordinates and eye colour masks are read at runtime).
+  await doc.transform(dedup(), prune({ keepAttributes: skinned }));
   await doc.transform(
-    dedup(),
-    prune(),
-    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [textureSize, textureSize], quality }),
+    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [textureSize, textureSize], quality, slots: /^baseColor|^emissive/ }),
+    textureCompress({ encoder: sharp, targetFormat: "webp", resize: [dataTextureSize, dataTextureSize], quality, slots: /^(?!baseColor|emissive)/ }),
   );
   if (skinned) {
     await doc.transform(reorder({ encoder: MeshoptEncoder, target: "size" }));
@@ -117,6 +126,21 @@ for (const sex of ["Male", "Female"]) {
   await write(doc, "character", `body_${sex.toLowerCase()}`, join(OUT, `characters/body_${sex.toLowerCase()}.glb`), {
     label: `${sex} base (Superhero proportions)`,
     credit: "quaternius-ubc",
+  });
+}
+
+// Realistic bodies: Blender Foundation base meshes rigged to the game skeleton by blender/build-bodies.sh.
+for (const sex of ["male", "female"]) {
+  const file = join(SRC, `generated/body_real_${sex}.glb`);
+  if (!existsSync(file)) {
+    console.warn(`  missing ${file} (run tools/assets/blender/build-bodies.sh)`);
+    continue;
+  }
+  const doc = await io.read(file);
+  await optimise(doc, { skinned: true });
+  await write(doc, "character", `body_real${sex}`, join(OUT, `characters/body_real${sex}.glb`), {
+    label: `${sex === "male" ? "Male" : "Female"} realistic`,
+    credit: "blender-hbm",
   });
 }
 
@@ -289,7 +313,12 @@ await copyKit(join(SRC, "kenney/car-kit/extracted/Models/GLB format"), VEHICLES,
       const ratio = (budget * 0.7) / tris;
       await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.06 }));
     }
-    await optimise(doc, { textureSize: biggest >= 1.2 ? 1024 : 512, quality: 80 });
+    // Texture size follows the object's size: only big pieces (sofas, beds, wardrobes) keep a 1024 colour map, and small
+    // ones (lamps, radios, clocks) get 256. A phone has to hold every texture in the house at once.
+    // Pieces with several materials (cabinets with glass and metal parts) step down one size: they have many maps.
+    const multi = doc.getRoot().listTextures().length > 3;
+    const sizes = multi && biggest >= 1.5 ? { textureSize: 512, dataTextureSize: 256 } : biggest >= 1.5 ? { textureSize: 1024, dataTextureSize: 512 } : biggest >= 0.6 ? { textureSize: 512, dataTextureSize: 512 } : { textureSize: 256, dataTextureSize: 256 };
+    await optimise(doc, { ...sizes, quality: 80 });
     await write(doc, "realistic", item.id, join(OUT, `props/real/${item.id}.glb`), {
       label: item.label,
       group: item.group,
@@ -307,6 +336,7 @@ for (const asset of manifest.assets) {
   const problems = [];
   if (budget.maxTriangles && asset.triangles > budget.maxTriangles) problems.push(`triangles ${asset.triangles} > ${budget.maxTriangles}`);
   if (budget.maxBytes && asset.bytes > budget.maxBytes) problems.push(`size ${asset.bytes} > ${budget.maxBytes}`);
+  if (budget.maxTextureMB && asset.textureMB > budget.maxTextureMB) problems.push(`texture memory ${asset.textureMB} MB > ${budget.maxTextureMB} MB`);
   if (problems.length) {
     failures++;
     asset.budgetProblems = problems;

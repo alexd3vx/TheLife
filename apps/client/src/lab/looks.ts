@@ -3,19 +3,21 @@
 export interface SkinTone {
   id: string;
   label: string;
-  /** "dark" uses the pack's own dark skin map; "light" multiplies the light map by the tint. */
+  /** "dark" uses the pack's own dark skin map; "light" multiplies the light map by the tint. (Stylised bodies.) */
   map: "dark" | "light";
   tint: string;
+  /** The skin colour itself, used by the realistic bodies, which carry no photo texture. */
+  base: string;
 }
 
 export const SKIN_TONES: SkinTone[] = [
-  { id: "ebony", label: "Ebony", map: "dark", tint: "#ffffff" },
-  { id: "deep", label: "Deep brown", map: "light", tint: "#5e3b2a" },
-  { id: "rich", label: "Rich brown", map: "light", tint: "#7c5037" },
-  { id: "warm", label: "Warm brown", map: "light", tint: "#9a6a47" },
-  { id: "caramel", label: "Caramel", map: "light", tint: "#b98458" },
-  { id: "honey", label: "Honey", map: "light", tint: "#d4a577" },
-  { id: "light", label: "Light", map: "light", tint: "#f0d2b4" },
+  { id: "ebony", label: "Ebony", map: "dark", tint: "#ffffff", base: "#3a2620" },
+  { id: "deep", label: "Deep brown", map: "light", tint: "#5e3b2a", base: "#59382a" },
+  { id: "rich", label: "Rich brown", map: "light", tint: "#7c5037", base: "#76503a" },
+  { id: "warm", label: "Warm brown", map: "light", tint: "#9a6a47", base: "#98694a" },
+  { id: "caramel", label: "Caramel", map: "light", tint: "#b98458", base: "#b98a62" },
+  { id: "honey", label: "Honey", map: "light", tint: "#d4a577", base: "#d6a97f" },
+  { id: "light", label: "Light", map: "light", tint: "#f0d2b4", base: "#e9c8a8" },
 ];
 
 export interface Swatch {
@@ -67,9 +69,15 @@ export const FABRIC_OPTIONS = [
 ] as const;
 
 export type Sex = "male" | "female";
+/** "real*" bodies are the realistic ones; the others are the stylised (Superhero proportions) pair. */
+export type BodyId = "male" | "female" | "realmale" | "realfemale";
+
+export const sexOf = (body: BodyId): Sex => (body.endsWith("female") ? "female" : "male");
+export const isRealistic = (body: BodyId): boolean => body.startsWith("real");
+export const bodyFor = (sex: Sex, realistic: boolean): BodyId => (realistic ? (sex === "male" ? "realmale" : "realfemale") : sex);
 
 export interface Look {
-  body: Sex;
+  body: BodyId;
   skinTone: string;
   hair: string | null;
   hairColor: string;
@@ -92,7 +100,7 @@ export interface Look {
 }
 
 export const DEFAULT_LOOK: Look = {
-  body: "male",
+  body: "realmale",
   skinTone: "deep",
   hair: "p_fade",
   hairColor: "black",
@@ -120,7 +128,9 @@ export function loadSavedLook(): Look {
     const raw = localStorage.getItem(LOOK_KEY);
     if (!raw) return { ...DEFAULT_LOOK };
     const parsed = JSON.parse(raw) as Partial<Look>;
-    return { ...DEFAULT_LOOK, ...parsed, body: parsed.body === "female" ? "female" : "male" };
+    // Looks saved before the realistic bodies existed used "male"/"female"; they move to the realistic pair.
+    const body: BodyId = parsed.body === "female" || parsed.body === "realfemale" ? "realfemale" : parsed.body === "male" || parsed.body === "realmale" ? "realmale" : DEFAULT_LOOK.body;
+    return { ...DEFAULT_LOOK, ...parsed, body };
   } catch {
     return { ...DEFAULT_LOOK };
   }
