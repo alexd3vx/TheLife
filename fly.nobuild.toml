@@ -1,0 +1,32 @@
+# Fallback deploy that needs no image build (use when Fly's builder is unreachable):
+#   fly deploy --image node:22-slim --config fly.nobuild.toml
+# The machine clones the repository on start, installs the server and runs it. Slower to start than the Dockerfile image.
+app = "thelife-server"
+primary_region = "jnb"
+
+[env]
+  PORT = "8080"
+  ROOM = "lagos-test"
+  ALLOWED_ORIGINS = "https://thelifesims.vercel.app"
+
+[experimental]
+  entrypoint = ["sh", "-c"]
+  cmd = ["apt-get update -qq && apt-get install -y -qq git ca-certificates >/dev/null && git clone --depth 1 --branch claude/hopeful-lovelace-20wkdq https://github.com/alexd3vx/TheLife /app && cd /app && corepack enable && pnpm install --frozen-lockfile --filter @thelife/server... && exec pnpm --filter @thelife/server start"]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "120s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
