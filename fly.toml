@@ -1,0 +1,29 @@
+# Fly.io config for the game server. Deploy: fly launch --no-deploy --copy-config, then fly deploy.
+app = "thelife-server"
+primary_region = "jnb"   # Johannesburg is the closest Fly region to Nigeria; change with `fly regions`
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  ROOM = "lagos-test"
+  # Comma-separated list of the website addresses allowed to connect, e.g. https://thelife.vercel.app
+  ALLOWED_ORIGINS = ""
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # the world lives in memory, so keep one machine running
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "3s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
