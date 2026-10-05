@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   APP_INFO, bestCharger, call, clearNotifications, clockOf, contactsFor, dismissNotification, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn,
   unreadCount, wallPower, balance,
@@ -26,6 +26,32 @@ const APP_NAME = (app: ClientApp) => (app === "battery" ? "Power" : APP_INFO[app
 /** The dock holds four apps on every model; the grid holds the rest. */
 const DOCK: ClientApp[] = ["chat", "pay", "shop", "news"];
 const GRID: ClientApp[] = ["jobs", "maps", "battery"];
+
+/** If an app throws while drawing, show what happened and a restart button instead of a blank screen. */
+class AppBoundary extends Component<{ name: string; children: ReactNode }, { error: Error | null; attempt: number }> {
+  state = { error: null as Error | null, attempt: 0 };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error) {
+    console.error(`[phone] ${this.props.name} stopped:`, error);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="phone-crash" role="alert">
+          <Icon name="power" size={40} />
+          <strong>{this.props.name} stopped</strong>
+          <span>{this.state.error.message.slice(0, 160)}</span>
+          <button className="pa-btn is-solid" onClick={() => this.setState((s) => ({ error: null, attempt: s.attempt + 1 }))}>
+            Restart app
+          </button>
+        </div>
+      );
+    }
+    return <div key={this.state.attempt} className="phone-boundary">{this.props.children}</div>;
+  }
+}
 
 interface Props {
   session: GameSession;
@@ -233,6 +259,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       <h1>{APP_NAME(app)}</h1>
                     </header>
                     <div className="phone-app-body">
+                      <AppBoundary name={APP_NAME(app)}>
                       {app === "chat" && <Chat state={state} act={act} startCall={startCall} refresh={refresh} />}
                       {app === "pay" && <Pay state={state} act={act} />}
                       {app === "shop" && <Shop state={state} act={act} session={session} />}
@@ -240,6 +267,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       {app === "news" && <News state={state} />}
                       {app === "maps" && <Maps state={state} />}
                       {app === "battery" && <Battery state={state} act={act} onModel={changeModel} />}
+                      </AppBoundary>
                     </div>
                   </section>
                 ))}

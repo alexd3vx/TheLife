@@ -83,7 +83,11 @@ export function Chat({ state, act, startCall, refresh }: { state: GameState; act
   const contacts = contactsFor(state.profile);
   const endRef = useRef<HTMLDivElement>(null);
   const t = current ? state.phone.threads[current] : undefined;
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [t?.messages.length, current]);
+  // Scroll the message list itself. scrollIntoView would also scroll every ancestor, including the (overflow: hidden) phone screen, and shift the whole app out of view.
+  useEffect(() => {
+    const list = endRef.current?.parentElement;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [t?.messages.length, current]);
 
   if (!current) {
     return (
