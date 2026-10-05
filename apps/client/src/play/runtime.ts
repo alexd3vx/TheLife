@@ -25,6 +25,10 @@ export interface RuntimeEvents {
 export interface PlayRuntime {
   dispose(): void;
   buyGroceries(): void;
+  /** Draws the 3D scene less while the phone covers it. */
+  setPhoneOpen(open: boolean): void;
+  /** The running game, for the phone screen. Null in the showroom. */
+  session: GameSession | null;
   newGame(): void;
   setFollow(on: boolean): void;
   resetView(): void;
@@ -260,6 +264,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     for (const link of placedById.get(id)?.def.link ?? []) set.add(link);
     return set;
   }
+  let renderEvery = 1;
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
@@ -297,7 +302,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     m.opacity = Math.max(0, 0.9 - markerAge * 0.7);
     marker.scale.setScalar(1 + Math.min(markerAge, 1.2) * 0.5);
 
-    renderer.render(world.scene, camera);
+    // With the phone open the scene is hidden behind it, so draw it rarely: smoother phone, cooler device.
+    if (renderEvery === 1 || frames % renderEvery === 0) renderer.render(world.scene, camera);
     frames++;
     acc += dt;
     if (acc >= 0.5) {
@@ -312,10 +318,14 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   document.addEventListener("visibilitychange", saveNow);
 
   return {
+    session,
     setFollow(on) {
       follow = on;
     },
     resetView,
+    setPhoneOpen(open) {
+      renderEvery = open ? 8 : 1;
+    },
     buyGroceries() {
       session?.buyGroceries();
     },

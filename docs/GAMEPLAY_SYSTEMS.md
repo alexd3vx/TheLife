@@ -13,7 +13,7 @@ New life = `#/create` (the first time you press Play, and after "New game"): **1
 | Allowance | none | none | ₦50,000-70,000 a week from a parent |
 | Phone | basic, cracked | mid | flagship |
 
-It also gives a few traits (descriptive for now) and a skill head-start. It is saved with the game (old saves without one go through the creator). The phone feature builds on the phone tier.
+It also gives a few flavour lines and a skill head-start. Step **3 Traits** is the player's choice: pick 2 strengths, or take one weakness to unlock a third (`traits.ts`); traits change need decay, pay, grocery prices or starting skills. It is saved with the game (old saves without one go through the creator). The phone feature builds on the phone tier.
 
 ## The loop
 
@@ -74,11 +74,23 @@ Cancelling an activity keeps the effects so far (and the ingredients used), but 
 
 Skills grow by doing: computer skill raises work pay by 8% per level.
 
+## The phone (`phone.ts`, `phoneData.ts`; screen in `apps/client/src/phone/`)
+
+Opened from the 📱 button on the play screen (a phone-shaped frame on desktop, full screen on phones). It is real game state (`GameState.phone`, saved and validated), so the same rules will run on the server.
+
+- **Three models, three looks** (your background gives you one; you can buy another in LifeShop): **LifePhone Go** (micro-USB, LCD, slower app animations, no LifeJobs/LifeMaps, no savings or loans, long standby), **LifePhone Plus** (USB-C, AMOLED 90Hz, all apps), **LifePhone Max** (LifeLink fast charging, dynamic-island look, widgets, fastest animations, shortest battery).
+- **Battery:** drains faster while the phone is open than on standby; at 0% it is dead until plugged in. **Chargers** have a port type (micro, USB-C, LifeLink) and a speed; a charger only works if it fits the phone, and the phone caps the speed. A **power bank** charges from the wall when there is power and charges the phone anywhere. **Power cuts** are deterministic per day (some announced in LifeNews, some not), and a water-and-power bill unpaid for two weeks cuts the wall power too. Generator and solar will plug into the same `wallPower` check later.
+- **Data and airtime:** apps use a little data when opened (LifePay works without data, like USSD); calls cost airtime. Both are topped up in LifePay.
+- **LifeChat:** written messages from family, a friend (Kola), your landlord and alert senders arrive on set days with quick replies (AI later). Choices have effects: lend Kola ₦2,000 and he pays ₦2,200 back three days later. Calls cost airtime and lift your mood.
+- **LifePay:** balance and history (the ledger), pay rent and the weekly bill (or leave auto-pay on), send money to people, **savings** (1% a week, own ledger account) and **loans** (10% fee, limit by background, 5% a week after two weeks) on Plus and Max, airtime and data bundles.
+- **LifeShop:** groceries (15% off on promo days, shown in LifeNews), chargers, power bank and phones, delivered after a delay (₦500 delivery under ₦10,000). **LifeJobs:** apply to a job; the answer arrives half a day later and depends on your skills; a job pays a weekly retainer and boosts what work pays. **LifeNews:** a few headlines a day, deterministic. **LifeMaps:** a simple "around you" list until the real map exists.
+- Not yet: the character does not hold the phone while using it, charging does not need walking to a socket (plugging in works anywhere), no camera or social feed.
+
 ## Money
 
 - **Double-entry ledger** (`ledger.ts`): every change is a transfer between two accounts (`player`, `mint`, `sink`). The sum of all accounts is always 0, the player can never go below ₦0, and a saved game whose ledger doesn't balance is rejected. This is the base for the audit and anti-cheat rules in `TECH_ARCHITECTURE.md`.
 - New money enters only from the mint (starting grant, wages); spending goes to the sink (groceries, rent).
-- Start: ₦12,000. Groceries ₦1,800 for 6 portions. **Rent ₦14,000 every 7th day at 08:00**, taken automatically when there is money. If you can't cover it: a ₦1,000 late fee, the debt stays, and two missed weeks bring an eviction warning.
+- Start: ₦12,000. Groceries ₦1,800 for 6 portions. **Rent ₦14,000 every 7th day at 08:00**, taken automatically when there is money (or paid from LifePay if auto-pay is off; then the late fee comes a day later). A ₦1,500 water-and-power bill comes the same day (not for nepos). If you can't cover it: a ₦1,000 late fee, the debt stays, and two missed weeks bring an eviction warning.
 - The starting money alone can't cover the first rent, so the first week requires working. A test checks that an ordinary week of work, food and sleep earns the rent.
 
 ## While you were away

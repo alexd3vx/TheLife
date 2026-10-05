@@ -2,6 +2,11 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — The phone, traits chosen at creation, boot fix
+- **Traits:** creation now has a third step where the player chooses their own strengths (2, or 3 with one weakness); backgrounds only set money and family.
+- **Boot fix:** a staging script had emptied the asset manifest in the hosted build, which showed "Could not reach the game files". The staging is fixed and the boot never blocks on the device cache.
+- **Phone (`packages/game-core/src/phone.ts`, `apps/client/src/phone/`):** LifePhone Go/Plus/Max with their own look, speed, ports, battery and apps; battery, chargers, power bank, power cuts and an unpaid-bill cut-off; LifeChat (written chats, choices with effects, calls), LifePay (history, rent and bills, auto-pay switch, transfers, savings, loans, airtime and data), LifeShop (delivery with a delay), LifeJobs, LifeNews, LifeMaps stub, a Power app. App-open animations, swipe-from-left-edge to go back, home bar, notification shade, a buzzing HUD button with an unread badge. The old "Order groceries" button is gone; food is ordered from the phone. 65 game-core tests cover it.
+
 ## 2026-10-05 — Fixes from playtest, character creator with nepo/lapo backgrounds
 - **White textures in the hosted build (root cause found):** reproduced the playtest artifact's Content Security Policy locally; it refuses `fetch(blob:)`, which three.js uses to decode a model's embedded textures, so every furniture model, vehicle and character lost its textures silently. Textures now load through an image element (`lab/loaders.ts`). Verified under the strict policy.
 - **Sleep position:** the lying height was measured with the legs still posed from the walking clip, so the body floated about 13 cm above the mattress; the measurement now starts from the bind pose and the body sinks 2 cm into the mattress.

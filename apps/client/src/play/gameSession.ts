@@ -7,7 +7,9 @@ import {
   mood,
   moodLabel,
   parseGameState,
+  isDead,
   simulateAbsence,
+  unreadCount,
   skillLevel,
   speedFactor,
   type GameState,
@@ -41,6 +43,7 @@ export interface HudSnapshot {
   action: { label: string; progress: number; seconds: number } | null;
   skills: { id: string; level: number }[];
   groceriesPrice: number;
+  phone: { battery: number; unread: number; charging: boolean; dead: boolean; latest: { id: number; app: string; title: string; text: string } | null };
 }
 
 export interface SavedGame {
@@ -183,6 +186,16 @@ export class GameSession implements GameBridge {
       action: act ? { label: ACTIONS[act.def.id]?.label ?? act.def.label, progress: Math.min(1, act.done / act.def.minutes), seconds: act.def.minutes / act.def.minutesPerSecond } : null,
       skills: Object.entries(s.skills).map(([id, xp]) => ({ id, level: skillLevel(xp) })),
       groceriesPrice: sim.groceriesPrice,
+      phone: {
+        battery: Math.round(s.phone.battery),
+        unread: unreadCount(s.phone),
+        charging: s.phone.plugged !== null,
+        dead: isDead(s.phone),
+        latest: (() => {
+          const n = s.phone.notifications.at(-1);
+          return n ? { id: n.id, app: n.app, title: n.title, text: n.text } : null;
+        })(),
+      },
     };
   }
 }

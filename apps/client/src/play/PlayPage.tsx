@@ -3,6 +3,7 @@ import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
 import type { HudSnapshot } from "./gameSession";
+import PhoneUI from "../phone/PhoneUI";
 import { startPlay, type PlayRuntime } from "./runtime";
 import "./play.css";
 
@@ -46,6 +47,10 @@ export default function PlayPage() {
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(null);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [buzz, setBuzz] = useState(false);
+  const lastNote = useRef<number | null>(null);
+  const [phoneApp, setPhoneApp] = useState<string | null>(null);
 
   const pushToasts = useCallback((events: SimEvent[]) => {
     const fresh = events.map((e) => ({ id: ++toastId.current, kind: e.kind, text: e.text }));
@@ -88,9 +93,26 @@ export default function PlayPage() {
   }, [pushToasts]);
 
   useEffect(() => runtimeRef.current?.setFollow(follow), [follow]);
+  useEffect(() => runtimeRef.current?.setPhoneOpen(phoneOpen), [phoneOpen]);
+
+  // A new phone notification buzzes the phone icon and shows as a toast while the phone is away.
+  const latest = hud?.phone.latest ?? null;
+  useEffect(() => {
+    if (!latest) return;
+    if (lastNote.current === null) {
+      lastNote.current = latest.id;
+      return;
+    }
+    if (latest.id === lastNote.current) return;
+    lastNote.current = latest.id;
+    if (phoneOpen) return;
+    setBuzz(true);
+    pushToasts([{ kind: "info", text: `📱 ${latest.title}: ${latest.text}`, minute: 0 }]);
+    const t = window.setTimeout(() => setBuzz(false), 1600);
+    return () => window.clearTimeout(t);
+  }, [latest, phoneOpen, pushToasts]);
 
   const banner = status.label ?? hover;
-  const canAffordGroceries = hud ? hud.money >= hud.groceriesPrice : false;
 
   return (
     <div className="play">
@@ -182,7 +204,7 @@ export default function PlayPage() {
 
       {introVisible && !loading && !error && !away && (
         <div className="play-intro">
-          <strong>Tap the floor</strong> to walk · <strong>tap furniture</strong> to use it · keep your needs up and pay the rent
+          <strong>Tap the floor</strong> to walk · <strong>tap furniture</strong> to use it · keep your needs up, order food and pay rent from your <strong>phone</strong>
         </div>
       )}
 
@@ -191,9 +213,6 @@ export default function PlayPage() {
           Follow
         </button>
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
-        <button className={canAffordGroceries ? "" : "is-dim"} onClick={() => runtimeRef.current?.buyGroceries()}>
-          Order groceries {hud ? naira(hud.groceriesPrice) : ""}
-        </button>
         <button
           className="is-dim"
           onClick={() => {
@@ -203,6 +222,21 @@ export default function PlayPage() {
           New game
         </button>
       </div>
+
+      {hud && !phoneOpen && (
+        <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => { setPhoneApp(null); setPhoneOpen(true); }} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
+          <span className="play-phone-body">
+            📱
+            {hud.phone.unread > 0 && <span className="phone-dot">{hud.phone.unread}</span>}
+          </span>
+          <span className={`play-phone-battery${hud.phone.battery <= 20 && !hud.phone.charging ? " is-low" : ""}`}>
+            {hud.phone.dead ? "🪫 0%" : `${hud.phone.charging ? "⚡" : "🔋"} ${hud.phone.battery}%`}
+          </span>
+        </button>
+      )}
+      {phoneOpen && runtimeRef.current?.session && (
+        <PhoneUI session={runtimeRef.current.session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />
+      )}
 
       {away && (
         <div className="play-modal" role="dialog" aria-label="While you were away">
