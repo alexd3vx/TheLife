@@ -1,5 +1,7 @@
 # Roadmap
 
+**The current plan is `MASTER_PLAN.md` (Lagos replica, travel, multiplayer, character rebuild); this file keeps the earlier stage history.**
+
 Principle: **fun before feature count.** Each stage ends with something visible and a go/no-go check. Timeline assumes part-time solo work with AI assistance.
 
 ## Build order (revised Oct 2026)
