@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  APP_INFO, bestCharger, call, clockOf, contactsFor, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn, unreadCount, wallPower,
+  APP_INFO, bestCharger, call, clearNotifications, clockOf, contactsFor, dismissNotification, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn,
+  unreadCount, wallPower, balance,
   type AppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier,
 } from "@thelife/game-core";
 import type { GameSession } from "../play/gameSession";
@@ -22,9 +23,9 @@ const APP_STYLE: Record<ClientApp, { icon: IconName; from: string; to: string }>
   battery: { icon: "power", from: "#6b7a90", to: "#38455a" },
 };
 const APP_NAME = (app: ClientApp) => (app === "battery" ? "Power" : APP_INFO[app].name);
-/** What sits in the bottom dock and what fills the grid, per look. */
-const DOCK: Record<PhoneTier, ClientApp[]> = { basic: ["chat", "pay", "shop"], mid: ["chat", "pay", "shop", "news"], flagship: ["chat", "pay", "shop", "news"] };
-const GRID: Record<PhoneTier, ClientApp[]> = { basic: ["news", "jobs", "maps", "battery"], mid: ["jobs", "maps", "battery"], flagship: ["jobs", "maps", "battery"] };
+/** The dock holds four apps on every model; the grid holds the rest. */
+const DOCK: ClientApp[] = ["chat", "pay", "shop", "news"];
+const GRID: ClientApp[] = ["jobs", "maps", "battery"];
 
 interface Props {
   session: GameSession;
@@ -34,10 +35,13 @@ interface Props {
 
 export default function PhoneUI({ session, onClose, initialApp = null }: Props) {
   const [, setTick] = useState(0);
-  const [app, setApp] = useState<ClientApp | null>(null);
+  /** Apps that are open (in the background or in front), oldest first. They stay alive so you come back to where you were. */
+  const [running, setRunning] = useState<ClientApp[]>([]);
+  const [current, setCurrent] = useState<ClientApp | null>(null);
+  const [switcher, setSwitcher] = useState(false);
   const [locked, setLocked] = useState(true);
   const [leaving, setLeaving] = useState(false);
-  const [shade, setShade] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   const [flash, setFlash] = useState<{ text: string; bad: boolean; id: number } | null>(null);
   const [dragX, setDragX] = useState<number | null>(null);
   const [calling, setCalling] = useState<{ name: string; seconds: number } | null>(null);
@@ -79,17 +83,20 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
   const open = useCallback(
     (next: ClientApp) => {
       const s = session.sim.state;
-      if (next !== "battery") {
+      const alreadyOpen = running.includes(next);
+      if (next !== "battery" && !alreadyOpen) {
         if (!hasApp(s.phone, next)) return say(`${APP_NAME(next)} needs a better phone than the ${modelOf(s.phone).name}.`, true);
         const result = openApp(s, next);
         if (!result.ok) return say(result.reason, true);
       }
-      setShade(false);
+      setDrawer(false);
+      setSwitcher(false);
       setLocked(false);
-      setApp(next);
+      setRunning((list) => [...list.filter((a) => a !== next), next]);
+      setCurrent(next);
       refresh();
     },
-    [refresh, say, session],
+    [refresh, running, say, session],
   );
 
   useEffect(() => {
@@ -97,9 +104,15 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Minimise: the app stays open in the background. */
   const home = () => {
-    setApp(null);
-    setShade(false);
+    setCurrent(null);
+    setDrawer(false);
+    setSwitcher(false);
+  };
+  const closeApp = (app: ClientApp) => {
+    setRunning((list) => list.filter((a) => a !== app));
+    setCurrent((c) => (c === app ? null : c));
   };
 
   // A call is a short moving screen; the airtime is taken when it connects.
@@ -116,32 +129,69 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     if (result.ok && who) setCalling({ name: who.name, seconds: 0 });
   };
 
-  // Swipe in from the left edge to go back, like a real phone.
-  const edge = useRef<{ startX: number; id: number } | null>(null);
-  const onPointerDown = (e: React.PointerEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    if (app && e.clientX - rect.left < 28) edge.current = { startX: e.clientX, id: e.pointerId };
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (edge.current?.id === e.pointerId) setDragX(Math.max(0, e.clientX - edge.current.startX));
-  };
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (edge.current?.id !== e.pointerId) return;
-    const dx = e.clientX - edge.current.startX;
-    edge.current = null;
-    setDragX(null);
-    if (dx > 90) setApp(null);
-  };
-
   const close = () => {
     setLeaving(true);
     window.setTimeout(onClose, 240 * model.slowness);
   };
 
+  // ---- gestures: swipe in from the left edge = back; swipe down from the top = notifications.
+  const gesture = useRef<{ kind: "edge" | "top"; x: number; y: number; id: number } | null>(null);
+  const onPointerDown = (e: React.PointerEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (current && !switcher && x < 28) gesture.current = { kind: "edge", x: e.clientX, y: e.clientY, id: e.pointerId };
+    else if (!locked && !drawer && y < 56) gesture.current = { kind: "top", x: e.clientX, y: e.clientY, id: e.pointerId };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    if (g?.id === e.pointerId && g.kind === "edge") setDragX(Math.max(0, e.clientX - g.x));
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    if (g?.id !== e.pointerId) return;
+    gesture.current = null;
+    setDragX(null);
+    if (g.kind === "edge" && e.clientX - g.x > 90) home();
+    if (g.kind === "top" && e.clientY - g.y > 50) setDrawer(true);
+  };
+
+  // The gesture bar (Plus, Max): tap = home, swipe up = home, swipe up and hold (or just hold) = recent apps.
+  const bar = useRef<{ y: number; t: number; timer: number } | null>(null);
+  const barDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    const timer = window.setTimeout(() => {
+      if (bar.current) {
+        bar.current.t = -1; // the hold already fired
+        setSwitcher(true);
+      }
+    }, 450);
+    bar.current = { y: e.clientY, t: performance.now(), timer };
+  };
+  const barUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    const b = bar.current;
+    bar.current = null;
+    if (!b) return;
+    window.clearTimeout(b.timer);
+    if (b.t === -1) return;
+    const swiped = b.y - e.clientY > 40;
+    if (locked) setLocked(false);
+    else if (switcher) home();
+    else if (current) home();
+    else if (!swiped) close();
+  };
+  const goHomeButton = () => {
+    if (locked) setLocked(false);
+    else if (switcher || current) home();
+    else close();
+  };
+
   const changeModel = (tier: PhoneTier) => {
     phone.model = tier;
     phone.plugged = null;
-    setApp(null);
+    setRunning((list) => list.filter((a) => a === "battery" || hasApp(phone, a as AppId)));
+    setCurrent((c) => (c && c !== "battery" && !hasApp(phone, c as AppId) ? null : c));
     say(`Now holding the ${modelOf(phone).name}.`);
     refresh();
   };
@@ -155,24 +205,29 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     <div className={`phone-overlay${leaving ? " is-leaving" : ""}`} onPointerDown={(e) => e.target === e.currentTarget && close()} style={style}>
       <div className="phone-stage">
         <div className={`phone phone-${LOOK[model.tier]}`} role="dialog" aria-label={model.name} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
-          <span className="phone-btn-side is-power" aria-hidden="true" />
+          <button className="phone-btn-side is-power" onClick={close} aria-label="Put the phone away" />
           <span className="phone-btn-side is-vol" aria-hidden="true" />
-          <div className="phone-screen" data-view={dead ? "dead" : locked ? "lock" : app ? "app" : "home"}>
+          <div className="phone-screen" data-view={dead ? "dead" : locked ? "lock" : current ? "app" : "home"}>
             {dead ? (
               <DeadScreen plugged={phone.plugged} wall={wall} hasCharger={!!bestCharger(phone)} onPlug={() => act((s) => plug(s, "wall"))} onClose={close} />
             ) : (
               <>
-                <StatusBar clock={clock.label} battery={phone.battery} plugged={phone.plugged} wall={wall} dataMB={phone.dataMB} />
+                <StatusBar clock={clock.label} battery={phone.battery} plugged={phone.plugged} wall={wall} dataMB={phone.dataMB} onTap={() => !locked && setDrawer((v) => !v)} />
                 {model.tier === "flagship" && <div className="phone-island" aria-hidden="true" />}
                 {model.tier === "mid" && <div className="phone-punch" aria-hidden="true" />}
                 {model.tier === "basic" && <div className="phone-drop" aria-hidden="true" />}
 
-                <Home state={state} tier={model.tier} onOpen={open} hidden={app !== null || locked} />
+                <Home state={state} tier={model.tier} onOpen={open} hidden={current !== null || locked} />
 
-                {app && (
-                  <div className="phone-app" key={app} style={dragX === null ? undefined : { transform: `translateX(${dragX}px)`, transition: "none" }}>
+                {running.map((app) => (
+                  <section
+                    key={app}
+                    className={`phone-app${app === current && !switcher ? "" : " is-min"}${switcher ? " is-switching" : ""}`}
+                    aria-hidden={app !== current}
+                    style={app === current && dragX !== null ? { transform: `translateX(${dragX}px)`, transition: "none" } : undefined}
+                  >
                     <header className="phone-head" style={{ ["--app-from" as string]: APP_STYLE[app].from, ["--app-to" as string]: APP_STYLE[app].to }}>
-                      <button className="phone-back" onClick={home} aria-label="Back to home">
+                      <button className="phone-back" onClick={home} aria-label="Minimise">
                         <Icon name="back" size={22} />
                       </button>
                       <h1>{APP_NAME(app)}</h1>
@@ -186,9 +241,10 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       {app === "maps" && <Maps state={state} />}
                       {app === "battery" && <Battery state={state} act={act} onModel={changeModel} />}
                     </div>
-                  </div>
-                )}
+                  </section>
+                ))}
 
+                {switcher && <Switcher running={running} state={state} onOpen={open} onClose={closeApp} onCloseAll={() => { setRunning([]); setCurrent(null); }} onDismiss={home} />}
                 {locked && (
                   <LockScreen
                     state={state}
@@ -199,23 +255,33 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                     }}
                   />
                 )}
-                {!locked && unread > 0 && !shade && !app && (
-                  <button className="phone-pull" onClick={() => setShade(true)} aria-label={`${unread} notifications`}>
+                {!locked && unread > 0 && !drawer && !current && !switcher && (
+                  <button className="phone-pull" onClick={() => setDrawer(true)} aria-label={`${unread} notifications`}>
                     <Icon name="bell" size={16} /> {unread}
                   </button>
                 )}
-                {shade && (
-                  <Shade
-                    notifications={phone.notifications}
+                {drawer && (
+                  <Drawer
+                    state={state}
                     onOpen={(n) => {
                       markNotificationsRead(state);
                       open(n.app);
                     }}
-                    onClose={() => {
-                      markNotificationsRead(state);
-                      setShade(false);
+                    onDismiss={(id) => {
+                      dismissNotification(state, id);
                       refresh();
                     }}
+                    onClear={() => {
+                      clearNotifications(state);
+                      refresh();
+                    }}
+                    onClose={() => {
+                      markNotificationsRead(state);
+                      setDrawer(false);
+                      refresh();
+                    }}
+                    onPlug={() => act((s) => plug(s, phone.plugged === "wall" ? null : "wall"))}
+                    onOpenApp={open}
                   />
                 )}
                 {calling && <CallScreen name={calling.name} seconds={calling.seconds} onEnd={() => setCalling(null)} />}
@@ -228,18 +294,18 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
             )}
             {model.tier === "basic" ? (
               <nav className="phone-nav-3" aria-label="Phone buttons">
-                <button onClick={() => (app ? home() : setShade((v) => !v))} aria-label="Back">
+                <button onClick={() => (drawer ? setDrawer(false) : switcher ? setSwitcher(false) : current ? home() : close())} aria-label="Back">
                   <i className="nav-back" />
                 </button>
-                <button onClick={() => (locked ? setLocked(false) : home())} aria-label="Home">
+                <button onClick={goHomeButton} aria-label="Home">
                   <i className="nav-home" />
                 </button>
-                <button onClick={close} aria-label="Put the phone away">
+                <button onClick={() => !locked && setSwitcher((v) => !v)} aria-label="Recent apps">
                   <i className="nav-recent" />
                 </button>
               </nav>
             ) : (
-              <button className="phone-homebar" onClick={() => (locked ? setLocked(false) : app ? home() : close())} aria-label={app ? "Home" : "Unlock or put the phone away"} />
+              <button className="phone-homebar" onPointerDown={barDown} onPointerUp={barUp} onPointerCancel={() => (bar.current = null)} aria-label="Home. Hold for recent apps" />
             )}
           </div>
         </div>
@@ -261,10 +327,10 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
 
 // ------------------------------------------------------------------ pieces
 
-function StatusBar(p: { clock: string; battery: number; plugged: string | null; wall: boolean; dataMB: number }) {
+function StatusBar(p: { clock: string; battery: number; plugged: string | null; wall: boolean; dataMB: number; onTap(): void }) {
   const low = p.battery <= 20 && !p.plugged;
   return (
-    <div className="phone-status">
+    <div className="phone-status" onClick={p.onTap}>
       <span className="phone-time">{p.clock}</span>
       <span className="phone-status-right">
         <Icon name="signal" size={14} />
@@ -299,6 +365,14 @@ function DeadScreen(p: { plugged: string | null; wall: boolean; hasCharger: bool
   );
 }
 
+function appBadge(n: PhoneNotification) {
+  return (
+    <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[n.app].from}, ${APP_STYLE[n.app].to})` }}>
+      <Icon name={APP_STYLE[n.app].icon} size={16} />
+    </span>
+  );
+}
+
 function LockScreen({ state, onUnlock, onOpen }: { state: GameState; onUnlock(): void; onOpen(n: PhoneNotification): void }) {
   const clock = clockOf(state.minute);
   const list = [...state.phone.notifications].reverse().filter((n) => !n.read).slice(0, 3);
@@ -320,9 +394,7 @@ function LockScreen({ state, onUnlock, onOpen }: { state: GameState; onUnlock():
       <div className="phone-lock-notes">
         {list.map((n) => (
           <button key={n.id} className="phone-note" onClick={() => onOpen(n)}>
-            <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[n.app].from}, ${APP_STYLE[n.app].to})` }}>
-              <Icon name={APP_STYLE[n.app].icon} size={16} />
-            </span>
+            {appBadge(n)}
             <span>
               <strong>{n.title}</strong>
               <small>{n.text}</small>
@@ -378,38 +450,181 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
                 <Icon name="bolt" size={14} /> {isPowerCut(state.minute) ? "Power cut now" : upcoming?.announced ? `Cut at ${String(Math.floor((upcoming.startMinute % 1440) / 60)).padStart(2, "0")}:00` : "Power on"}
               </span>
               <span>
-                <Icon name="pay" size={14} /> {naira(state.ledger.accounts.player ?? 0)}
+                <Icon name="pay" size={14} /> {naira(balance(state.ledger))}
               </span>
             </div>
           </div>
         )}
       </div>
-      <div className="phone-grid">{GRID[tier].map(icon)}</div>
-      <div className="phone-dock">{DOCK[tier].map(icon)}</div>
+      <div className="phone-grid">{GRID.map(icon)}</div>
+      <div className="phone-dock">{DOCK.map(icon)}</div>
     </div>
   );
 }
 
-function Shade({ notifications, onOpen, onClose }: { notifications: PhoneNotification[]; onOpen(n: PhoneNotification): void; onClose(): void }) {
-  const list = [...notifications].reverse().slice(0, 12);
+/** Recent apps: a row of cards. Tap to come back to one, swipe a card up to close it. */
+function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { running: ClientApp[]; state: GameState; onOpen(a: ClientApp): void; onClose(a: ClientApp): void; onCloseAll(): void; onDismiss(): void }) {
+  const [drag, setDrag] = useState<{ app: ClientApp; dy: number } | null>(null);
+  const start = useRef<{ app: ClientApp; y: number; id: number } | null>(null);
+  const gist = (app: ClientApp): string => {
+    const p = state.phone;
+    if (app === "chat") return `${Object.values(p.threads).reduce((s, t) => s + t.unread, 0)} unread`;
+    if (app === "pay") return naira(balance(state.ledger));
+    if (app === "shop") return p.orders.length ? `${p.orders.length} on the way` : "Order food, chargers, phones";
+    if (app === "jobs") return p.job ? "You have a job" : "Find a job";
+    if (app === "news") return `Day ${clockOf(state.minute).day} headlines`;
+    if (app === "maps") return "Around you";
+    return `${Math.round(p.battery)}% battery`;
+  };
+  const cards = [...running].reverse();
   return (
-    <div className="phone-shade">
-      <div className="phone-shade-head">
-        <strong>Notifications</strong>
-        <button onClick={onClose}>Done</button>
+    <div className="phone-switcher" onClick={(e) => e.target === e.currentTarget && onDismiss()}>
+      {cards.length === 0 && <p className="phone-switcher-empty">No recent apps</p>}
+      <div className="phone-cards">
+        {cards.map((app) => (
+          <div
+            key={app}
+            className="phone-card-wrap"
+            style={drag?.app === app ? { transform: `translateY(${drag.dy}px)`, opacity: 1 + drag.dy / 300, transition: "none" } : undefined}
+            onPointerDown={(e) => {
+              start.current = { app, y: e.clientY, id: e.pointerId };
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            }}
+            onPointerMove={(e) => start.current?.id === e.pointerId && setDrag({ app, dy: Math.min(0, e.clientY - start.current.y) })}
+            onPointerUp={(e) => {
+              const s = start.current;
+              start.current = null;
+              setDrag(null);
+              if (!s || s.id !== e.pointerId) return;
+              const dy = e.clientY - s.y;
+              if (dy < -90) onClose(app);
+              else if (Math.abs(dy) < 8) onOpen(app);
+            }}
+          >
+            <div className="phone-card-head">
+              <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[app].from}, ${APP_STYLE[app].to})` }}>
+                <Icon name={APP_STYLE[app].icon} size={16} />
+              </span>
+              <strong>{APP_NAME(app)}</strong>
+              <button
+                className="phone-card-x"
+                aria-label={`Close ${APP_NAME(app)}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose(app);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="phone-card-body" style={{ background: `linear-gradient(160deg, ${APP_STYLE[app].from}, ${APP_STYLE[app].to})` }}>
+              <Icon name={APP_STYLE[app].icon} size={54} />
+              <span>{gist(app)}</span>
+            </div>
+          </div>
+        ))}
       </div>
-      {list.length === 0 && <p className="pa-empty">Nothing new.</p>}
-      {list.map((n) => (
-        <button key={n.id} className={`phone-note${n.read ? "" : " is-new"}`} onClick={() => onOpen(n)}>
-          <span className="phone-note-icon" style={{ background: `linear-gradient(145deg, ${APP_STYLE[n.app].from}, ${APP_STYLE[n.app].to})` }}>
-            <Icon name={APP_STYLE[n.app].icon} size={16} />
-          </span>
-          <span>
-            <strong>{n.title}</strong>
-            <small>{n.text}</small>
-          </span>
+      {cards.length > 0 && (
+        <button className="phone-switcher-clear" onClick={onCloseAll}>
+          Close all
         </button>
-      ))}
+      )}
+    </div>
+  );
+}
+
+/** The notification drawer: quick tiles on top, notifications below. Swipe one sideways to dismiss it. */
+function Drawer({ state, onOpen, onDismiss, onClear, onClose, onPlug, onOpenApp }: { state: GameState; onOpen(n: PhoneNotification): void; onDismiss(id: number): void; onClear(): void; onClose(): void; onPlug(): void; onOpenApp(a: ClientApp): void }) {
+  const phone = state.phone;
+  const clock = clockOf(state.minute);
+  const list = [...phone.notifications].reverse();
+  const wall = wallPower(state);
+  const [drag, setDrag] = useState<{ id: number; dx: number } | null>(null);
+  const start = useRef<{ id: number; x: number; pointer: number; moved: boolean } | null>(null);
+  const closeSwipe = useRef<number | null>(null);
+  return (
+    <div
+      className="phone-drawer"
+      onPointerDown={(e) => (closeSwipe.current = e.clientY)}
+      onPointerUp={(e) => {
+        if (closeSwipe.current !== null && closeSwipe.current - e.clientY > 70) onClose();
+        closeSwipe.current = null;
+      }}
+    >
+      <div className="phone-drawer-head">
+        <div>
+          <strong>{clock.label}</strong>
+          <span>Day {clock.day}</span>
+        </div>
+        <button onClick={onClose} aria-label="Close notifications">
+          <Icon name="back" size={20} />
+        </button>
+      </div>
+      <div className="phone-tiles">
+        <button className={phone.plugged ? "is-on" : ""} onClick={onPlug}>
+          <Icon name="plug" size={22} />
+          <span>{phone.plugged ? (phone.plugged === "wall" && !wall ? "No power" : "Charging") : "Plug in"}</span>
+        </button>
+        <button onClick={() => onOpenApp("battery")}>
+          <Icon name="power" size={22} />
+          <span>{Math.round(phone.battery)}%</span>
+        </button>
+        <button onClick={() => onOpenApp("pay")}>
+          <Icon name="signal" size={22} />
+          <span>{phone.dataMB >= 1024 ? `${(phone.dataMB / 1024).toFixed(1)} GB` : `${Math.round(phone.dataMB)} MB`}</span>
+        </button>
+        <button onClick={() => onOpenApp("pay")}>
+          <Icon name="call" size={22} />
+          <span>{naira(phone.airtime)}</span>
+        </button>
+      </div>
+      <div className="phone-drawer-title">
+        <strong>Notifications</strong>
+        {list.length > 0 && <button onClick={onClear}>Clear all</button>}
+      </div>
+      <div className="phone-drawer-list">
+        {list.length === 0 && <p className="pa-empty">You're all caught up.</p>}
+        {list.map((n) => (
+          <div
+            key={n.id}
+            className={`phone-notice${n.read ? "" : " is-new"}`}
+            style={drag?.id === n.id ? { transform: `translateX(${drag.dx}px)`, opacity: 1 - Math.abs(drag.dx) / 220, transition: "none" } : undefined}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              start.current = { id: n.id, x: e.clientX, pointer: e.pointerId, moved: false };
+            }}
+            onPointerMove={(e) => {
+              const s = start.current;
+              if (s?.pointer !== e.pointerId) return;
+              const dx = e.clientX - s.x;
+              if (Math.abs(dx) > 6) s.moved = true;
+              if (s.moved) setDrag({ id: n.id, dx });
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              const s = start.current;
+              start.current = null;
+              setDrag(null);
+              if (!s || s.pointer !== e.pointerId) return;
+              const dx = e.clientX - s.x;
+              if (Math.abs(dx) > 90) onDismiss(n.id);
+              else if (!s.moved) onOpen(n);
+            }}
+          >
+            {appBadge(n)}
+            <span className="phone-notice-main">
+              <span className="phone-notice-meta">
+                {APP_INFO[n.app].name} · {clockOf(n.minute).label}
+              </span>
+              <strong>{n.title}</strong>
+              <small>{n.text}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="phone-drawer-grab" aria-hidden="true" />
     </div>
   );
 }

@@ -278,6 +278,15 @@ export function markThreadRead(state: GameState, contact: string): void {
   for (const n of state.phone.notifications) if (n.app === "chat" && n.title === contactName(state, contact)) n.read = true;
 }
 
+/** Swipes one notification away. */
+export function dismissNotification(state: GameState, id: number): void {
+  state.phone.notifications = state.phone.notifications.filter((n) => n.id !== id);
+}
+
+export function clearNotifications(state: GameState): void {
+  state.phone.notifications = [];
+}
+
 export function markNotificationsRead(state: GameState): void {
   for (const n of state.phone.notifications) n.read = true;
 }

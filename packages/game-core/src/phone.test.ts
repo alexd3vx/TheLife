@@ -3,7 +3,7 @@ import {
   BEATS, JOBS, MINT, PLAYER, SAVINGS, Sim, balance, bestCharger, borrow, createGameState, deposit, isPowerCut, ledgerTotal, newsFor, openApp,
   parseGameState, payBill, payRent, placeOrder, plug, powerCutOn, profileFrom, repay, replyToThread, applyForJob, sendMoney, setAutoPay, setBankCharging,
   topUp, withdraw, BACKGROUNDS, transfer, call, wallPower, markThreadRead, unreadChats, PHONE_MODELS, SHOP_ITEMS,
-  type GameState,
+  type GameState, dismissNotification, clearNotifications,
 } from "./index.js";
 
 const background = (tier: string) => BACKGROUNDS.find((b) => b.tier === tier)!;
@@ -338,6 +338,19 @@ describe("news", () => {
     expect(newsFor(3)).toEqual(newsFor(3));
     const day = [...Array(40).keys()].map((d) => d + 1).find((d) => powerCutOn(d)?.announced)!;
     expect(newsFor(day).some((n) => n.tag === "Power")).toBe(true);
+  });
+});
+
+describe("notifications", () => {
+  it("can be dismissed one at a time or all at once", () => {
+    const s = sim("middle");
+    run(s, 24 * 60 * 3);
+    const n = s.state.phone.notifications.length;
+    expect(n).toBeGreaterThan(2);
+    dismissNotification(s.state, s.state.phone.notifications[0]!.id);
+    expect(s.state.phone.notifications.length).toBe(n - 1);
+    clearNotifications(s.state);
+    expect(s.state.phone.notifications).toEqual([]);
   });
 });
 
