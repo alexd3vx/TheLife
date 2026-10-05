@@ -28,3 +28,12 @@ Redeploy after changing variables (they are baked in at build time). Open `https
 
 ## 4. Test with friends
 Everyone opens the same Vercel link, goes to `#/map`, taps **Go online**, picks a name. Up to 50 players per room. Check `/health` on the game server for the player count.
+
+## Free / cheap alternatives to Fly.io (Fly needs a card)
+- **Render (free, no card)**: dashboard -> New -> Blueprint -> pick this repo (`render.yaml`). The address is `wss://thelife-server-xxxx.onrender.com`.
+  The free service sleeps when idle; the first connection after a while takes about a minute.
+- **Your own VPS (LemeHost etc.)**: as root on Ubuntu/Debian run `curl -fsSL https://raw.githubusercontent.com/alexd3vx/TheLife/claude/hopeful-lovelace-20wkdq/deploy/vps-setup.sh | bash`.
+  It prints the `wss://<ip>.sslip.io` address (free HTTPS). Open ports 80 and 443 in the VPS firewall.
+- **Your own computer, today, free**: `pnpm --filter @thelife/server start`, then `cloudflared tunnel --url http://localhost:8787` prints an `https://....trycloudflare.com` address;
+  use `wss://....trycloudflare.com` in "Go online". Works while your computer is on.
+In every case, type the address into **Go online -> Server** (it is remembered), or set `VITE_SERVER_URL` in Vercel and redeploy.

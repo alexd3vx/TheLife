@@ -1,0 +1,14 @@
+# Render blueprint: free game server (no card needed). The free plan sleeps after ~15 minutes without players
+# and takes about a minute to wake on the next connection. New -> Blueprint -> pick this repository.
+services:
+  - type: web
+    name: thelife-server
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ROOM
+        value: lagos-test
+      - key: ALLOWED_ORIGINS
+        value: https://thelifesims.vercel.app
