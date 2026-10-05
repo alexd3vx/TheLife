@@ -79,6 +79,16 @@ The whole `GameState` is saved on the device every few seconds and when the page
 - **New activity:** add an entry to `ACTIONS`, add a clip if needed, point a piece of furniture at it in `play/layout.ts`.
 - **New furniture:** add the model (`tools/assets/sources.mjs` + asset build, or a builder in `furniture/procedural.ts`), add an entry to `packages/game-core/src/catalog.ts` (name, price, action), then place it in a layout. Open `#/showroom` and run the tests to check it works.
 
+## How the body moves (animation director)
+
+The controller (`play/controller.ts`) adds life on top of the clips:
+
+- **Eased movement:** speed ramps up and down (no instant starts or stops), slows in time to stop exactly at the target, and the walk/jog clip speed follows the real ground speed. Turning mostly happens on the spot before setting off.
+- **Head tracking:** the head turns toward where it is going (the next waypoint), toward the thing being used (the fridge, or the TV when watching from the sofa), and glances around now and then while standing or resting.
+- **Blinking** every few seconds.
+- **Body language from needs:** while standing idle the character yawns and stretches when tired, rubs their stomach when hungry, fidgets when they need the toilet.
+- **Getting into bed:** walk to the side, sit on the edge with the real sitting clip, lie back; getting up reverses it.
+
 ## Furniture and prices
 
 Every piece of furniture is a catalog item with a price in naira (a Plastic chair ₦6,500, a Two-seat leather sofa ₦185,000, a Refrigerator ₦290,000...). Players will buy and place them with the shop and home-building tools in a later stage; for now the test house and the showroom use the catalog directly. The catalog also decides what each piece lets you do (sofa and armchairs: watch TV; any chair: sit; bed: sleep; fridge: snack; stove: cook; toilet, basin, shower; boombox or radio: dance; bookshelf: read; desk or laptop: work).

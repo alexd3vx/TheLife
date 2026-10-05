@@ -21,6 +21,11 @@ export const LIFE_CLIP_NAMES = [
   "Life_Read_Loop",
   "Life_Cook_Loop",
   "Life_Sleep_Loop",
+  // short body-language clips the character plays when idle (played once)
+  "Life_Yawn",
+  "Life_Stretch",
+  "Life_BellyRub",
+  "Life_Fidget",
 ] as const;
 
 const DEG = Math.PI / 180;
@@ -38,6 +43,12 @@ const CHILD: Record<string, string> = {
   upperarm_r: "lowerarm_r",
   lowerarm_l: "hand_l",
   lowerarm_r: "hand_r",
+  thigh_l: "calf_l",
+  thigh_r: "calf_r",
+  spine_01: "spine_02",
+  spine_02: "spine_03",
+  spine_03: "neck_01",
+  neck_01: "Head",
 };
 
 interface Context {
@@ -271,6 +282,72 @@ export function buildLifeClips(
     }
     // Idle has a weight-shift pose; lying down that becomes a raised knee. Drop the leg tracks so legs stay straight.
     clip.tracks = clip.tracks.filter((t) => !/^(thigh|calf|foot|ball)/.test(t.name));
+    out.push(clip);
+  }
+
+  // ---- body language, played once while standing idle (see the controller's idle behaviours)
+  const UP_FORWARD = new THREE.Vector3(0, 1, 0.6);
+  const BACK = new THREE.Vector3(0, 0, -1);
+  const IN = { l: new THREE.Vector3(-1, 0, 0), r: new THREE.Vector3(1, 0, 0) };
+
+  // Yawn: hand to the mouth, head tipped back, a deep breath.
+  {
+    const clip = cloneClip(idle, "Life_Yawn", 4.6);
+    posedAt(ctx, idle);
+    const shoulder = bend(ctx, "upperarm_r", FORWARD, 52);
+    const elbow = bend(ctx, "lowerarm_r", FORWARD, 112);
+    const head = bend(ctx, "neck_01", BACK, 15);
+    const chest = bend(ctx, "spine_03", BACK, 7);
+    const wave = (p: number) => pulse(p, 0.22, 0.4);
+    addRotation(clip, "upperarm_r", cycle(4.6, 16, (p) => slerp(identity(), shoulder, wave(p))));
+    addRotation(clip, "lowerarm_r", cycle(4.6, 16, (p) => slerp(identity(), elbow, wave(p))));
+    addRotation(clip, "neck_01", cycle(4.6, 16, (p) => slerp(identity(), head, wave(p))));
+    addRotation(clip, "spine_03", cycle(4.6, 16, (p) => slerp(identity(), chest, wave(p))));
+    out.push(clip);
+  }
+
+  // Stretch: both arms up over the head, back arched, then relax.
+  {
+    const clip = cloneClip(idle, "Life_Stretch", 5);
+    posedAt(ctx, idle);
+    const wave = (p: number) => pulse(p, 0.3, 0.32);
+    for (const side of ["l", "r"] as const) {
+      const lift = bend(ctx, `upperarm_${side}`, UP_FORWARD, 150);
+      addRotation(clip, `upperarm_${side}`, cycle(5, 20, (p) => slerp(identity(), lift, wave(p))));
+    }
+    const arch = bend(ctx, "spine_02", BACK, 9);
+    const archHigh = bend(ctx, "spine_03", BACK, 7);
+    const head = bend(ctx, "neck_01", BACK, 10);
+    addRotation(clip, "spine_02", cycle(5, 20, (p) => slerp(identity(), arch, wave(p))));
+    addRotation(clip, "spine_03", cycle(5, 20, (p) => slerp(identity(), archHigh, wave(p))));
+    addRotation(clip, "neck_01", cycle(5, 20, (p) => slerp(identity(), head, wave(p))));
+    out.push(clip);
+  }
+
+  // Hungry: rubbing the stomach in slow circles, a slight hunch.
+  {
+    const clip = cloneClip(idle, "Life_BellyRub", 3.6);
+    posedAt(ctx, idle);
+    const shoulder = bend(ctx, "upperarm_r", FORWARD, 9);
+    const elbow = bend(ctx, "lowerarm_r", FORWARD, 60);
+    const circle = bend(ctx, "upperarm_r", FORWARD, 6);
+    const hunch = bend(ctx, "spine_02", FORWARD, 7);
+    const wave = (p: number) => pulse(p, 0.15, 0.7);
+    addRotation(clip, "upperarm_r", cycle(3.6, 24, (p) => slerp(identity(), shoulder, wave(p)).multiply(slerp(identity(), circle, Math.sin(p * 3 * Math.PI * 2) * wave(p)))));
+    addRotation(clip, "lowerarm_r", cycle(3.6, 24, (p) => slerp(identity(), elbow, wave(p))));
+    addRotation(clip, "spine_02", cycle(3.6, 24, (p) => slerp(identity(), hunch, wave(p))));
+    out.push(clip);
+  }
+
+  // Needs the toilet: knees together, weight shifting from foot to foot.
+  {
+    const clip = cloneClip(idle, "Life_Fidget", 2.4);
+    posedAt(ctx, idle);
+    for (const side of ["l", "r"] as const) {
+      const squeeze = bend(ctx, `thigh_${side}`, IN[side], 7);
+      const offset = side === "l" ? 0 : Math.PI;
+      addRotation(clip, `thigh_${side}`, cycle(2.4, 24, (p) => slerp(identity(), squeeze, 0.55 + 0.45 * Math.sin(p * 2 * Math.PI * 2 + offset))));
+    }
     out.push(clip);
   }
 

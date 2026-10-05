@@ -308,7 +308,7 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   });
   const start = { x: layout.start.x, z: layout.start.z };
   const reachable = (x: number, z: number) => isFree(nav, x, z) && findPath(nav, start, { x, z }) !== null;
-  const interactions = deriveInteractions(derived, reachable);
+  const interactions = deriveInteractions(derived, reachable, (id) => byId.get(id)?.bounds);
 
   // Interaction spots must always be reachable, even if furniture padding covered them.
   for (const list of interactions.values()) {

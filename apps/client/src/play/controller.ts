@@ -13,6 +13,8 @@ export interface GameBridge {
   /** Walking speed multiplier from tiredness. */
   speedFactor(): number;
   notice(text: string): void;
+  /** Current need levels (0-100), so the body can show how the character feels. */
+  needs(): { hunger: number; energy: number; hygiene: number; bladder: number; fun: number };
 }
 
 export interface Status {
@@ -28,6 +30,10 @@ const WALK_SPEED = 1.55; // metres per second
 const RUN_SPEED = 3.3;
 const RUN_DISTANCE = 7; // runs when the trip is longer than this
 const TURN_RATE = 9; // radians per second
+const ACCEL = 4.5; // metres per second squared: how quickly the character gets up to speed
+const DECEL = 5.5; // and slows down for a stop
+const WALK_CLIP_SPEED = 1.35; // ground speed the Walk clip was authored for; the clip is sped up or slowed to match
+const JOG_CLIP_SPEED = 3.0;
 const SLIDE_TIME = 0.5; // seconds to step in front of a seat (or into the shower) from where you stood
 
 function wrapAngle(a: number): number {
@@ -59,6 +65,14 @@ export class CharacterController {
   private onFloor = false;
   private clip = "";
   private running = false;
+  /** Current ground speed (m/s), eased up and down so the character never starts or stops instantly. */
+  private speed = 0;
+  private glance: { until: number; point: THREE.Vector3 } | null = null;
+  private nextGlanceAt = 2;
+  /** A short body-language clip (yawn, stretch...) in progress while standing idle. */
+  private gesture: { until: number } | null = null;
+  private nextGestureAt = 9;
+  private clock = 0;
   /** A tap that arrived during a short transition (sitting down, standing up); run once it finishes. */
   private queued: { target: Point; interaction: Interaction | null } | null = null;
   /** A timed pause (waiting for a one-shot clip like Sitting_Enter to finish). */
@@ -116,7 +130,6 @@ export class CharacterController {
       this.running = pathLength({ x: this.position.x, z: this.position.z }, route) > RUN_DISTANCE;
       this.mode = "walking";
       this.setStatus(null, null);
-      this.updateLocomotion();
       return true;
     };
 
@@ -144,21 +157,30 @@ export class CharacterController {
     this.setStatus(null, null);
     this.avatar.setSpeed(1);
     const to = spot ? new THREE.Vector3(spot.approach[0], 0, spot.approach[1]) : new THREE.Vector3(this.position.x, 0, this.position.z);
-    const leave = () => {
+    const pose = spot ? ACTIONS[spot.action]?.pose : undefined;
+    // Face away from the furniture while stepping back out.
+    const leave = (awayYaw: number) => {
       this.setClip("Idle_Loop");
-      // Face away from the furniture while stepping back out.
-      const away = spot && ACTIONS[spot.action]?.pose === "seat" ? spot.yaw + Math.PI : spot ? Math.atan2(to.x - this.position.x, to.z - this.position.z) : this.yaw;
+      const away = spot ? awayYaw : this.yaw;
       this.startTween(to, away, 0.5, () => {
         this.finishActivity();
         then();
       });
     };
-    if (spot && ACTIONS[spot.action]?.pose === "seat" && !this.onFloor) {
+    const standUp = (yaw: number) => {
       const length = this.avatar.playOnce("Sitting_Exit");
       this.clip = "Sitting_Exit";
-      this.waitFor(length || 0.1, leave);
+      this.waitFor(length || 0.1, () => leave(yaw + Math.PI));
+    };
+    if (spot && pose === "seat" && !this.onFloor) {
+      standUp(spot.yaw);
+    } else if (spot?.edge && pose === "lie" && !this.onFloor) {
+      // Sit up on the edge of the bed first, then stand.
+      const edge = spot.edge;
+      this.setClip("Sitting_Idle_Loop");
+      this.startTween(new THREE.Vector3(...edge.pose), edge.yaw, 0.8, () => standUp(edge.yaw));
     } else {
-      leave();
+      leave(spot ? Math.atan2(to.x - this.position.x, to.z - this.position.z) : this.yaw);
     }
   }
 
@@ -211,8 +233,27 @@ export class CharacterController {
     if (def.pose === "lie" && pose) {
       // Rest the body on the surface using the lowest point of the sleeping pose, so it lies on the mattress, not in it.
       const low = this.avatar.lowestPoint(def.clip) ?? 0;
-      this.setClip(def.clip);
-      this.startTween(new THREE.Vector3(pose[0], pose[1] - low + 0.01, pose[2]), interaction.yaw, 0.7, finish);
+      const lie = new THREE.Vector3(pose[0], pose[1] - low + 0.01, pose[2]);
+      const lieDown = () => {
+        this.setClip(def.clip);
+        this.startTween(lie, interaction.yaw, 0.9, finish);
+      };
+      const edge = interaction.edge;
+      if (!edge) {
+        lieDown();
+        return;
+      }
+      // Walk up to the side of the bed, sit on its edge with the real sitting clip, then lie back.
+      this.setClip("Idle_Loop");
+      this.startTween(new THREE.Vector3(edge.pose[0], 0, edge.pose[2]), edge.yaw, SLIDE_TIME, () => {
+        this.position.y = edge.pose[1];
+        const length = this.avatar.playOnce("Sitting_Enter");
+        this.clip = "Sitting_Enter";
+        this.waitFor(length || 0.1, () => {
+          this.setClip("Sitting_Idle_Loop");
+          this.waitFor(0.3, lieDown);
+        });
+      });
       return;
     }
     this.setClip(def.clip);
@@ -242,6 +283,8 @@ export class CharacterController {
       this.walk(dt);
     }
     this.followGame();
+    this.updateLook(dt);
+    this.idleBehaviour();
     if (this.queued && !this.tween && !this.wait && (this.mode === "doing" || this.mode === "idle")) {
       const next = this.queued;
       this.queued = null;
@@ -338,10 +381,17 @@ export class CharacterController {
     const turn = Math.abs(wrapAngle(desired - this.yaw));
     this.yaw = turnToward(this.yaw, desired, TURN_RATE * dt);
 
-    // Turn mostly on the spot before setting off, so the feet don't slide sideways.
-    const speed = (this.running ? RUN_SPEED : WALK_SPEED) * this.game.speedFactor() * Math.max(0.2, 1 - turn / 1.6);
-    const step = speed * dt;
-    if (distance <= step) {
+    // Ease: speed up gradually, turn mostly on the spot before setting off, and slow down in time to stop at the end.
+    let remaining = distance;
+    for (let i = 1; i < this.path.length; i++) remaining += Math.hypot(this.path[i]!.x - this.path[i - 1]!.x, this.path[i]!.z - this.path[i - 1]!.z);
+    const cruise = (this.running ? RUN_SPEED : WALK_SPEED) * this.game.speedFactor();
+    const stopLimit = Math.sqrt(2 * DECEL * Math.max(0, remaining - 0.03)) + 0.2;
+    const wanted = Math.min(cruise * Math.max(0.12, 1 - turn / 1.4), stopLimit);
+    this.speed += THREE.MathUtils.clamp(wanted - this.speed, -DECEL * dt, ACCEL * dt);
+    this.updateLocomotion();
+
+    const step = this.speed * dt;
+    if (distance <= step || distance < 0.015) {
       this.position.x = next.x;
       this.position.z = next.z;
       this.path.shift();
@@ -361,14 +411,83 @@ export class CharacterController {
     }
     this.mode = "idle";
     this.running = false;
+    this.speed = 0;
     this.avatar.setSpeed(1);
     this.setClip("Idle_Loop");
   }
 
+  /** Picks idle, walk or jog from the actual speed and times the clip to the ground speed so the feet don't skate. */
   private updateLocomotion() {
-    const factor = this.game.speedFactor();
-    this.setClip(this.running ? "Jog_Fwd_Loop" : "Walk_Loop");
-    this.avatar.setSpeed(((this.running ? RUN_SPEED : WALK_SPEED) / (this.running ? 3.0 : 1.35)) * factor);
+    const jogging = this.clip === "Jog_Fwd_Loop" ? this.speed > 2.1 : this.speed > 2.6;
+    if (this.speed < 0.12) {
+      this.setClip("Idle_Loop");
+      this.avatar.setSpeed(1);
+      return;
+    }
+    this.setClip(jogging ? "Jog_Fwd_Loop" : "Walk_Loop");
+    this.avatar.setSpeed(THREE.MathUtils.clamp(this.speed / (jogging ? JOG_CLIP_SPEED : WALK_CLIP_SPEED), 0.35, 1.7));
+  }
+
+  /** Where the head points: ahead along the path when walking, at the thing being used, or an occasional glance around. */
+  /** While standing around, the body shows how the character feels: yawning when tired, rubbing the stomach when hungry... */
+  private idleBehaviour() {
+    if (this.mode !== "idle" || this.tween || this.wait || this.queued) {
+      this.gesture = null;
+      return;
+    }
+    if (this.gesture) {
+      if (this.clock > this.gesture.until) {
+        this.gesture = null;
+        this.setClip("Idle_Loop");
+        this.nextGestureAt = this.clock + 9 + Math.random() * 12;
+      }
+      return;
+    }
+    if (this.clock < this.nextGestureAt) return;
+    const needs = this.game.needs();
+    const options: { clip: string; weight: number }[] = [];
+    if (needs.energy < 45) options.push({ clip: "Life_Yawn", weight: 1 + (45 - needs.energy) / 10 });
+    if (needs.energy < 65) options.push({ clip: "Life_Stretch", weight: 1 });
+    if (needs.hunger < 40) options.push({ clip: "Life_BellyRub", weight: 1 + (40 - needs.hunger) / 10 });
+    if (needs.bladder < 35) options.push({ clip: "Life_Fidget", weight: 1 + (35 - needs.bladder) / 10 });
+    if (options.length === 0) {
+      this.nextGestureAt = this.clock + 10;
+      return;
+    }
+    let roll = Math.random() * options.reduce((sum, o) => sum + o.weight, 0);
+    const pick = options.find((o) => (roll -= o.weight) <= 0) ?? options[0]!;
+    const length = this.avatar.playOnce(pick.clip, 0.3);
+    if (length > 0) {
+      this.clip = pick.clip;
+      this.gesture = { until: this.clock + length };
+    } else {
+      this.nextGestureAt = this.clock + 15;
+    }
+  }
+
+  private updateLook(dt: number) {
+    this.clock += dt;
+    let target: THREE.Vector3 | null = null;
+    if (this.mode === "walking") {
+      const ahead = this.path[1] ?? this.path[0];
+      if (ahead) target = new THREE.Vector3(ahead.x, 1.55, ahead.z);
+    } else if ((this.mode === "doing" || this.mode === "settling") && this.interaction?.look) {
+      target = new THREE.Vector3(...this.interaction.look);
+    } else if (this.mode === "idle" || (this.mode === "doing" && this.resting)) {
+      if (this.glance && this.clock > this.glance.until) {
+        this.glance = null;
+        this.nextGlanceAt = this.clock + 3 + Math.random() * 5;
+      }
+      if (!this.glance && this.clock > this.nextGlanceAt) {
+        const angle = this.yaw + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.7);
+        this.glance = {
+          until: this.clock + 1.1 + Math.random() * 1.4,
+          point: new THREE.Vector3(this.position.x + Math.sin(angle) * 4, 1.5 + (Math.random() - 0.5) * 0.4, this.position.z + Math.cos(angle) * 4),
+        };
+      }
+      target = this.glance?.point ?? null;
+    }
+    this.avatar.setLookTarget(target);
   }
 
   private setClip(name: string) {

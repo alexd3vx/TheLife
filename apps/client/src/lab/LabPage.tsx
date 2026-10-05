@@ -67,6 +67,7 @@ export default function LabPage() {
     if (!manifest || !viewer) return;
     const avatar = new Avatar(manifest, loadSavedLook());
     avatarRef.current = avatar;
+    if (import.meta.env.DEV) (window as unknown as { __labAvatar: Avatar }).__labAvatar = avatar;
     viewer.addFrameCallback((delta) => avatar.update(delta));
     avatar
       .load()

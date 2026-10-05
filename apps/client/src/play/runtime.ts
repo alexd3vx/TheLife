@@ -45,6 +45,7 @@ export interface PlayRuntime {
     free(x: number, z: number): boolean;
     session: GameSession | null;
     avatar: Avatar;
+    scene: THREE.Scene;
     canReach(interactionId: string): boolean;
     teleport(x: number, z: number): void;
     setView(azimuthDeg: number, polarDeg: number, distance: number): void;
@@ -83,7 +84,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   // The showroom has no needs or money: every activity can always start, and runs until you walk away.
   let fakeActive: { id: string; forced: boolean } | null = null;
   const bridge: GameBridge = session
-    ? { start: (id) => session.start(id), cancel: () => session.cancel(), active: () => session.active(), speedFactor: () => session.speedFactor(), notice: (t) => session.notice(t) }
+    ? { start: (id) => session.start(id), cancel: () => session.cancel(), active: () => session.active(), speedFactor: () => session.speedFactor(), notice: (t) => session.notice(t), needs: () => session.sim.state.needs }
     : {
         start: (id) => {
           fakeActive = { id, forced: false };
@@ -95,6 +96,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         active: () => fakeActive,
         speedFactor: () => 1,
         notice: () => {},
+        needs: () => ({ hunger: 100, energy: 100, hygiene: 100, bladder: 100, fun: 100 }),
       };
   const controller = new CharacterController(avatar, world.nav, bridge, events.onStatus);
   controller.place(layout.start.x, layout.start.z, layout.start.yaw);
@@ -374,6 +376,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         return { hipsY: bone.getWorldPosition(new THREE.Vector3()).y };
       },
       avatar,
+      scene: world.scene,
       state: () => controller.state,
       free: (x, z) => isFree(world.nav, x, z),
       get session() {

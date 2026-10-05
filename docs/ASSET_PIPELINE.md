@@ -13,6 +13,7 @@ Every third-party asset is CC0 (public domain). Credit is not required but is sh
 | [Modular Character Outfits - Fantasy (Standard)](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Quaternius | CC0 1.0 | 2 outfits (Peasant, Ranger) × male/female: top, sleeves, bottom, shoes, hood, shoulder guards; shared textures |
 | [Furniture Kit 2.0](https://kenney.nl/assets/furniture-kit) | Kenney | CC0 1.0 | 52 furniture/structure pieces |
 | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 1.0 | 12 vehicles |
+| [Human Base Meshes](https://studio.blender.org/projects/human-base-meshes/) | Blender Studio / Blender Foundation | CC0 1.0 | Realistic male and female body meshes (anatomy, face, hands, feet, eyes), rigged to our skeleton by us |
 | [Poly Haven models](https://polyhaven.com/models) | Poly Haven contributors | CC0 1.0 | 60 realistic photoscanned furniture and props (sofas, chairs, tables, shelves, lamps, TV, radio, stove, fan...) |
 
 Rule: nothing goes in without its licence recorded in `tools/assets/sources.mjs` (`CREDITS`).
@@ -40,13 +41,30 @@ What the build does to each model: dedupe/prune, textures → WebP (1024 px for 
 
 | Type | Max triangles | Max size |
 |------|---------------|----------|
-| character | 20,000 | 1.8 MB |
+| character | 26,000 | 1.8 MB |
 | hair | 6,000 | 0.9 MB |
 | furniture | 4,000 | 120 KB |
 | vehicle | 8,000 | 250 KB |
 | animation set | — | 6 MB |
 
-Current library: 78 assets, ~5.3 MB total, all within budget.
+Realistic furniture also has a **texture-memory budget** (10 MB of graphics-card memory per piece, checked by the build), because phones fail on texture memory long before file size. Texture size follows object size: big pieces keep a 1024 colour map, mid-size 512, small ones 256.
+
+Current library: 202 assets, ~18.5 MB total, all within budget.
+
+## Realistic characters (Blender Foundation base meshes + our rigging)
+
+The Quaternius bodies are stylised "superhero" figures. The game's default people are now **realistic bodies** from the Blender Foundation's CC0 Human Base Meshes (one-piece male and female meshes with real anatomy, hands with fingers, feet with toes, a modelled face and eyes), rigged to the **same 65-bone skeleton**, so every animation we have plays on them unchanged.
+
+How (`tools/assets/blender/make_body.py`, run headless by `build-bodies.sh`; Blender 4.2 is downloaded on first use):
+1. Import the Quaternius skeleton and mesh (T-pose). Scale the realistic mesh to the skeleton's height and place it on it.
+2. Lower the skeleton's arms to match the realistic mesh's A-pose, so the two bodies line up.
+3. Copy skin weights from the posed Quaternius mesh to the realistic mesh (nearest surface), fold the finger bones into the hand bones (the realistic hands are modelled relaxed; they move as one piece), clean to 4 bones per vertex, smooth.
+4. Bake the A-pose in as the bind pose and export. Clips only set bone rotations, so a different bind pose is fine.
+5. Add what the base mesh lacks: eye iris/pupil marks (vertex colours the game tints with the chosen eye colour) and eyebrow ribbons laid on the face.
+
+At runtime (`lab/avatar.ts`): skin tone is a colour plus a procedural pore texture (`procedural/skinTexture.ts`); eyes are painted from the iris marks; **eyelids** (skin-coloured caps on the head bone) give random blinks; the head turns toward a look target. Garments are cut from the body mesh as before, now using planes square to each arm (works for T-pose or A-pose) and a signed-distance neckline; body skin is hidden only under triangles a garment wholly covers.
+
+Limits: 23k triangles per body (budget raised to 26k; a lower-detail version is needed for crowds); the Quaternius fantasy outfits do not fit the realistic bodies (modern procedural clothes only); fingers do not animate; the bodies are 1.82 m (male) and 1.78 m (female) to match the skeleton.
 
 ## Realistic furniture (Poly Haven + code)
 

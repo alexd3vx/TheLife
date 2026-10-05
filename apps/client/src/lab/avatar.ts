@@ -115,9 +115,12 @@ export class Avatar {
       mesh.receiveShadow = true;
     }
     this.prepareBodyMask();
+    this.eyelids = [];
+    if (isRealistic(this.look.body)) this.buildEyelids();
 
     this.mixer = new THREE.AnimationMixer(this.bodyScene);
     this.currentAction = null;
+    this.lookBones = null;
 
     await this.applySkin();
     this.applyEyes();
@@ -588,6 +591,128 @@ export class Avatar {
 
   update(delta: number): void {
     this.mixer?.update(delta);
+    this.applyLook(delta);
+    this.applyBlink(delta);
+  }
+
+  // ------------------------------------------------------------------ blinking
+
+  private eyelids: THREE.Group[] = [];
+  private blinkClock = 0;
+  private nextBlinkAt = 2.5;
+
+  /**
+   * Skin-coloured upper eyelids over the realistic eyes. Each is a spherical cap just larger than the eyeball, riding on
+   * the head bone, that swings down over the eye for a blink. The bodies have no eyelid geometry or face morphs, so this
+   * is what makes the eyes blink at all.
+   */
+  private buildEyelids(): void {
+    const rest = this.bodyRest;
+    const body = this.bodyMesh;
+    const headBone = this.skeleton?.bones.find((b) => b.name === "Head");
+    const toHead = rest?.toBoneSpace("Head");
+    if (!rest || !body || !headBone || !toHead || !this.bodyScene) return;
+    const material = materialsOf(body)[0];
+    if (!material) return;
+
+    this.bodyScene.traverse((child) => {
+      const mesh = child as THREE.SkinnedMesh;
+      if (!mesh.isSkinnedMesh || !materialsOf(mesh).some((m) => /eye/i.test(m.name))) return;
+      mesh.geometry.computeBoundingSphere();
+      const sphere = mesh.geometry.boundingSphere!;
+      const centre = sphere.center.clone().applyMatrix4(toHead);
+      // Eye axes (forward = +Z, up = +Y in the mesh's own space) expressed in the head bone's space.
+      const basis = new THREE.Matrix4().extractRotation(toHead);
+      const forward = new THREE.Vector3(0, 0, 1).applyMatrix4(basis).normalize();
+      const up = new THREE.Vector3(0, 1, 0).applyMatrix4(basis).normalize();
+      const right = new THREE.Vector3().crossVectors(up, forward).normalize();
+      const pivot = new THREE.Group();
+      pivot.matrix.makeBasis(right, up, forward).setPosition(centre);
+      pivot.matrixAutoUpdate = false;
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(sphere.radius * 1.07, 20, 12, 0, Math.PI * 2, 0, THREE.MathUtils.degToRad(72)), material);
+      cap.castShadow = false;
+      cap.rotation.x = THREE.MathUtils.degToRad(-25); // open: the cap rests up and back, clear of the iris
+      pivot.add(cap);
+      headBone.add(pivot);
+      this.eyelids.push(pivot);
+    });
+  }
+
+  private applyBlink(delta: number): void {
+    if (!this.eyelids.length) return;
+    this.blinkClock += delta;
+    let closed = 0;
+    if (this.blinkClock >= this.nextBlinkAt) {
+      const t = this.blinkClock - this.nextBlinkAt;
+      closed = t < 0.07 ? t / 0.07 : t < 0.19 ? 1 - (t - 0.07) / 0.12 : 0;
+      if (t >= 0.19) {
+        this.blinkClock = 0;
+        this.nextBlinkAt = 2 + Math.random() * 4.5;
+      }
+    }
+    const angle = THREE.MathUtils.degToRad(-25 + 70 * closed);
+    for (const pivot of this.eyelids) (pivot.children[0] as THREE.Mesh).rotation.x = angle;
+  }
+
+  // ------------------------------------------------------------------ looking
+
+  private lookTarget: THREE.Vector3 | null = null;
+  private lookYaw = 0;
+  private lookPitch = 0;
+  private lookBones: { neck: THREE.Bone; head: THREE.Bone } | null = null;
+
+  /** Makes the head (and a little of the neck) turn toward a world point. Null looks straight ahead. */
+  setLookTarget(point: THREE.Vector3 | null): void {
+    this.lookTarget = point ? point.clone() : null;
+  }
+
+  /** Turns the neck and head toward the look target on top of whatever the clip is doing. Runs after the animation. */
+  private applyLook(delta: number): void {
+    if (!this.skeleton) return;
+    if (!this.lookBones) {
+      const neck = this.skeleton.bones.find((b) => b.name === "neck_01");
+      const head = this.skeleton.bones.find((b) => b.name === "Head");
+      if (!neck || !head) return;
+      this.lookBones = { neck, head };
+    }
+    const { neck, head } = this.lookBones;
+    const bodyYaw = this.root.rotation.y;
+
+    let yawGoal = 0;
+    let pitchGoal = 0;
+    if (this.lookTarget) {
+      this.root.updateMatrixWorld(true);
+      const from = head.getWorldPosition(new THREE.Vector3());
+      const dir = this.lookTarget.clone().sub(from);
+      const horizontal = Math.hypot(dir.x, dir.z);
+      if (horizontal > 0.05) {
+        let yaw = Math.atan2(dir.x, dir.z) - bodyYaw;
+        yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw));
+        yawGoal = THREE.MathUtils.clamp(yaw, -1.1, 1.1); // about 63 degrees each way
+        pitchGoal = THREE.MathUtils.clamp(Math.atan2(-dir.y, horizontal), -0.4, 0.5);
+      }
+    }
+    const k = 1 - Math.exp(-7 * delta);
+    this.lookYaw += (yawGoal - this.lookYaw) * k;
+    this.lookPitch += (pitchGoal - this.lookPitch) * k;
+    if (Math.abs(this.lookYaw) < 0.003 && Math.abs(this.lookPitch) < 0.003) return;
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3(Math.cos(bodyYaw), 0, -Math.sin(bodyYaw));
+    const turn = (bone: THREE.Bone, share: number) => {
+      const parent = bone.parent;
+      if (!parent) return;
+      parent.updateWorldMatrix(true, false);
+      const parentQ = parent.getWorldQuaternion(new THREE.Quaternion());
+      const worldQ = parentQ.clone().multiply(bone.quaternion);
+      const delta = new THREE.Quaternion()
+        .setFromAxisAngle(up, this.lookYaw * share)
+        .multiply(new THREE.Quaternion().setFromAxisAngle(right, this.lookPitch * share));
+      bone.quaternion.copy(parentQ.invert().multiply(delta.multiply(worldQ)));
+      bone.updateMatrixWorld(true);
+    };
+    turn(neck, 0.4);
+    turn(head, 0.6);
   }
 
   dispose(): void {

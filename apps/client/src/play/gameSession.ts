@@ -96,6 +96,9 @@ export class GameSession implements GameBridge {
   speedFactor() {
     return speedFactor(this.sim.state.needs);
   }
+  needs() {
+    return this.sim.state.needs;
+  }
   notice(text: string) {
     this.notices.push({ kind: "warn", text, minute: this.sim.state.minute });
   }

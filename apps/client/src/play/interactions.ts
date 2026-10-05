@@ -27,6 +27,10 @@ export interface Interaction {
   pose?: [number, number, number];
   /** Centre of this seat/spot, to match a tap on a multi-seat sofa to the nearest seat. */
   at: [number, number];
+  /** Where the head should turn while doing it (world point), if there is something to look at. */
+  look?: [number, number, number];
+  /** For beds: where to sit down on the edge before lying back, and the way to face while sitting. */
+  edge?: { pose: [number, number, number]; yaw: number };
   hint: string;
 }
 
@@ -122,7 +126,7 @@ function seatApproach(rx: number, rz: number, f: { x: number; z: number }, ok: O
   return firstOk(candidates, ok);
 }
 
-export function deriveInteractions(items: DerivedItem[], ok: Ok): Map<string, Interaction[]> {
+export function deriveInteractions(items: DerivedItem[], ok: Ok, boxOf?: (id: string) => THREE.Box3 | undefined): Map<string, Interaction[]> {
   const result = new Map<string, Interaction[]>();
   for (const item of items) {
     const actionId = itemAction(item);
@@ -150,6 +154,8 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok): Map<string, In
         const rx = cx + f.x * SEAT_BACK;
         const rz = cz + f.z * SEAT_BACK;
         const approach = seatApproach(rx, rz, f, ok);
+        const watched = item.def.link?.map((id) => boxOf?.(id)).find((b): b is THREE.Box3 => !!b);
+        const look = watched ? watched.getCenter(new THREE.Vector3()) : undefined;
         list.push({
           id: slots.length > 1 ? `${item.def.id}#${index}` : item.def.id,
           itemId: item.def.id,
@@ -158,6 +164,7 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok): Map<string, In
           yaw: Math.atan2(f.x, f.z),
           pose: [rx, top - HIP_HEIGHT, rz],
           at: [cx, cz],
+          ...(look ? { look: [look.x, look.y, look.z] as [number, number, number] } : {}),
           hint,
         });
       });
@@ -174,7 +181,13 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok): Map<string, In
         ],
         ok,
       );
-      list.push({ id: item.def.id, itemId: item.def.id, action: actionId, approach, yaw: Math.atan2(f.x, f.z), pose: [centre.x, top, centre.z], at: [centre.x, centre.z], hint });
+      // Sit on the edge nearest the approach first, then lie back: hips on the edge, facing away from the bed.
+      const out = new THREE.Vector2(approach[0] - centre.x, approach[1] - centre.z).normalize();
+      const reach = extent(item.box, out.x, out.y);
+      const hx = centre.x + out.x * (reach - 0.24);
+      const hz = centre.z + out.y * (reach - 0.24);
+      const edge = { pose: [hx + out.x * SEAT_BACK, top - HIP_HEIGHT, hz + out.y * SEAT_BACK] as [number, number, number], yaw: Math.atan2(out.x, out.y) };
+      list.push({ id: item.def.id, itemId: item.def.id, action: actionId, approach, yaw: Math.atan2(f.x, f.z), pose: [centre.x, top, centre.z], at: [centre.x, centre.z], edge, hint });
     } else {
       const c = item.reach.getCenter(new THREE.Vector3());
       const gap = (dx: number, dz: number) => extent(item.reach, dx, dz) + STAND_GAP;
@@ -188,7 +201,8 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok): Map<string, In
         ok,
       );
       const yaw = Math.atan2(c.x - approach[0], c.z - approach[1]); // face the item
-      const interaction: Interaction = { id: item.def.id, itemId: item.def.id, action: actionId, approach, yaw, at: [c.x, c.z], hint };
+      const lookHeight = THREE.MathUtils.clamp(item.reach.min.y + (item.reach.max.y - item.reach.min.y) * 0.65, 0.95, 1.5);
+      const interaction: Interaction = { id: item.def.id, itemId: item.def.id, action: actionId, approach, yaw, at: [c.x, c.z], look: [c.x, lookHeight, c.z], hint };
       if (ENTER_ACTIONS.has(actionId)) interaction.pose = [centre.x, item.box.min.y, centre.z];
       list.push(interaction);
     }
