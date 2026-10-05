@@ -8,6 +8,21 @@ import * as THREE from "three";
 // "elbow", we pose the real skeleton on the base clip, try each local axis, and keep the one that moves the child
 // joint (hand) toward a goal direction (forward, up, out). That works for both bodies and any base pose.
 
+/** Every clip this module builds; tests check that game actions only use clips that exist. */
+export const LIFE_CLIP_NAMES = [
+  "Life_Eat_Standing_Loop",
+  "Life_Eat_Loop",
+  "Life_Drink_Loop",
+  "Life_Type_Loop",
+  "Life_Phone_Loop",
+  "Life_Wave_Loop",
+  "Life_Wash_Loop",
+  "Life_Brush_Loop",
+  "Life_Read_Loop",
+  "Life_Cook_Loop",
+  "Life_Sleep_Loop",
+] as const;
+
 const DEG = Math.PI / 180;
 const AXES = [
   new THREE.Vector3(1, 0, 0),
@@ -189,6 +204,46 @@ export function buildLifeClips(
       const offset = side === "l" ? 0 : 1.6;
       addRotation(clip, `upperarm_${side}`, cycle(2.4, 12, (p) => shoulder.clone().multiply(slerp(identity(), stir, Math.sin(p * Math.PI * 2 + offset)))));
       addRotation(clip, `lowerarm_${side}`, cycle(2.4, 4, () => elbow.clone()));
+    }
+    out.push(clip);
+  }
+
+  // Washing in the shower: both hands up, scrubbing the head.
+  {
+    const clip = cloneClip(idle, "Life_Wash_Loop", 2);
+    posedAt(ctx, idle);
+    for (const side of ["l", "r"] as const) {
+      const shoulder = bend(ctx, `upperarm_${side}`, FORWARD, 70);
+      const elbow = bend(ctx, `lowerarm_${side}`, FORWARD, 112);
+      const scrub = bend(ctx, `lowerarm_${side}`, FORWARD, 14);
+      const offset = side === "l" ? 0 : 0.5;
+      addRotation(clip, `upperarm_${side}`, cycle(2, 4, () => shoulder.clone()));
+      addRotation(clip, `lowerarm_${side}`, cycle(2, 16, (p) => elbow.clone().multiply(slerp(identity(), scrub, 0.5 + 0.5 * Math.sin((p * 4 + offset) * Math.PI * 2)))));
+    }
+    out.push(clip);
+  }
+
+  // Brushing teeth: right hand at the mouth, quick short strokes.
+  {
+    const clip = cloneClip(idle, "Life_Brush_Loop", 1.2);
+    posedAt(ctx, idle);
+    const shoulder = bend(ctx, "upperarm_r", FORWARD, 36);
+    const elbow = bend(ctx, "lowerarm_r", FORWARD, 96);
+    const stroke = bend(ctx, "lowerarm_r", FORWARD, 9);
+    addRotation(clip, "upperarm_r", cycle(1.2, 4, () => shoulder.clone()));
+    addRotation(clip, "lowerarm_r", cycle(1.2, 12, (p) => elbow.clone().multiply(slerp(identity(), stroke, 0.5 + 0.5 * Math.sin(p * 6 * Math.PI * 2)))));
+    out.push(clip);
+  }
+
+  // Reading: holding a book in both hands in front of the chest.
+  {
+    const clip = cloneClip(idle, "Life_Read_Loop");
+    posedAt(ctx, idle);
+    for (const side of ["l", "r"] as const) {
+      const shoulder = bend(ctx, `upperarm_${side}`, FORWARD, 24);
+      const elbow = bend(ctx, `lowerarm_${side}`, FORWARD, 78);
+      addRotation(clip, `upperarm_${side}`, cycle(clip.duration, 4, () => shoulder.clone()));
+      addRotation(clip, `lowerarm_${side}`, cycle(clip.duration, 4, () => elbow.clone()));
     }
     out.push(clip);
   }

@@ -112,9 +112,9 @@ export const ACTIONS: Record<string, ActionDef> = {
   },
   radio: {
     id: "radio",
-    label: "Listening to music",
+    label: "Dancing to the radio",
     pose: "stand",
-    clip: "Idle_Talking_Loop",
+    clip: "Dance_Loop",
     minutes: 30,
     minutesPerSecond: 4,
     needs: { fun: 16 },

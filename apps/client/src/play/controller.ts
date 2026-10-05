@@ -1,7 +1,19 @@
 import * as THREE from "three";
+import { ACTIONS } from "@thelife/game-core";
 import { findPath, pathLength, type NavGrid, type Point } from "@thelife/shared";
 import type { Avatar } from "../lab/avatar";
 import type { Interaction } from "./layout";
+
+/** What the controller needs from the game rules. The simulation implements it; tests can fake it. */
+export interface GameBridge {
+  start(actionId: string): { ok: true } | { ok: false; reason: string };
+  cancel(): void;
+  /** The action currently running, if any (it can also end or start on its own, e.g. collapsing from exhaustion). */
+  active(): { id: string; forced: boolean } | null;
+  /** Walking speed multiplier from tiredness. */
+  speedFactor(): number;
+  notice(text: string): void;
+}
 
 export interface Status {
   /** What the character is doing right now ("Sleeping"), or null when idle/walking. */
@@ -16,6 +28,7 @@ const WALK_SPEED = 1.55; // metres per second
 const RUN_SPEED = 3.3;
 const RUN_DISTANCE = 7; // runs when the trip is longer than this
 const TURN_RATE = 9; // radians per second
+const SEAT_SETBACK = 0.08; // sit this far back from the seat's centre so people sit *on* chairs, not at their edge
 
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
@@ -27,8 +40,9 @@ function turnToward(current: number, target: number, maxStep: number): number {
 }
 
 /**
- * Drives one character around the world: follows paths, turns smoothly, switches between walk/run/idle clips,
- * and plays actions (stand, sit, lie) when it reaches an interaction spot.
+ * Drives one character around the world: follows paths, turns smoothly, switches between walk/run/idle clips, and
+ * performs game actions at interaction spots. The game rules (needs, time, money) decide whether an action can
+ * start and when it ends; this class only moves and animates the body to match.
  */
 export class CharacterController {
   readonly position = new THREE.Vector3();
@@ -37,16 +51,22 @@ export class CharacterController {
 
   private path: Point[] = [];
   private pending: Interaction | null = null;
-  private active: Interaction | null = null;
+  private interaction: Interaction | null = null;
+  private actionId: string | null = null;
+  /** True once the action has ended but the character is still sitting (e.g. after a meal). */
+  private resting = false;
+  /** Collapsed on the spot (not at a bed). */
+  private onFloor = false;
   private clip = "";
   private running = false;
-  private timer = 0;
+  /** A tap that arrived during a short transition (sitting down, standing up); run once it finishes. */
+  private queued: { target: Point; interaction: Interaction | null } | null = null;
   private tween: { t: number; duration: number; from: THREE.Vector3; to: THREE.Vector3; fromYaw: number; toYaw: number; done: () => void } | null = null;
-  private resume: (() => void) | null = null;
 
   constructor(
     private readonly avatar: Avatar,
     private readonly nav: NavGrid,
+    private readonly game: GameBridge,
     private readonly onStatus: (status: Status) => void,
   ) {
     this.apply();
@@ -66,16 +86,31 @@ export class CharacterController {
 
   /** Walk to a piece of furniture and use it. */
   tapInteraction(interaction: Interaction): boolean {
+    if (this.mode === "doing" && this.interaction?.id === interaction.id && !this.resting) return true; // already doing it
     return this.go({ x: interaction.approach[0], z: interaction.approach[1] }, interaction);
   }
 
+  /** Can the character get from here to that spot? (No side effects.) */
+  canReach(x: number, z: number): boolean {
+    return !!findPath(this.nav, { x: this.position.x, z: this.position.z }, { x, z });
+  }
+
   private go(target: Point, interaction: Interaction | null): boolean {
+    if (this.mode === "settling" || this.mode === "leaving") {
+      if (!findPath(this.nav, { x: target.x, z: target.z }, { x: target.x, z: target.z })) return false;
+      this.queued = { target, interaction };
+      return true;
+    }
+
     const begin = () => {
       const route = findPath(this.nav, { x: this.position.x, z: this.position.z }, target);
-      if (!route || route.length === 0) return false;
+      if (!route || route.length === 0) {
+        this.mode = "idle";
+        this.setClip("Idle_Loop");
+        return false;
+      }
       this.path = route;
       this.pending = interaction;
-      this.active = null;
       this.running = pathLength({ x: this.position.x, z: this.position.z }, route) > RUN_DISTANCE;
       this.mode = "walking";
       this.setStatus(null, null);
@@ -83,27 +118,42 @@ export class CharacterController {
       return true;
     };
 
-    // Getting up from a seat or bed first, then setting off.
-    if (this.mode === "doing" && this.active && this.active.kind !== "stand") {
-      const reachable = findPath(this.nav, { x: this.active.approach[0], z: this.active.approach[1] }, target);
-      if (!reachable) return false;
-      this.leaveSeat(begin);
+    if (this.mode === "doing") {
+      // Check the way is clear before giving up the current activity.
+      if (!findPath(this.nav, this.interaction ? { x: this.interaction.approach[0], z: this.interaction.approach[1] } : { x: this.position.x, z: this.position.z }, target)) {
+        return false;
+      }
+      this.game.cancel();
+      this.actionId = null;
+      if (this.interaction?.pose || this.onFloor) this.getUp(begin);
+      else {
+        this.finishActivity();
+        return begin();
+      }
       return true;
     }
-    if (this.mode === "settling" || this.mode === "leaving") return false;
     return begin();
   }
 
-  private leaveSeat(then: () => void) {
-    const spot = this.active;
-    if (!spot) return then();
+  /** Stand back up from a seat, bed or the floor, then carry on. */
+  private getUp(then: () => void) {
+    const spot = this.interaction;
     this.mode = "leaving";
     this.setStatus(null, null);
     this.setClip("Idle_Loop");
-    this.startTween(new THREE.Vector3(spot.approach[0], 0, spot.approach[1]), this.yaw, 0.45, () => {
-      this.active = null;
+    this.avatar.setSpeed(1);
+    const to = spot ? new THREE.Vector3(spot.approach[0], 0, spot.approach[1]) : new THREE.Vector3(this.position.x, 0, this.position.z);
+    this.startTween(to, this.yaw, 0.45, () => {
+      this.finishActivity();
       then();
     });
+  }
+
+  private finishActivity() {
+    this.interaction = null;
+    this.actionId = null;
+    this.resting = false;
+    this.onFloor = false;
   }
 
   private startTween(to: THREE.Vector3, toYaw: number, duration: number, done: () => void) {
@@ -111,24 +161,27 @@ export class CharacterController {
   }
 
   private beginInteraction(interaction: Interaction) {
-    this.active = interaction;
-    this.avatar.setSpeed(1);
-    if (interaction.kind === "stand") {
-      this.mode = "settling";
-      this.startTween(this.position.clone(), interaction.yaw, 0.35, () => {
-        this.mode = "doing";
-        this.timer = interaction.seconds ?? 5;
-        this.setClip(interaction.clip);
-        this.setStatus(interaction.label, null);
-      });
+    const started = this.game.start(interaction.action);
+    if (!started.ok) {
+      this.game.notice(started.reason);
+      this.mode = "idle";
+      this.setClip("Idle_Loop");
       return;
     }
-    const pose = interaction.pose ?? [this.position.x, 0, this.position.z];
+    const def = ACTIONS[interaction.action]!;
+    this.interaction = interaction;
+    this.actionId = def.id;
+    this.avatar.setSpeed(1);
     this.mode = "settling";
-    this.setClip(interaction.clip);
-    this.startTween(new THREE.Vector3(pose[0], pose[1], pose[2]), interaction.yaw, 0.6, () => {
+    this.setClip(def.clip);
+    const pose = interaction.pose;
+    const back = def.pose === "seat" ? SEAT_SETBACK : 0;
+    const target = pose
+      ? new THREE.Vector3(pose[0] - Math.sin(interaction.yaw) * back, pose[1], pose[2] - Math.cos(interaction.yaw) * back)
+      : this.position.clone();
+    this.startTween(target, interaction.yaw, pose ? 0.6 : 0.35, () => {
       this.mode = "doing";
-      this.setStatus(interaction.label, "Tap anywhere to get up");
+      this.setStatus(def.label, def.pose === "stand" ? null : "Tap anywhere to get up");
     });
   }
 
@@ -145,16 +198,86 @@ export class CharacterController {
       }
     } else if (this.mode === "walking") {
       this.walk(dt);
-    } else if (this.mode === "doing" && this.active?.kind === "stand") {
-      this.timer -= dt;
-      if (this.timer <= 0) this.finishStanding();
+    }
+    this.followGame();
+    if (this.queued && !this.tween && (this.mode === "doing" || this.mode === "idle")) {
+      const next = this.queued;
+      this.queued = null;
+      this.go(next.target, next.interaction);
     }
     this.apply();
   }
 
-  private finishStanding() {
+  /** Keeps the body in step with the game rules: actions end, or are forced, without the player tapping. */
+  private followGame() {
+    const active = this.game.active();
+
+    // The rules forced an action on us (collapsed from exhaustion).
+    if (active?.forced && this.actionId !== active.id && this.mode !== "leaving" && !this.tween) {
+      this.collapse(active.id);
+      return;
+    }
+    if (this.mode !== "doing" || this.tween) return;
+
+    if (this.actionId && (!active || active.id !== this.actionId)) this.actionEnded();
+  }
+
+  private collapse(actionId: string) {
+    const def = ACTIONS[actionId]!;
+    this.path = [];
+    this.pending = null;
+    this.avatar.setSpeed(1);
+    const proceed = () => {
+      this.interaction = null;
+      this.onFloor = true;
+      this.actionId = actionId;
+      this.mode = "doing";
+      this.setClip(def.clip);
+      this.setStatus(def.label, null);
+    };
+    if (this.mode === "doing" && this.interaction?.pose) {
+      this.getUp(proceed);
+    } else {
+      this.mode = "settling";
+      this.startTween(this.position.clone(), this.yaw, 0.1, proceed);
+    }
+  }
+
+  private actionEnded() {
+    const interaction = this.interaction;
+    const def = this.actionId ? ACTIONS[this.actionId] : undefined;
+    this.actionId = null;
+    if (this.onFloor) {
+      // Woke up on the floor.
+      this.finishActivity();
+      this.mode = "idle";
+      this.setClip("Idle_Loop");
+      this.setStatus(null, null);
+      return;
+    }
+    if (def?.pose === "seat" && interaction?.pose) {
+      this.resting = true; // stay in the chair
+      this.setClip("Sitting_Idle_Loop");
+      this.setStatus(null, "Tap anywhere to get up");
+      return;
+    }
+    if (def?.pose === "lie") {
+      this.getUp(() => {
+        this.mode = "idle";
+        this.setStatus(null, null);
+      });
+      return;
+    }
+    // Standing actions: if they used a pose (shower), step back out.
+    if (interaction?.pose) {
+      this.getUp(() => {
+        this.mode = "idle";
+        this.setStatus(null, null);
+      });
+      return;
+    }
+    this.finishActivity();
     this.mode = "idle";
-    this.active = null;
     this.setClip("Idle_Loop");
     this.setStatus(null, null);
   }
@@ -174,7 +297,7 @@ export class CharacterController {
     this.yaw = turnToward(this.yaw, desired, TURN_RATE * dt);
 
     // Turn mostly on the spot before setting off, so the feet don't slide sideways.
-    const speed = (this.running ? RUN_SPEED : WALK_SPEED) * Math.max(0.2, 1 - turn / 1.6);
+    const speed = (this.running ? RUN_SPEED : WALK_SPEED) * this.game.speedFactor() * Math.max(0.2, 1 - turn / 1.6);
     const step = speed * dt;
     if (distance <= step) {
       this.position.x = next.x;
@@ -201,9 +324,9 @@ export class CharacterController {
   }
 
   private updateLocomotion() {
-    const clip = this.running ? "Jog_Fwd_Loop" : "Walk_Loop";
-    this.setClip(clip);
-    this.avatar.setSpeed(this.running ? RUN_SPEED / 3.0 : WALK_SPEED / 1.35);
+    const factor = this.game.speedFactor();
+    this.setClip(this.running ? "Jog_Fwd_Loop" : "Walk_Loop");
+    this.avatar.setSpeed(((this.running ? RUN_SPEED : WALK_SPEED) / (this.running ? 3.0 : 1.35)) * factor);
   }
 
   private setClip(name: string) {
@@ -221,7 +344,7 @@ export class CharacterController {
     root.rotation.y = this.yaw;
   }
 
-  get state(): { mode: Mode; x: number; y: number; z: number; clip: string; action: string | null } {
-    return { mode: this.mode, x: this.position.x, y: this.position.y, z: this.position.z, clip: this.clip, action: this.active?.id ?? null };
+  get state(): { mode: Mode; x: number; y: number; z: number; clip: string; action: string | null; resting: boolean } {
+    return { mode: this.mode, x: this.position.x, y: this.position.y, z: this.position.z, clip: this.clip, action: this.actionId, resting: this.resting };
   }
 }

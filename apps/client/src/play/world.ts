@@ -22,6 +22,8 @@ export interface World {
   ground: THREE.Mesh;
   /** Fades the walls between the camera and the house so you can always see in. */
   updateWalls(camera: THREE.Camera, delta: number): void;
+  /** Sun, sky and house lights for a time of day (hours, 0-24). */
+  setTimeOfDay(hour: number): void;
   dispose(): void;
 }
 
@@ -104,7 +106,8 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
   scene.fog = new THREE.Fog("#a9c9e8", 40, 90);
 
   // ---- lighting
-  scene.add(new THREE.HemisphereLight("#cfe0ff", "#8a7058", 1.05));
+  const hemi = new THREE.HemisphereLight("#cfe0ff", "#8a7058", 1.05);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff0d6", 2.8);
   sun.position.set(-9, 16, 11);
   sun.castShadow = true;
@@ -166,6 +169,15 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
     wallMeshes.push({ mesh, centre, outward: wall.outward ? new THREE.Vector3(wall.outward[0], 0, wall.outward[1]) : null, opacity: 1 });
   }
 
+  // ---- warm lights inside the house, switched on by setTimeOfDay at dusk
+  const houseLights: THREE.PointLight[] = [];
+  for (const [x, z] of [[-3.5, -0.5], [-3.5, 3.0], [3.7, -1.5], [3.7, 3.2]] as const) {
+    const light = new THREE.PointLight("#ffcf9a", 0, 9, 1.6);
+    light.position.set(x, 2.3, z);
+    scene.add(light);
+    houseLights.push(light);
+  }
+
   // ---- navigation grid: walls and furniture block, the play area edge blocks
   const nav = createNavGrid(PLAY_AREA, NAV_CELL);
   blockOutside(nav, PLAY_AREA, 0.4);
@@ -207,8 +219,15 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
         if (!mesh.isMesh) return;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        mesh.material = (mesh.material as THREE.MeshStandardMaterial).clone();
-        materials.push(mesh.material as THREE.MeshStandardMaterial);
+        const material = (mesh.material as THREE.MeshStandardMaterial).clone();
+        if (def.ghost !== undefined) {
+          material.transparent = true;
+          material.opacity = def.ghost;
+          material.depthWrite = false;
+          mesh.castShadow = false;
+        }
+        mesh.material = material;
+        materials.push(material);
       });
       scene.add(group);
       group.updateMatrixWorld(true);
@@ -217,6 +236,25 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
       if (def.interaction) pickables.push(group);
     }),
   );
+
+  // Items that rest on others take their height from the item below (resolved in dependency order).
+  const placed = new Set(items.filter((i) => !i.def.onTopOf).map((i) => i.def.id));
+  let remaining = items.filter((i) => i.def.onTopOf);
+  for (let pass = 0; pass < 4 && remaining.length; pass++) {
+    const next: PlacedItem[] = [];
+    for (const item of remaining) {
+      const base = items.find((i) => i.def.id === item.def.onTopOf);
+      if (!base || !placed.has(base.def.id)) {
+        next.push(item);
+        continue;
+      }
+      item.group.position.y = base.bounds.max.y + (item.def.y ?? 0);
+      item.group.updateMatrixWorld(true);
+      item.bounds = new THREE.Box3().setFromObject(item.group);
+      placed.add(item.def.id);
+    }
+    remaining = next;
+  }
 
   for (const item of items) {
     if (item.def.blocks === false) continue;
@@ -251,6 +289,46 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
     }
   }
 
+
+
+  // ---- time of day
+  const keys: { hour: number; sky: string; sun: string; sunPower: number; hemi: number; hemiSky: string; exposure: number }[] = [
+    { hour: 0, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.35, hemiSky: "#3a4a8a", exposure: 1 },
+    { hour: 5, sky: "#1d2750", sun: "#8da0e8", sunPower: 0.3, hemi: 0.4, hemiSky: "#4a5a9a", exposure: 1 },
+    { hour: 6.5, sky: "#f0a06a", sun: "#ffb072", sunPower: 1.6, hemi: 0.75, hemiSky: "#e8b8a0", exposure: 1 },
+    { hour: 9, sky: "#a9c9e8", sun: "#fff0d6", sunPower: 2.8, hemi: 1.05, hemiSky: "#cfe0ff", exposure: 1 },
+    { hour: 14, sky: "#9fc4ea", sun: "#fff6e6", sunPower: 3.1, hemi: 1.1, hemiSky: "#cfe4ff", exposure: 1 },
+    { hour: 17.5, sky: "#e8b078", sun: "#ffb06a", sunPower: 2.2, hemi: 0.85, hemiSky: "#f0c8a0", exposure: 1 },
+    { hour: 19, sky: "#6a3a52", sun: "#ff8a5a", sunPower: 0.9, hemi: 0.5, hemiSky: "#8a6a9a", exposure: 1 },
+    { hour: 20.5, sky: "#141b3a", sun: "#6f86d8", sunPower: 0.3, hemi: 0.38, hemiSky: "#3a4a8a", exposure: 1 },
+    { hour: 24, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.35, hemiSky: "#3a4a8a", exposure: 1 },
+  ];
+  const skyColor = new THREE.Color();
+  const tmpA = new THREE.Color();
+  const tmpB = new THREE.Color();
+  function setTimeOfDay(hour: number) {
+    const h = ((hour % 24) + 24) % 24;
+    let i = 0;
+    while (i < keys.length - 2 && keys[i + 1]!.hour <= h) i++;
+    const a = keys[i]!;
+    const b = keys[i + 1]!;
+    const t = (h - a.hour) / (b.hour - a.hour);
+    skyColor.set(a.sky).lerp(tmpA.set(b.sky), t);
+    (scene.background as THREE.Color).copy(skyColor);
+    (scene.fog as THREE.Fog).color.copy(skyColor);
+    sun.color.set(a.sun).lerp(tmpB.set(b.sun), t);
+    sun.intensity = a.sunPower + (b.sunPower - a.sunPower) * t;
+    hemi.intensity = a.hemi + (b.hemi - a.hemi) * t;
+    hemi.color.set(a.hemiSky).lerp(tmpB.set(b.hemiSky), t);
+    // The sun crosses the sky from east (6:00) to west (18:00); at night it becomes a dim moon from the same side.
+    const day = Math.max(0, Math.sin(((h - 6) / 12) * Math.PI));
+    const angle = ((h - 6) / 12) * Math.PI;
+    sun.position.set(Math.cos(angle) * 16 * -1, 6 + day * 12, 9);
+    const dark = h < 6.5 || h > 19.5 ? 1 : h < 8 ? (8 - h) / 1.5 : h > 18 ? (h - 18) / 1.5 : 0;
+    for (const light of houseLights) light.intensity = Math.min(1, Math.max(0, dark)) * 14;
+  }
+  setTimeOfDay(9);
+
   return {
     scene,
     nav,
@@ -258,6 +336,7 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
     pickables,
     ground,
     updateWalls,
+    setTimeOfDay,
     dispose() {
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;

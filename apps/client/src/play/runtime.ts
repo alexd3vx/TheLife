@@ -5,11 +5,17 @@ import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type Status } from "./controller";
+import { GameSession, clearGameSave, type HudSnapshot } from "./gameSession";
+import type { SimEvent } from "@thelife/game-core";
 import { INTERACTIONS, PLAY_AREA } from "./layout";
 import { buildWorld, type PlacedItem } from "./world";
 
 export interface RuntimeEvents {
   onStatus(status: Status): void;
+  onHud(snapshot: HudSnapshot): void;
+  onEvents(events: SimEvent[]): void;
+  /** Lines for the "While you were away" panel. */
+  onAway(lines: string[]): void;
   /** Hint for the thing under the pointer (desktop hover), or null. */
   onHover(hint: string | null): void;
   onStats(text: string): void;
@@ -17,6 +23,8 @@ export interface RuntimeEvents {
 
 export interface PlayRuntime {
   dispose(): void;
+  buyGroceries(): void;
+  newGame(): void;
   setFollow(on: boolean): void;
   resetView(): void;
   /** For tests and debugging. */
@@ -25,6 +33,9 @@ export interface PlayRuntime {
     tapItem(id: string): boolean;
     state(): CharacterController["state"];
     free(x: number, z: number): boolean;
+    session: GameSession;
+    canReach(interactionId: string): boolean;
+    teleport(x: number, z: number): void;
     setView(azimuthDeg: number, polarDeg: number, distance: number): void;
   };
 }
@@ -32,7 +43,7 @@ export interface PlayRuntime {
 const TAP_MAX_MOVE = 9; // pixels
 const TAP_MAX_TIME = 450; // milliseconds
 
-export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents): Promise<PlayRuntime | null> {
+export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean } = {}): Promise<PlayRuntime | null> {
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -52,7 +63,9 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   await avatar.load();
   world.scene.add(avatar.root);
 
-  const controller = new CharacterController(avatar, world.nav, events.onStatus);
+  let session = new GameSession(options.fresh);
+  if (session.awaySummary.length) events.onAway(session.awaySummary);
+  const controller = new CharacterController(avatar, world.nav, { start: (id) => session.start(id), cancel: () => session.cancel(), active: () => session.active(), speedFactor: () => session.speedFactor(), notice: (t) => session.notice(t) }, events.onStatus);
   controller.place(-1, 1, Math.PI);
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.3, 200);
@@ -185,6 +198,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   let stopped = false;
   let frames = 0;
   let acc = 0;
+  let hudClock = 1;
   const followTarget = new THREE.Vector3();
   function loop() {
     if (stopped) return;
@@ -192,8 +206,16 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     const dt = Math.min(clock.getDelta(), 0.1);
     if (document.hidden) return;
 
+    const simEvents = session.step(dt);
+    if (simEvents.length) events.onEvents(simEvents);
+    world.setTimeOfDay(session.sim.clock.hourFloat);
     controller.update(dt);
     avatar.update(dt);
+    hudClock += dt;
+    if (hudClock > 0.2) {
+      hudClock = 0;
+      events.onHud(session.snapshot());
+    }
 
     if (follow) {
       followTarget.set(controller.position.x, 0.9, controller.position.z);
@@ -219,12 +241,22 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     }
   }
   loop();
+  const saveNow = () => session.save();
+  window.addEventListener("pagehide", saveNow);
+  document.addEventListener("visibilitychange", saveNow);
 
   return {
     setFollow(on) {
       follow = on;
     },
     resetView,
+    buyGroceries() {
+      session.buyGroceries();
+    },
+    newGame() {
+      clearGameSave();
+      location.reload();
+    },
     dispose() {
       stopped = true;
       cancelAnimationFrame(raf);
@@ -233,6 +265,9 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("pointercancel", onCancel);
+      session.save();
+      window.removeEventListener("pagehide", saveNow);
+      document.removeEventListener("visibilitychange", saveNow);
       controls.dispose();
       avatar.dispose();
       world.dispose();
@@ -248,6 +283,16 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       },
       state: () => controller.state,
       free: (x, z) => isFree(world.nav, x, z),
+      get session() {
+        return session;
+      },
+      canReach(id) {
+        const i = INTERACTIONS[id];
+        return i ? controller.canReach(i.approach[0], i.approach[1]) : false;
+      },
+      teleport(x, z) {
+        controller.place(x, z, controller.yaw);
+      },
       setView(azimuthDeg, polarDeg, distance) {
         const az = (azimuthDeg * Math.PI) / 180;
         const pol = (polarDeg * Math.PI) / 180;

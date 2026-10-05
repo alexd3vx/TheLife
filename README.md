@@ -13,6 +13,11 @@ pnpm typecheck
 pnpm test
 ```
 
+## Try the game
+
+- `#/play` — the playable house: tap the floor to walk, tap furniture to cook, eat, sleep, work, shower and more. Keep your needs up and earn the rent.
+- `#/lab` — the Asset Lab: build a character (hair, clothes, skin), preview animations, browse props.
+
 ## Sign-in setup
 
 - **No setup (dev mode):** with no Supabase keys, `pnpm dev` uses a browser-only fake account store so you can try the auth page. It is disabled in production builds.
@@ -26,6 +31,8 @@ pnpm test
 
 ```
 apps/client      React + Vite app (auth page today; game world from M1)
-packages/shared  Types and validation shared by client and server
+packages/shared     Validation and pathfinding shared by client and server
+packages/game-core  The game's rules (needs, money, actions, rent), pure and tested
+tools/assets        Turns free CC0 asset packs into the game's compressed models
 docs/            Vision, architecture, roadmap, dev log
 ```

@@ -2,6 +2,15 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Playable day: needs, time, money, more furniture, polish
+- **game-core** (`packages/game-core`, 24 tests): five needs with mood/performance, a double-entry ledger (total always 0, no overdrafts, tampered saves rejected), data-driven actions (12 activities), weekly rent with late fee and eviction warning, skills, groceries/cooking/eating inventory, collapse from exhaustion, accidents, and offline catch-up with a "While you were away" summary. Full spec: `docs/GAMEPLAY_SYSTEMS.md`.
+- **Prototype is now a game:** HUD (clock, money, need bars, mood, inventory, rent, skills), action banner with progress, toasts, away panel, day/night lighting with house lights, saved on the device. Tired characters walk slower; collapsing puts the character on the floor.
+- **More furniture (30 new asset types, 140 assets / 7.8 MB total) and a bigger house:** bathroom (toilet, shower with a see-through stall, sink, cabinet, washer), bedroom (bed, nightstands, wardrobe, bookshelf), living room (TV, coffee table, sofa, side table, lamp, radio), 4-seat dining set, entrance (doormat, coat rack), kitchen (cabinets, hood, toaster, microwave, bin). "Rest on top of" placement. 14 interactions, several pieces per action (tap the desk, monitor, keyboard or laptop to work).
+- **New animations:** wash, brush teeth, read (plus dancing to the radio using the library clip).
+- **Polish from testing:** toilet and sink facing, seat setback and sofa height, see-through shower, tap queueing during sit/stand transitions, phone top bar and plural text fixes, mirror removed (looked like a floating plank).
+- **Verification:** all 14 interactions driven end to end in a browser (tap, walk, perform, needs change, return to idle); collapse, night lighting, away panel, groceries and low-money notice checked; 60 random rapid taps leave the game in a valid state (ledger sums to 0, needs within 0-100, no errors, no stuck states); 10 layout data-integrity tests (assets, actions, clips, reachability from the front door). 46 tests in total.
+- **Limits:** the cartoon furniture doesn't match the realistic characters; sit/lie offsets are tuned by eye; one lot; no other characters; no sound; clips for brushing and washing are approximate; frame rate figures in my tests come from software rendering.
+
 ## 2026-10-05 — Tap-to-walk prototype (`#/play`)
 - Pathfinding in `packages/shared/src/nav.ts` (grid A*, no corner cutting, string-pulling) with 6 unit tests. Shared package so the server can validate moves later.
 - Prototype house as data (`play/layout.ts`): walls with a front door and a partition doorway, 24 furniture items from the Kenney kit at real-world scale, 7 interactions (fridge, stove, dining, sofa/TV, desk, bed). Camera orbit/zoom/pan with follow; walls fade when the camera is outside; hover highlight; target marker.
