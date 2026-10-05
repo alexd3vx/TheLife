@@ -36,6 +36,8 @@ export interface MapRuntime {
   dispose(): void;
   resetView(): void;
   zoomOut(): void;
+  /** Switches between day and night (street lamps light up). */
+  setNight(on: boolean): void;
   /** Flies over the whole district while measuring the frame rate. */
   tour(onProgress?: (fraction: number) => void): Promise<TourResult>;
   debug: {
@@ -44,6 +46,7 @@ export interface MapRuntime {
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
     state(): CharacterController["state"];
+    night(): boolean;
   };
 }
 
@@ -78,7 +81,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.background = SKY;
   scene.fog = new THREE.Fog(SKY, 140, 330);
 
-  scene.add(new THREE.HemisphereLight("#cfe0ff", "#8a7058", 0.85));
+  const hemi = new THREE.HemisphereLight("#cfe0ff", "#8a7058", 0.85);
+  scene.add(hemi);
+  let night = false;
   const sun = new THREE.DirectionalLight("#fff0d6", 2.6);
   const SUN_OFFSET = new THREE.Vector3(-30, 50, 36);
   sun.castShadow = true;
@@ -99,7 +104,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   ground.position.y = -0.01;
   ground.receiveShadow = true;
   scene.add(ground);
-  for (const m of buildGroundDetail(district)) scene.add(m);
+  const groundDetail = buildGroundDetail(district, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+  scene.add(groundDetail.group);
 
   const streamer = new ChunkStreamer(district);
   scene.add(streamer.root);
@@ -375,6 +381,16 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   return {
     resetView,
+    setNight(on) {
+      night = on;
+      groundDetail.setNight(on);
+      SKY.set(on ? "#0d1426" : "#a9cbe8");
+      scene.fog = new THREE.Fog(SKY, on ? 90 : 140, on ? 360 : 330);
+      hemi.intensity = on ? 0.38 : 0.85;
+      sun.intensity = on ? 0.35 : 2.6;
+      sun.color.set(on ? "#8fa8d8" : "#fff0d6");
+      renderer.toneMappingExposure = on ? 1.25 : 1;
+    },
     zoomOut() {
       camera.position.set(controls.target.x + 90, 150, controls.target.z + 150);
       controls.update();
@@ -400,6 +416,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       tapGround: (x, z) => controller.tapGround(x, z),
       streamer,
       state: () => controller.state,
+      night: () => night,
     },
   };
 }

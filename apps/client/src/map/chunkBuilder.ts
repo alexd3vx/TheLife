@@ -1,6 +1,8 @@
 import * as THREE from "three";
-import type { ChunkData, District, Facing, Lamp, Lot, Rect } from "@thelife/game-core";
+import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, type ChunkData, type District, type Facing, type Lamp, type Lot, type Rect } from "@thelife/game-core";
 import { MeshBuilder } from "./meshBuilder";
+import { addProp } from "./props";
+import { asphaltTexture, concreteTexture, glowTexture, pavingTexture } from "./groundTextures";
 
 /** How much detail a chunk is built with: 0 = full (windows, doors, fences, lamps), 1 = shells and trees, 2 = plain blocks. */
 export type Lod = 0 | 1 | 2;
@@ -18,6 +20,8 @@ const LEAF = ["#3f7d3a", "#4f8f3f", "#2f6b3a"].map(C);
 const POLE = C("#4a4f55");
 
 export const buildingMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+/** The lamp heads glow at night (emissive); the poles are part of the chunk mesh. */
+export const lampMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: new THREE.Color("#ffd58a"), emissiveIntensity: 0 });
 export const treeMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -152,16 +156,13 @@ function treeGeometry(): THREE.BufferGeometry {
 }
 
 function lampGeometry(): THREE.BufferGeometry {
-  const pole = new THREE.CylinderGeometry(0.06, 0.08, 6.2, 5).toNonIndexed();
-  pole.translate(0, 3.1, 0);
-  paint(pole, POLE);
   const arm = new THREE.BoxGeometry(1.3, 0.1, 0.1).toNonIndexed();
   arm.translate(0.6, 6.15, 0);
   paint(arm, POLE);
   const head = new THREE.BoxGeometry(0.5, 0.14, 0.26).toNonIndexed();
   head.translate(1.25, 6.05, 0);
   paint(head, C("#f3e6b0"));
-  return merge([pole, arm, head]);
+  return merge([arm, head]);
 }
 
 function paint(g: THREE.BufferGeometry, color: THREE.Color, vary = false) {
@@ -224,7 +225,7 @@ function instancedTrees(trees: ChunkData["trees"], shadows: boolean): THREE.Inst
 }
 
 function instancedLamps(lamps: Lamp[]): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(SHARED_LAMP, treeMaterial, lamps.length);
+  const mesh = new THREE.InstancedMesh(SHARED_LAMP, lampMaterial, lamps.length);
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   lamps.forEach((l, i) => {
@@ -251,6 +252,8 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
   let triangles = 0;
   const b = new MeshBuilder();
   for (const lot of chunk.lots) addBuilding(b, lot, lod);
+  if (lod <= 1) for (const p of chunk.props) addProp(b, p, lod === 0);
+  if (lod === 0) for (const l of chunk.lamps) b.box(l.x - 0.06, 0, l.z - 0.06, l.x + 0.06, 6.2, l.z + 0.06, POLE, 0.9);
   const geo = b.build();
   if (geo) {
     const mesh = new THREE.Mesh(geo, buildingMaterial);
@@ -274,26 +277,73 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
 
 // ---------------------------------------------------------------- the parts that never stream (roads, ground detail)
 
-/** Roads, sidewalks, paving and crop fields for the whole district: a few hundred flat quads, built once, three draw calls or fewer. */
-export function buildGroundDetail(d: District): THREE.Mesh[] {
+export interface GroundDetail {
+  group: THREE.Group;
+  /** Street lamps glow and throw pools of light at night. */
+  setNight(on: boolean): void;
+}
+
+/** Roads, sidewalks, paving, crossings, crop fields, cables and lamp light-pools for the whole district: built once, about ten draw calls. */
+export function buildGroundDetail(d: District, anisotropy = 4): GroundDetail {
+  const group = new THREE.Group();
+  const half = ROAD_WIDTH / 2;
+  const white = C("#ffffff");
+  const asphalt = asphaltTexture();
+  const paving = pavingTexture();
+  const concrete = concreteTexture();
+  for (const t of [asphalt, paving, concrete]) t.anisotropy = anisotropy;
+
   const roads = new MeshBuilder();
-  const asphalt = C("#3b3e43");
-  const marking = C("#e8e2c4");
-  for (const r of d.roads) roads.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.02, asphalt);
-  // Dashed centre lines along every road, left out at the junctions.
-  const centres = [-180, -108, -36, 36, 108, 180];
-  const nearJunction = (t: number) => centres.some((c) => Math.abs(t - c) < 6);
-  for (const c of centres) {
-    for (let t = -d.bounds.maxX + 3; t < d.bounds.maxX - 3; t += 6) {
-      if (nearJunction(t) || nearJunction(t + 3)) continue;
-      roads.flat(c - 0.12, t, c + 0.12, t + 3, 0.035, marking);
-      roads.flat(t, c - 0.12, t + 3, c + 0.12, 0.035, marking);
+  for (const r of d.roads) roads.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.02, white, 8);
+
+  // Paint: dashed centre lines, solid edge lines, zebra crossings. Drawn just above the asphalt.
+  const paint = new MeshBuilder();
+  const line = C("#e8e2c4");
+  const edge = C("#d9d6c8");
+  const near = (t: number) => ROAD_CENTRES.some((c) => Math.abs(t - c) < half + 0.2);
+  const H = d.bounds.maxX;
+  for (const c of ROAD_CENTRES) {
+    for (let t = -H + 3; t < H - 3; t += 6) {
+      if (near(t) || near(t + 3) || near(t + 1.5)) continue;
+      paint.flat(c - 0.12, t, c + 0.12, t + 3, 0.035, line);
+      paint.flat(t, c - 0.12, t + 3, c + 0.12, 0.035, line);
+    }
+    // Edge lines between junctions.
+    let from = -H;
+    for (const other of [...ROAD_CENTRES, H + ROAD_WIDTH]) {
+      const to = Math.min(other - half - 3.5, H);
+      if (to > from + 1) {
+        for (const o of [-half + 0.35, half - 0.35]) {
+          paint.flat(c + o - 0.07, from, c + o + 0.07, to, 0.034, edge);
+          paint.flat(from, c + o - 0.07, to, c + o + 0.07, 0.034, edge);
+        }
+      }
+      from = other + half + 3.5;
     }
   }
-  const paving = new MeshBuilder();
-  for (const r of d.paving) paving.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.03, C("#9d9a92"));
+  for (const cx of ROAD_CENTRES) {
+    for (const cz of ROAD_CENTRES) {
+      for (const arm of [-1, 1]) {
+        const a = arm * (half + 1.2); // zebra stripes sit just outside the junction square
+        const b = arm * (half + 3.2);
+        for (let k = 0; k < 6; k++) {
+          const o = -half + 0.7 + k * 1.2;
+          paint.flat(cx + o, cz + Math.min(a, b), cx + o + 0.6, cz + Math.max(a, b), 0.036, edge); // across the north-south road
+          paint.flat(cx + Math.min(a, b), cz + o, cx + Math.max(a, b), cz + o + 0.6, 0.036, edge); // across the east-west road
+        }
+      }
+    }
+  }
+
+  const walk = new MeshBuilder();
   const curb = new MeshBuilder();
-  for (const r of d.sidewalks) curb.box(r.minX, 0, r.minZ, r.maxX, 0.14, r.maxZ, C("#b8b3a8"), 0.9);
+  const curbColour = C("#b3aea3");
+  for (const r of d.sidewalks) {
+    walk.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.042, white, 2);
+    curb.box(r.minX, 0, r.minZ, r.maxX, 0.04, r.maxZ, curbColour, 0.82);
+  }
+  const slabs = new MeshBuilder();
+  for (const r of d.paving) slabs.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.03, white, 6);
   const crops = new MeshBuilder();
   const cropColours = ["#7aa04a", "#8fae52", "#a5883f", "#6b8f3f"].map(C);
   d.fields.forEach((r, i) => {
@@ -301,13 +351,70 @@ export function buildGroundDetail(d: District): THREE.Mesh[] {
     const rows = Math.floor((r.maxX - r.minX) / 1.6);
     for (let k = 0; k < rows; k++) crops.flat(r.minX + 0.5 + k * 1.6, r.minZ + 0.4, r.minX + 1.3 + k * 1.6, r.maxZ - 0.4, 0.04, cropColours[(i + k) % cropColours.length]!);
   });
-  const meshes: THREE.Mesh[] = [];
-  for (const builder of [roads, paving, curb, crops]) {
+  const add = (builder: MeshBuilder, material: THREE.Material, polygonOffset = 0) => {
     const g = builder.build();
-    if (!g) continue;
-    const mesh = new THREE.Mesh(g, buildingMaterial);
+    if (!g) return;
+    if (polygonOffset) {
+      material.polygonOffset = true;
+      material.polygonOffsetFactor = -polygonOffset;
+      material.polygonOffsetUnits = -polygonOffset;
+    }
+    const mesh = new THREE.Mesh(g, material);
     mesh.receiveShadow = true;
-    meshes.push(mesh);
+    group.add(mesh);
+  };
+  add(roads, new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.95 }));
+  add(paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 1);
+  add(walk, new THREE.MeshStandardMaterial({ map: paving, roughness: 0.95 }), 1);
+  add(curb, buildingMaterial);
+  add(slabs, new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95 }), 1);
+  add(crops, buildingMaterial);
+
+  // Overhead cables: three sagging lines per span, one draw call.
+  const wire: number[] = [];
+  for (const [x1, z1, x2, z2] of d.wires) {
+    const along = Math.abs(x2 - x1) > Math.abs(z2 - z1); // true: the span runs along x, so the three lines are spread along z
+    for (const off of [-0.7, 0, 0.7]) {
+      const h = off === 0 ? 6.95 : 7.75;
+      const ax = x1 + (along ? 0 : off), az = z1 + (along ? off : 0), bx = x2 + (along ? 0 : off), bz = z2 + (along ? off : 0);
+      wire.push(ax, h, az, (ax + bx) / 2, h - 0.45, (az + bz) / 2, (ax + bx) / 2, h - 0.45, (az + bz) / 2, bx, h, bz);
+    }
   }
-  return meshes;
+  if (wire.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(wire, 3));
+    g.computeBoundingSphere();
+    group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: "#1c1d20" })));
+  }
+
+  // Pools of light on the street under each lamp (visible at night only).
+  const pool: number[] = [];
+  const poolUv: number[] = [];
+  const size = 8;
+  for (const l of d.lamps) {
+    const dx = l.facing === 3 ? 1.6 : l.facing === 1 ? -1.6 : 0;
+    const dz = l.facing === 0 ? 1.6 : l.facing === 2 ? -1.6 : 0;
+    const x = l.x + dx, z = l.z + dz;
+    pool.push(x - size, 0.05, z - size, x + size, 0.05, z - size, x + size, 0.05, z + size, x - size, 0.05, z - size, x + size, 0.05, z + size, x - size, 0.05, z + size);
+    poolUv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+  }
+  const poolMaterial = new THREE.MeshBasicMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, fog: false, side: THREE.DoubleSide });
+  if (pool.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pool, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(poolUv, 2));
+    g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, poolMaterial);
+    mesh.renderOrder = 2;
+    mesh.frustumCulled = false;
+    group.add(mesh);
+  }
+  void SIDEWALK;
+  return {
+    group,
+    setNight(on: boolean) {
+      poolMaterial.opacity = on ? 1 : 0;
+      lampMaterial.emissiveIntensity = on ? 2.2 : 0;
+    },
+  };
 }

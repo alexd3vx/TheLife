@@ -37,12 +37,32 @@ describe("district generator", () => {
     for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) expect(overlaps(solid[i]!.footprint, solid[j]!.footprint), `${solid[i]!.id} ${solid[j]!.id}`).toBe(false);
   });
 
-  it("puts every lot, tree and lamp in exactly one chunk", () => {
+  it("has street furniture and parked cars that stay off buildings and out of junctions", () => {
+    for (const kind of ["pole", "hydrant", "bin", "bench", "busStop", "sign", "car"] as const) expect(d.props.some((p) => p.kind === kind), kind).toBe(true);
+    expect(d.wires.length).toBeGreaterThan(40);
+    const centres = [-180, -108, -36, 36, 108, 180];
+    for (const p of d.props) {
+      if (p.kind !== "bench") expect(d.lots.some((l) => overlaps(l.plot, { minX: p.x - 0.5, maxX: p.x + 0.5, minZ: p.z - 0.5, maxZ: p.z + 0.5 })), `${p.kind} on a plot`).toBe(false);
+      if (p.kind === "car") {
+        const along = p.yaw === 0 ? p.z : p.x;
+        expect(centres.some((c) => Math.abs(along - c) < 4), "car in a junction").toBe(false);
+      }
+    }
+    const cars = d.props.filter((p) => p.kind === "car");
+    expect(cars.length).toBeGreaterThan(40);
+    for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
+      const a = cars[i]!, b = cars[j]!;
+      expect(Math.abs(a.x - b.x) < 1.8 && Math.abs(a.z - b.z) < 1.8, "cars overlap").toBe(false);
+    }
+  });
+
+  it("puts every lot, tree, lamp and prop in exactly one chunk", () => {
     const chunks = indexChunks(d);
     const count = (pick: (c: ReturnType<typeof indexChunks> extends Map<string, infer V> ? V : never) => unknown[]) => [...chunks.values()].reduce((s, c) => s + pick(c).length, 0);
     expect(count((c) => c.lots)).toBe(d.lots.length);
     expect(count((c) => c.trees)).toBe(d.trees.length);
     expect(count((c) => c.lamps)).toBe(d.lamps.length);
+    expect(count((c) => c.props)).toBe(d.props.length);
     const perSide = Math.ceil((DISTRICT_HALF * 2) / CHUNK_SIZE);
     expect(chunks.size).toBe(perSide * perSide);
     expect(chunks.has(chunkKey(0, 0))).toBe(true);
@@ -78,7 +98,10 @@ describe("district generator", () => {
       }
     }
     void cell;
-    const reach = (x: number, z: number) => seen[idx(x, z)] === 1;
+    const reach = (x: number, z: number) => {
+      for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (seen[idx(x + dx, z + dz)] === 1) return true; // something small may stand on the exact spot
+      return false;
+    };
     expect(reach(0, 0)).toBe(true); // the market
     expect(reach(-180, 180)).toBe(true);
     expect(reach(180, -180)).toBe(true);

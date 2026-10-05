@@ -49,7 +49,7 @@ Today the game skips time for long activities (sleep runs at 15 game minutes per
 ## Build steps
 
 1. **Engine (built, awaiting real-hardware numbers; open `#/map`)**: chunk format, loader, streaming, LODs and a flat test district (a street grid with 30 plain lots) running through the same game. Measure frame rate on a phone-class budget (the in-game perf probe and adaptive quality are already in). *Exit check: walk the whole test district at stable frame rate, memory flat.*
-2. **Roads and ground**: roads, sidewalks, junctions, ground textures, street furniture, lamps, trees (instanced).
+2. **Roads and ground (built: textured streets, crossings, furniture, parked cars, cables, night lamps)**: roads, sidewalks, junctions, ground textures, street furniture, lamps, trees (instanced).
 3. **Building kit and generator**: house types (small flat, bungalow, two-storey, compound with garage), shops; cutaway walls, stairs, doors; collision and navigation from the generator. The current house becomes one generated archetype.
 4. **Life on the streets**: traffic loops, buses, planes and apron, background pedestrians; day and night, lights tied to power cuts.
 5. **Travel and places**: leave the house, shops with real counters, market stalls, taxi/bus/flight rides; the phone's LifeMaps shows the real map; deliveries come to your door.

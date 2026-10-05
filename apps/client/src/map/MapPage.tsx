@@ -15,6 +15,7 @@ export default function MapPage() {
   const [menu, setMenu] = useState<TapMenu | null>(null);
   const [touring, setTouring] = useState<number | null>(null);
   const [result, setResult] = useState<TourResult | null>(null);
+  const [night, setNight] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -30,7 +31,7 @@ export default function MapPage() {
         if (!runtime) setError("Your browser can't run WebGL, which the game needs.");
         else {
           runtimeRef.current = runtime;
-          if (import.meta.env.DEV) (window as unknown as { __map: MapRuntime["debug"] & { tour: MapRuntime["tour"] } }).__map = { ...runtime.debug, tour: runtime.tour };
+          if (import.meta.env.DEV) (window as unknown as { __map: MapRuntime["debug"] & { tour: MapRuntime["tour"] } }).__map = { ...runtime.debug, tour: runtime.tour, setNight: runtime.setNight } as never;
         }
         setLoading(false);
       })
@@ -94,6 +95,7 @@ export default function MapPage() {
       <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
         <button onClick={() => runtimeRef.current?.zoomOut()}>Whole district</button>
+        <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day" : "Night"}</button>
         <button onClick={runTour} disabled={touring !== null}>
           {touring === null ? "Run the performance tour" : `Touring… ${touring}%`}
         </button>

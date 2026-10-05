@@ -4,6 +4,7 @@ import * as THREE from "three";
 export class MeshBuilder {
   private readonly pos: number[] = [];
   private readonly col: number[] = [];
+  private readonly uv: number[] = [];
 
   get triangles(): number {
     return this.pos.length / 9;
@@ -41,10 +42,16 @@ export class MeshBuilder {
     this.quad(V(x0, y1, z0), V(x1, y1, z0), V(x1, y1, z1), V(x0, y1, z1), { x: 0, y: 1, z: 0 }, lit, lit, lit);
   }
 
-  /** A flat horizontal rectangle facing up. */
-  flat(x0: number, z0: number, x1: number, z1: number, y: number, color: THREE.Color): void {
+  /** A flat horizontal rectangle facing up. With `uvScale` the texture repeats every that many metres (world-space UVs). */
+  flat(x0: number, z0: number, x1: number, z1: number, y: number, color: THREE.Color, uvScale?: number): void {
     const V = (x: number, z: number) => new THREE.Vector3(x, y, z);
     this.quad(V(x0, z0), V(x1, z0), V(x1, z1), V(x0, z1), { x: 0, y: 1, z: 0 }, color);
+    if (uvScale) {
+      const u = (x: number, z: number) => this.uv.push(x / uvScale, z / uvScale);
+      // quad() pushes six vertices, in a-b-c / a-c-d order (or the flipped order): map by position.
+      const n = this.pos.length / 3;
+      for (let i = n - 6; i < n; i++) u(this.pos[i * 3]!, this.pos[i * 3 + 2]!);
+    }
   }
 
   build(): THREE.BufferGeometry | null {
@@ -52,6 +59,7 @@ export class MeshBuilder {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.uv.length && this.uv.length / 2 === this.pos.length / 3) g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
     g.computeVertexNormals(); // non-indexed: one normal per face, so flat shading
     g.computeBoundingSphere();
     g.computeBoundingBox();

@@ -5,9 +5,9 @@
 export const CHUNK_SIZE = 32;
 /** Half the width of the playable district in metres (the district is 2 x HALF wide). */
 export const DISTRICT_HALF = 216;
-const ROAD_CENTRES = [-180, -108, -36, 36, 108, 180];
-const ROAD_WIDTH = 8;
-const SIDEWALK = 2;
+export const ROAD_CENTRES = [-180, -108, -36, 36, 108, 180];
+export const ROAD_WIDTH = 8;
+export const SIDEWALK = 2;
 
 export interface Rect {
   minX: number;
@@ -54,6 +54,18 @@ export interface Lamp {
   facing: Facing;
 }
 
+export type PropKind = "pole" | "hydrant" | "bin" | "bench" | "busStop" | "sign" | "car";
+
+/** Street furniture and parked cars. `yaw` is a multiple of 90 degrees (0 faces +x along the crossarm/length, 90 turns it). */
+export interface Prop {
+  kind: PropKind;
+  x: number;
+  z: number;
+  yaw: 0 | 90;
+  /** Car colour, sign type, and so on. */
+  variant: number;
+}
+
 export type BlockKind = "residential" | "commercial" | "market" | "park" | "farm" | "apron";
 
 export interface Block {
@@ -70,6 +82,9 @@ export interface District {
   lots: Lot[];
   trees: Tree[];
   lamps: Lamp[];
+  props: Prop[];
+  /** Overhead cable spans between power poles: [x1, z1, x2, z2]. */
+  wires: [number, number, number, number][];
   /** Paved areas that are not roads (car parks, the apron). */
   paving: Rect[];
   /** Crop plots on the outskirts. */
@@ -234,13 +249,79 @@ export function generateDistrict(seed = 1): District {
   }
 
   // Trees that landed on a building or the road are dropped (the random yard trees are not planned around lots).
+  const props: Prop[] = [];
+  const wires: District["wires"] = [];
+  const outerLimit = H - 8;
+  const propBox = (x: number, z: number, r: number) => rect(x - r, x + r, z - r, z + r);
+  const onLot = (x: number, z: number, r: number) => lots.some((l) => overlaps(l.plot, propBox(x, z, r)));
+  for (const c of ROAD_CENTRES) {
+    // Power poles on one side of every road, joined by cables.
+    const ts: number[] = [];
+    for (let t = -H + 20; t < outerLimit; t += 36) if (!nearJunction(t)) ts.push(t);
+    ts.forEach((t, i) => {
+      props.push({ kind: "pole", x: c - half - 0.8, z: t, yaw: 0, variant: 0 }, { kind: "pole", x: t, z: c - half - 0.8, yaw: 90, variant: 0 });
+      if (i > 0) wires.push([c - half - 0.8, ts[i - 1]!, c - half - 0.8, t], [ts[i - 1]!, c - half - 0.8, t, c - half - 0.8]);
+    });
+    for (let t = -H + 30; t < outerLimit; t += 96) {
+      if (nearJunction(t)) continue;
+      props.push({ kind: "hydrant", x: c + half + 0.7, z: t, yaw: 0, variant: 0 }, { kind: "hydrant", x: t, z: c + half + 0.7, yaw: 0, variant: 0 });
+    }
+    for (let t = -H + 40; t < outerLimit; t += 48) {
+      if (nearJunction(t)) continue;
+      props.push({ kind: "bin", x: c - half - 1.4, z: t, yaw: 0, variant: 0 }, { kind: "bin", x: t, z: c - half - 1.4, yaw: 0, variant: 0 });
+    }
+    // Parked cars along the kerbs, never across a junction.
+    for (let t = -H + 14; t < outerLimit; t += 7.5) {
+      if (nearJunction(t) || nearJunction(t + 4.5) || nearJunction(t - 4.5)) continue;
+      for (const side of [-1, 1]) {
+        if (rand() > 0.2) continue;
+        const off = c + side * (half - 1.25);
+        props.push({ kind: "car", x: off, z: t, yaw: 0, variant: Math.floor(rand() * 6) });
+      }
+      for (const side of [-1, 1]) {
+        if (rand() > 0.2) continue;
+        const off = c + side * (half - 1.25);
+        props.push({ kind: "car", x: t, z: off, yaw: 90, variant: Math.floor(rand() * 6) });
+      }
+    }
+  }
+  // Stop signs at some junction corners; bus stops mid-block on the north-south roads.
+  for (const cx of ROAD_CENTRES) {
+    for (const cz of ROAD_CENTRES) {
+      for (const [sx, sz] of [[1, 1], [-1, -1]] as const) if (rand() < 0.6) props.push({ kind: "sign", x: cx + sx * (half + 1.1), z: cz + sz * (half + 1.1), yaw: 0, variant: 0 });
+    }
+  }
+  for (let k = 0; k + 1 < ROAD_CENTRES.length; k++) {
+    const mid = (ROAD_CENTRES[k]! + ROAD_CENTRES[k + 1]!) / 2;
+    for (const c of ROAD_CENTRES) if (rand() < 0.3) props.push({ kind: "busStop", x: c + half + 1.4, z: mid, yaw: 0, variant: 0 });
+  }
+  for (const b of blocks) {
+    if (b.kind !== "park" && b.kind !== "market") continue;
+    const n = b.kind === "park" ? 3 : 4;
+    for (let i = 0; i < n; i++) props.push({ kind: "bench", x: between(b.area.minX + 4, b.area.maxX - 4), z: between(b.area.minZ + 4, b.area.maxZ - 4), yaw: rand() < 0.5 ? 0 : 90, variant: 0 });
+  }
+  // Furniture that landed on a plot, off the playable ground, or too close to another is dropped.
+  const placed: Prop[] = [];
+  for (const p of props) {
+    if (Math.abs(p.x) > H - 1 || Math.abs(p.z) > H - 1) continue;
+    if (p.kind !== "car" && p.kind !== "bench" && onLot(p.x, p.z, 0.6)) continue;
+    if (p.kind === "bench" && lots.some((l) => overlaps(l.footprint, propBox(p.x, p.z, 1.5)))) continue;
+    const clash = placed.some((q) => {
+      if (p.kind === "car" && q.kind === "car") return p.yaw === q.yaw ? (p.yaw === 0 ? Math.abs(q.x - p.x) < 2.4 && Math.abs(q.z - p.z) < 4.8 : Math.abs(q.x - p.x) < 4.8 && Math.abs(q.z - p.z) < 2.4) : Math.abs(q.x - p.x) < 4.6 && Math.abs(q.z - p.z) < 4.6;
+      if (p.kind === "car" || q.kind === "car") return false;
+      return Math.abs(q.x - p.x) < 1 && Math.abs(q.z - p.z) < 1;
+    });
+    if (clash) continue;
+    placed.push(p);
+  }
+
   const keep = trees.filter((tr) => {
     const box = rect(tr.x - 0.5, tr.x + 0.5, tr.z - 0.5, tr.z + 0.5);
     if (roads.some((r) => overlaps(r, box))) return false;
     return !lots.some((l) => overlaps(l.footprint, box, 1));
   });
 
-  return { seed, bounds, roads, sidewalks, blocks, lots, trees: keep, lamps, paving, fields, spawn: { x: ROAD_CENTRES[2]! + 0.5, z: ROAD_CENTRES[2]! + 12, yaw: 0 } };
+  return { seed, bounds, roads, sidewalks, blocks, lots, trees: keep, lamps, props: placed, wires, paving, fields, spawn: { x: ROAD_CENTRES[2]! + 0.5, z: ROAD_CENTRES[2]! + 12, yaw: 0 } };
 }
 
 // ---------------------------------------------------------------- chunks
@@ -258,6 +339,7 @@ export interface ChunkData {
   lots: Lot[];
   trees: Tree[];
   lamps: Lamp[];
+  props: Prop[];
 }
 
 /** Everything in the district sorted into its chunk (a lot, tree or lamp belongs to the chunk holding its centre). */
@@ -269,7 +351,7 @@ export function indexChunks(d: District): Map<string, ChunkData> {
     const key = chunkKey(cx, cz);
     let c = map.get(key);
     if (!c) {
-      c = { cx, cz, bounds: rect(cx * CHUNK_SIZE, (cx + 1) * CHUNK_SIZE, cz * CHUNK_SIZE, (cz + 1) * CHUNK_SIZE), lots: [], trees: [], lamps: [] };
+      c = { cx, cz, bounds: rect(cx * CHUNK_SIZE, (cx + 1) * CHUNK_SIZE, cz * CHUNK_SIZE, (cz + 1) * CHUNK_SIZE), lots: [], trees: [], lamps: [], props: [] };
       map.set(key, c);
     }
     return c;
@@ -280,6 +362,7 @@ export function indexChunks(d: District): Map<string, ChunkData> {
   for (const l of d.lots) get((l.footprint.minX + l.footprint.maxX) / 2, (l.footprint.minZ + l.footprint.maxZ) / 2).lots.push(l);
   for (const t of d.trees) get(t.x, t.z).trees.push(t);
   for (const l of d.lamps) get(l.x, l.z).lamps.push(l);
+  for (const p of d.props) get(p.x, p.z).props.push(p);
   return map;
 }
 
@@ -289,5 +372,11 @@ export function walkBlockers(d: District): Rect[] {
   for (const l of d.lots) out.push(l.footprint);
   for (const t of d.trees) out.push(rect(t.x - 0.35, t.x + 0.35, t.z - 0.35, t.z + 0.35));
   for (const l of d.lamps) out.push(rect(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15));
+  for (const p of d.props) {
+    const r = { pole: [0.15, 0.15], hydrant: [0.2, 0.2], bin: [0.3, 0.3], sign: [0.1, 0.1], bench: [0.9, 0.3], busStop: [1.5, 0.8], car: [0.95, 2.2] }[p.kind];
+    const [hx, hz] = p.yaw === 90 ? [r[1]!, r[0]!] : [r[0]!, r[1]!];
+    // A car is long along the road: yaw 0 means the road runs north-south (z), so its long side is z; the table above is (x, z) for yaw 0.
+    out.push(rect(p.x - hx, p.x + hx, p.z - hz, p.z + hz));
+  }
   return out;
 }
