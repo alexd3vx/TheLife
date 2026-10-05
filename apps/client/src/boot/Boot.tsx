@@ -44,13 +44,21 @@ export function Boot({ children }: { children: ReactNode }) {
     setSynced(false);
     (async () => {
       try {
-        const manifest = await loadManifest();
-        const result = await syncAssets(manifest, (p) => alive && setProgress(p));
+        let manifest;
+        try {
+          manifest = await loadManifest();
+        } catch (e) {
+          if (alive) setError(e instanceof Error ? e.message : "Could not reach the game files.");
+          return;
+        }
+        // Keeping files on the device is a bonus: if it fails for any reason the game still starts.
+        const result = await syncAssets(manifest, (p) => alive && setProgress(p)).catch(() => null);
         if (!alive) return;
-        if (result.failed.length) setWarning("Some files will finish loading while you play.");
+        if (!result || result.failed.length) setWarning("Some files will finish loading while you play.");
         setSynced(true);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Could not reach the game files.");
+        if (alive) setSynced(true);
+        console.warn("boot failed", e);
       }
     })();
     return () => {
@@ -205,6 +213,7 @@ export function Boot({ children }: { children: ReactNode }) {
                 {error ? (
                   <>
                     <p className="boot-error">Could not reach the game files. Check your connection and try again.</p>
+                    {error !== "" && <p className="boot-note">{error}</p>}
                     <button className="btn btn-primary" onClick={retry}>
                       Try again
                     </button>

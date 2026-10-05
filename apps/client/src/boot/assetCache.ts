@@ -49,6 +49,18 @@ export interface SyncProgress {
  * what is no longer used. Resolves with the final state; failed files are left for the game to load on demand.
  */
 export async function syncAssets(manifest: AssetManifest, onProgress: (p: SyncProgress) => void): Promise<{ failed: string[]; progress: SyncProgress }> {
+  try {
+    return await syncAssetsUnsafe(manifest, onProgress);
+  } catch (error) {
+    // Some hosted pages allow opening the cache but refuse writes. The game must still start: it loads files as it needs them.
+    console.warn("boot: could not keep assets on this device", error);
+    const progress: SyncProgress = { toDownload: 0, loaded: 0, firstRun: false, alreadyStored: 0, cacheAvailable: false };
+    onProgress(progress);
+    return { failed: [], progress };
+  }
+}
+
+async function syncAssetsUnsafe(manifest: AssetManifest, onProgress: (p: SyncProgress) => void): Promise<{ failed: string[]; progress: SyncProgress }> {
   const assets = selectBootAssets(manifest);
   const cache = await openCache();
   if (!cache) {

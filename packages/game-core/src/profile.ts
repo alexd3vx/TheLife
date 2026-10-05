@@ -1,3 +1,5 @@
+import { sanitizeTraits } from "./traits";
+
 // Who you are and where you start. A random background (lapo = poor, middle, nepo = rich) decides your money, rent,
 // weekly allowance, phone and a few traits, so every new life begins differently. Pure data and one pure function
 // (given a random source), so it is unit-tested and will run on the server later.
@@ -25,7 +27,10 @@ export interface Profile {
   allowanceFrom: string;
   /** The phone you start with (the phone feature builds on this). */
   phone: PhoneTier;
+  /** Trait ids the player chose (see traits.ts). */
   traits: string[];
+  /** Flavour from the background itself ("Hustler", "Knows the neighbours"): description only. */
+  flavour: string[];
   /** Starting skill experience by skill id. */
   skills: Record<string, number>;
 }
@@ -128,7 +133,8 @@ export function profileFrom(def: BackgroundDef, random: Random, sex: Sex): Profi
     weeklyAllowance: def.allowance,
     allowanceFrom: def.allowanceFrom ?? "",
     phone: def.phone,
-    traits: [...def.traits],
+    traits: [],
+    flavour: [...def.traits],
     skills: { ...(def.skills ?? {}) },
   };
 }
@@ -158,7 +164,8 @@ export function parseProfile(raw: unknown): Profile | null {
     weeklyAllowance: num(r.weeklyAllowance, 10_000_000),
     allowanceFrom: text(r.allowanceFrom, 30),
     phone: r.phone === "flagship" || r.phone === "mid" ? r.phone : "basic",
-    traits: Array.isArray(r.traits) ? r.traits.filter((t): t is string => typeof t === "string").slice(0, 6).map((t) => t.slice(0, 40)) : [],
+    traits: sanitizeTraits(Array.isArray(r.traits) ? r.traits.filter((t): t is string => typeof t === "string") : []),
+    flavour: Array.isArray(r.flavour) ? r.flavour.filter((t): t is string => typeof t === "string").slice(0, 6).map((t) => t.slice(0, 40)) : [],
     skills,
   };
 }

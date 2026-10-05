@@ -2,6 +2,7 @@ import { ACTIONS, ECONOMY, skillPayMultiplier } from "./actions";
 import { MINT, PLAYER, SINK, balance, createLedger, transfer } from "./ledger";
 import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./needs";
 import type { Profile } from "./profile";
+import { combineTraits, type TraitEffects } from "./traits";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
 const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped"
@@ -14,6 +15,12 @@ const WARNINGS: Record<NeedId, string> = {
   fun: "You're bored.",
 };
 
+function startingSkills(profile: Profile | null): Record<string, number> {
+  const skills = profile ? { ...profile.skills } : {};
+  for (const [id, xp] of Object.entries(combineTraits(profile?.traits).skills)) skills[id] = (skills[id] ?? 0) + xp;
+  return skills;
+}
+
 export function createGameState(profile: Profile | null = null): GameState {
   const ledger = createLedger();
   transfer(ledger, MINT, PLAYER, profile?.startingMoney ?? ECONOMY.startingMoney, "Starting money", 0);
@@ -23,7 +30,7 @@ export function createGameState(profile: Profile | null = null): GameState {
     needs: createNeeds(),
     ledger,
     inventory: { portions: 3, meals: 0 },
-    skills: profile ? { ...profile.skills } : {},
+    skills: startingSkills(profile),
     incomeCarry: 0,
     rentOwed: 0,
     lastRentDay: 0,
@@ -130,12 +137,22 @@ export class Sim {
 
   // -------------------------------------------------------------- shop
 
+  /** The player's trait effects (decay rates, pay, prices). */
+  get traits(): TraitEffects {
+    return combineTraits(this.state.profile?.traits);
+  }
+
+  get groceriesPrice(): number {
+    return Math.round((ECONOMY.groceriesPrice * this.traits.groceries) / 100) * 100;
+  }
+
   buyGroceries(): StartResult {
-    const result = transfer(this.state.ledger, PLAYER, SINK, ECONOMY.groceriesPrice, "Groceries", this.state.minute);
-    if (!result.ok) return { ok: false, reason: `Groceries cost ₦${ECONOMY.groceriesPrice.toLocaleString()}. You don't have enough.` };
+    const price = this.groceriesPrice;
+    const result = transfer(this.state.ledger, PLAYER, SINK, price, "Groceries", this.state.minute);
+    if (!result.ok) return { ok: false, reason: `Groceries cost ₦${price.toLocaleString()}. You don't have enough.` };
     this.state.inventory.portions += ECONOMY.groceriesPortions;
-    this.state.stats.totalSpent += ECONOMY.groceriesPrice;
-    this.emit("info", `Ordered groceries: +${ECONOMY.groceriesPortions} portions (−₦${ECONOMY.groceriesPrice.toLocaleString()}).`);
+    this.state.stats.totalSpent += price;
+    this.emit("info", `Ordered groceries: +${ECONOMY.groceriesPortions} portions (−₦${price.toLocaleString()}).`);
     return { ok: true };
   }
 
@@ -192,7 +209,7 @@ export class Sim {
     const hours = minutes / 60;
 
     for (const id of NEED_IDS) {
-      const decayScale = (act?.def.decay?.[id] ?? 1) * (this.offline ? 0.5 : 1);
+      const decayScale = (act?.def.decay?.[id] ?? 1) * (this.offline ? 0.5 : 1) * this.traits.decay[id];
       let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale;
       if (act) perHour += ((act.def.needs[id] ?? 0) / act.def.minutes) * 60;
       if (id === "energy" && s.needs.hunger <= 0) perHour -= 3; // starving drains energy
@@ -201,7 +218,7 @@ export class Sim {
 
     if (act) {
       act.done += minutes;
-      if (act.def.incomePerHour) this.earn(act.def.incomePerHour * performance(s.needs) * skillPayMultiplier(s.skills.computer ?? 0) * hours);
+      if (act.def.incomePerHour) this.earn(act.def.incomePerHour * performance(s.needs) * skillPayMultiplier(s.skills.computer ?? 0) * this.traits.workPay * hours);
       if (act.def.skill) {
         const before = Math.floor(Math.sqrt((s.skills[act.def.skill.id] ?? 0) / 8));
         s.skills[act.def.skill.id] = (s.skills[act.def.skill.id] ?? 0) + act.def.skill.xpPerHour * hours;

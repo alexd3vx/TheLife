@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKGROUNDS, ECONOMY, Sim, createGameState, parseGameState, parseProfile, profileFrom, rollBackground, balance } from "./index";
+import { BACKGROUNDS, ECONOMY, Sim, TRAITS, balance, combineTraits, createGameState, parseGameState, parseProfile, profileFrom, rollBackground, sanitizeTraits } from "./index";
 
 /** A small deterministic random source, so tests are repeatable. */
 function seeded(seed: number) {
@@ -82,10 +82,52 @@ describe("backgrounds", () => {
   it("rejects nonsense profiles and clamps numbers", () => {
     expect(parseProfile(null)).toBeNull();
     expect(parseProfile({ tier: "king" })).toBeNull();
-    const p = parseProfile({ tier: "nepo", firstName: "x".repeat(500), startingMoney: -5, rentPerWeek: Infinity, phone: "toaster", traits: ["a", 3, "b"] });
+    const p = parseProfile({ tier: "nepo", firstName: "x".repeat(500), startingMoney: -5, rentPerWeek: Infinity, phone: "toaster", traits: ["hustler", 3, "nonsense", "thrifty", "techie", "bookworm"] });
     expect(p?.firstName.length).toBe(30);
     expect(p?.startingMoney).toBe(0);
     expect(p?.phone).toBe("basic");
-    expect(p?.traits).toEqual(["a", "b"]);
+    expect(p?.traits).toEqual(["hustler", "thrifty"]); // unknown dropped, at most two strengths without a weakness
+  });
+});
+
+describe("traits", () => {
+  it("every trait has a plain description and a real effect", () => {
+    for (const t of TRAITS) {
+      expect(t.text.length, t.id).toBeGreaterThan(10);
+      expect(Object.keys(t.effect).length, t.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("allows two strengths, or three with one weakness", () => {
+    expect(sanitizeTraits(["hustler", "thrifty", "tidy"])).toEqual(["hustler", "thrifty"]);
+    expect(sanitizeTraits(["hustler", "thrifty", "tidy", "lazy", "restless"])).toEqual(["hustler", "thrifty", "tidy", "lazy"]);
+  });
+
+  it("combines effects", () => {
+    const e = combineTraits(["iron_stomach", "big_appetite", "hustler", "techie"]);
+    expect(e.decay.hunger).toBeCloseTo(1.0, 5); // 0.8 x 1.25
+    expect(e.workPay).toBeCloseTo(1.1, 5);
+    expect(e.skills.computer).toBe(72);
+  });
+
+  it("an iron stomach gets hungry slower than a big appetite", () => {
+    const run = (trait: string) => {
+      const profile = { ...rollBackground(seeded(5), "male"), traits: [trait] };
+      const sim = new Sim(createGameState(profile));
+      sim.advance(240);
+      return sim.state.needs.hunger;
+    };
+    expect(run("iron_stomach")).toBeGreaterThan(run("big_appetite"));
+  });
+
+  it("thrifty cuts the grocery bill, a head-start skill is applied, and money stays whole", () => {
+    const base = rollBackground(seeded(9), "female");
+    const thrifty = new Sim(createGameState({ ...base, traits: ["thrifty"] }));
+    const spender = new Sim(createGameState({ ...base, traits: ["thrifty", "spender"] }));
+    expect(thrifty.groceriesPrice).toBeLessThan(ECONOMY.groceriesPrice);
+    expect(spender.groceriesPrice % 100).toBe(0);
+    const tech = createGameState({ ...base, traits: ["techie"] });
+    expect(tech.skills.computer).toBe(72);
+    expect(balance(tech.ledger)).toBe(base.startingMoney);
   });
 });

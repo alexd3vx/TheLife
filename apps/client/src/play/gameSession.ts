@@ -182,7 +182,7 @@ export class GameSession implements GameBridge {
       rentInDays: daysToRent === 0 && clock.hour < ECONOMY.rentHour ? 0 : daysToRent === 0 ? ECONOMY.rentDay : daysToRent,
       action: act ? { label: ACTIONS[act.def.id]?.label ?? act.def.label, progress: Math.min(1, act.done / act.def.minutes), seconds: act.def.minutes / act.def.minutesPerSecond } : null,
       skills: Object.entries(s.skills).map(([id, xp]) => ({ id, level: skillLevel(xp) })),
-      groceriesPrice: ECONOMY.groceriesPrice,
+      groceriesPrice: sim.groceriesPrice,
     };
   }
 }
