@@ -81,6 +81,15 @@ export const ACTIONS: Record<string, ActionDef> = {
     decay: { energy: 0, hunger: 0.6, bladder: 0.4, hygiene: 0.4, fun: 0.4 },
     until: { need: "energy", atLeast: 45 },
   },
+  sit: {
+    id: "sit",
+    label: "Sitting",
+    pose: "seat",
+    clip: "Sitting_Idle_Loop",
+    minutes: 30,
+    minutesPerSecond: 5,
+    needs: { energy: 6, fun: 2 },
+  },
   toilet: {
     id: "toilet",
     label: "Using the toilet",

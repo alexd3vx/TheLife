@@ -3,6 +3,8 @@ import { useAuth } from "../auth/AuthProvider";
 
 const HeroCanvas = lazy(() => import("../world3d/HeroCanvas"));
 
+const linkStyle = { textAlign: "center", textDecoration: "none", display: "grid", placeItems: "center" } as const;
+
 // Temporary in-game screen. Replaced by the character creator and the world in later milestones.
 export function HomePlaceholder() {
   const { user, save, leave } = useAuth();
@@ -26,9 +28,14 @@ export function HomePlaceholder() {
           </p>
         )}
         {save && <p className="muted">Save started {new Date(save.createdAt).toLocaleDateString()}</p>}
-        <p className="muted">Next: build the character and asset lab, then step into the district.</p>
-        <a className="btn btn-primary" href="#/play" style={{ textAlign: "center", textDecoration: "none", display: "grid", placeItems: "center" }}>
-          Try the walking prototype
+        <a className="btn btn-primary" href="#/play" style={linkStyle}>
+          Play: your house
+        </a>
+        <a className="btn btn-ghost" href="#/showroom" style={linkStyle}>
+          Furniture showroom (test everything)
+        </a>
+        <a className="btn btn-ghost" href="#/lab" style={linkStyle}>
+          Character and asset lab
         </a>
         <button className="btn btn-ghost" onClick={() => void leave()}>
           {user ? "Log out" : "Back to start"}

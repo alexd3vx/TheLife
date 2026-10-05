@@ -6,6 +6,7 @@ import { HomePlaceholder } from "./ui/HomePlaceholder";
 // The lab is a developer tool, so it only downloads when someone opens #/lab.
 const LabPage = lazy(() => import("./lab/LabPage"));
 const PlayPage = lazy(() => import("./play/PlayPage"));
+const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(window.location.hash);
@@ -25,6 +26,13 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <LabPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/showroom")) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <ShowroomPage />
       </Suspense>
     );
   }

@@ -13,6 +13,7 @@ Every third-party asset is CC0 (public domain). Credit is not required but is sh
 | [Modular Character Outfits - Fantasy (Standard)](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Quaternius | CC0 1.0 | 2 outfits (Peasant, Ranger) × male/female: top, sleeves, bottom, shoes, hood, shoulder guards; shared textures |
 | [Furniture Kit 2.0](https://kenney.nl/assets/furniture-kit) | Kenney | CC0 1.0 | 52 furniture/structure pieces |
 | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 1.0 | 12 vehicles |
+| [Poly Haven models](https://polyhaven.com/models) | Poly Haven contributors | CC0 1.0 | 60 realistic photoscanned furniture and props (sofas, chairs, tables, shelves, lamps, TV, radio, stove, fan...) |
 
 Rule: nothing goes in without its licence recorded in `tools/assets/sources.mjs` (`CREDITS`).
 
@@ -47,6 +48,33 @@ What the build does to each model: dedupe/prune, textures → WebP (1024 px for 
 
 Current library: 78 assets, ~5.3 MB total, all within budget.
 
+## Realistic furniture (Poly Haven + code)
+
+The cartoon Kenney furniture did not match the realistic characters, so the home is furnished with **60 photoscanned CC0 models from Poly Haven** plus **14 pieces built in code** where nothing suitable is free (fridge, toilet, basin, shower cabin, double bed with mattress and pillows, wardrobe, flat-screen TV, washing machine, kitchen units, floor lamp, rug, doormat).
+
+- **Fetch:** `tools/assets/fetch_polyhaven.py` downloads the glTF + textures through the public Poly Haven API (the list is `REALISTIC` in `sources.mjs`). The Kenney furniture stays in the Lab (category "furniture") but is no longer used in the game.
+- **Build:** meshopt-compressed, textures to WebP at 1024 px (colour, normal, roughness/metal packed), budget 7,000 triangles and 700 KB per piece (two heavier models were dropped). All 60 models, ~13 MB.
+- **Fronts and size:** every model is normalised so its front faces +z, origin at the centre of its footprint on the floor, real-world size (the manifest records `sizeMetres`; a test fails if anything is absurdly big or small).
+- **Procedural pieces** live in `apps/client/src/furniture/procedural.ts` with shared materials (`materials.ts`: enamel, steel, ceramic, glass, wood, fabric, Ankara print, granite...). They can have moving parts (the fridge door, the shower water).
+- **Catalog:** `packages/game-core/src/catalog.ts` lists all 77 sellable pieces with a name, category, price in naira and the action they enable. The shop (later) sells from this list; today the showroom and the test house place them directly. A test checks every catalog item has a model and every model is sold.
+
+### How furniture is used (no hand-tuned poses)
+
+`apps/client/src/play/interactions.ts` works out how to use each placed piece from its **measured shape**:
+
+- **Sitting:** a ray is cast down onto the seat to find its real height. The character's origin goes `0.331 m` in front of the seat centre and `seat height − 0.452 m` up (the two numbers are the hips' position in the library's `Sitting_Idle_Loop`), then plays the real `Sitting_Enter` clip; standing up plays `Sitting_Exit`. Sofas get one seat per cushion (`meta.slots`) and a tap picks the nearest.
+- **Lying:** the pose is lowered onto the mattress using the lowest point of the posed sleeping body, measured from the skeleton at runtime.
+- **Standing:** the character stands 55 cm in front of the piece (fridge, stove, basin, radio, bookshelf), facing it; the shower is stepped into.
+- **Approach:** the nearest free, reachable spot in front of or beside it.
+
+### Furniture animation
+
+Moving parts react to the character using them: fridge door opens, oven door swings, ceiling fans spin (faster when used), shower water runs, TV glows (while someone watches from the sofa), radio pulses, lamps light up at night. Defined in `furniture/instance.ts` (models) and `furniture/procedural.ts` (built pieces).
+
+### The showroom (`#/showroom`)
+
+Every catalog piece on display with its price. **Run all tests** walks the character to each piece, uses it, and checks the right activity and animation started; ✓/✗ appear in the list. **Use** tries one piece, tap a name to look at it, Day/Night shows the lamps. Rules (needs, money) are switched off there.
+
 ## Clothing
 
 - Parts come from the Quaternius outfits pack (same skeleton as the base characters) and are attached exactly like hair: re-bound to the body skeleton by bone name.
@@ -72,7 +100,7 @@ Limits: garments are body-hugging plus a few mm (kaftan is looser but follows th
 - **Library clips (43, CC0):** idle, walk, jog, sprint, crouch, sit (enter/idle/talk/exit), talk, interact, pick up, fix (kneeling), push, drive, dance, jump, swim, combat, spell casting, death.
 - **Everyday-life clips (made in code, `procedural/lifeClips.ts`):** `Life_Sleep_Loop` (lying on the back, legs straight, breathing), `Life_Eat_Loop` (seated), `Life_Eat_Standing_Loop`, `Life_Drink_Loop`, `Life_Type_Loop` (hands at a keyboard, alternating taps), `Life_Phone_Loop`, `Life_Wave_Loop`, `Life_Cook_Loop` (stirring).
 - **How they're built:** start from an Idle or Sitting clip (keeps breathing and sway), then add or replace motion on a few joints. Joint axes differ between rigs, so each bend is chosen by posing the real skeleton and testing which local axis moves the hand toward a goal direction (forward, up). Works on both bodies.
-- **Polish list:** the phone clip holds the hand near the chin rather than the ear; the wave is a raised-arm greeting without a convincing hand wobble; no hands/fingers poses; no facial expressions; no lying-down transitions (get in/out of bed); no sit-down/stand-up blend onto arbitrary chairs yet (that arrives with the map and object interactions).
+- **Polish list:** the phone clip holds the hand near the chin rather than the ear; the wave is a raised-arm greeting without a convincing hand wobble; no hands/fingers poses; no facial expressions; no lying-down transitions (get in/out of bed); sit-down/stand-up now use the library's `Sitting_Enter`/`Sitting_Exit` on every chair, sofa and toilet (see "How furniture is used"); no get-in/out-of-bed transitions.
 
 ## Character system
 

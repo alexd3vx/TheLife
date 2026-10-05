@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-05T09:51:48.990Z",
+ "generatedAt": "2026-10-05T10:30:19.656Z",
  "credits": {
   "quaternius-ubc": {
    "name": "Universal Base Characters (Standard)",
@@ -18,6 +18,12 @@
    "author": "Quaternius",
    "licence": "CC0 1.0",
    "url": "https://quaternius.com/packs/modularcharacteroutfitsfantasy.html"
+  },
+  "polyhaven": {
+   "name": "Poly Haven models",
+   "author": "Poly Haven contributors",
+   "licence": "CC0 1.0",
+   "url": "https://polyhaven.com/models"
   },
   "kenney-furniture": {
    "name": "Furniture Kit 2.0",
@@ -52,6 +58,10 @@
   "clothing": {
    "maxTriangles": 10000,
    "maxBytes": 300000
+  },
+  "realistic": {
+   "maxTriangles": 14000,
+   "maxBytes": 1100000
   },
   "animation": {
    "maxBytes": 6000000
@@ -2172,6 +2182,1210 @@
    "label": "Garbage truck",
    "group": "vehicle",
    "credit": "kenney-cars"
+  },
+  {
+   "id": "sofa_02",
+   "category": "realistic",
+   "file": "props/real/sofa_02.glb",
+   "bytes": 177864,
+   "triangles": 2728,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Sofa (two-seat)",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.81,
+    0.71,
+    0.82
+   ]
+  },
+  {
+   "id": "sofa_03",
+   "category": "realistic",
+   "file": "props/real/sofa_03.glb",
+   "bytes": 318916,
+   "triangles": 8004,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Sofa (large)",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.73,
+    1.12,
+    0.93
+   ]
+  },
+  {
+   "id": "modern_arm_chair_01",
+   "category": "realistic",
+   "file": "props/real/modern_arm_chair_01.glb",
+   "bytes": 171948,
+   "triangles": 8916,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Modern armchair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.82,
+    1.02,
+    0.99
+   ]
+  },
+  {
+   "id": "mid_century_lounge_chair",
+   "category": "realistic",
+   "file": "props/real/mid_century_lounge_chair.glb",
+   "bytes": 139348,
+   "triangles": 6148,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Lounge chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.01,
+    1.17,
+    1.19
+   ]
+  },
+  {
+   "id": "dining_chair_02",
+   "category": "realistic",
+   "file": "props/real/dining_chair_02.glb",
+   "bytes": 146836,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Dining chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.43,
+    0.97,
+    0.58
+   ]
+  },
+  {
+   "id": "painted_wooden_chair_01",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_chair_01.glb",
+   "bytes": 82152,
+   "triangles": 724,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wooden chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.43,
+    0.96,
+    0.54
+   ]
+  },
+  {
+   "id": "painted_wooden_chair_02",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_chair_02.glb",
+   "bytes": 408324,
+   "triangles": 1246,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wooden chair (tall)",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.64,
+    1.26,
+    0.66
+   ]
+  },
+  {
+   "id": "WoodenChair_01",
+   "category": "realistic",
+   "file": "props/real/WoodenChair_01.glb",
+   "bytes": 369512,
+   "triangles": 9799,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Carved chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.69,
+    2.27,
+    0.66
+   ]
+  },
+  {
+   "id": "plastic_monobloc_chair_01",
+   "category": "realistic",
+   "file": "props/real/plastic_monobloc_chair_01.glb",
+   "bytes": 142400,
+   "triangles": 3356,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Plastic chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.64,
+    0.88,
+    0.63
+   ]
+  },
+  {
+   "id": "wooden_stool_01",
+   "category": "realistic",
+   "file": "props/real/wooden_stool_01.glb",
+   "bytes": 213628,
+   "triangles": 10946,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wooden stool",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.43,
+    0.44,
+    0.44
+   ]
+  },
+  {
+   "id": "painted_wooden_bench",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_bench.glb",
+   "bytes": 67268,
+   "triangles": 630,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wooden bench",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.16,
+    0.89,
+    0.5
+   ]
+  },
+  {
+   "id": "Ottoman_01",
+   "category": "realistic",
+   "file": "props/real/Ottoman_01.glb",
+   "bytes": 108316,
+   "triangles": 4240,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ottoman",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.88,
+    0.62,
+    0.62
+   ]
+  },
+  {
+   "id": "Rockingchair_01",
+   "category": "realistic",
+   "file": "props/real/Rockingchair_01.glb",
+   "bytes": 205852,
+   "triangles": 11866,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Rocking chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.71,
+    0.99,
+    0.83
+   ]
+  },
+  {
+   "id": "SchoolChair_01",
+   "category": "realistic",
+   "file": "props/real/SchoolChair_01.glb",
+   "bytes": 101640,
+   "triangles": 5072,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Office chair",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.57,
+    1.01,
+    0.68
+   ]
+  },
+  {
+   "id": "folding_wooden_stool",
+   "category": "realistic",
+   "file": "props/real/folding_wooden_stool.glb",
+   "bytes": 157776,
+   "triangles": 6324,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Folding stool",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.53,
+    0.44,
+    0.55
+   ]
+  },
+  {
+   "id": "painted_wooden_table",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_table.glb",
+   "bytes": 145500,
+   "triangles": 600,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Dining table (large)",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.41,
+    0.96,
+    1.14
+   ]
+  },
+  {
+   "id": "round_wooden_table_01",
+   "category": "realistic",
+   "file": "props/real/round_wooden_table_01.glb",
+   "bytes": 204284,
+   "triangles": 8640,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Round table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.4,
+    1.01,
+    1.4
+   ]
+  },
+  {
+   "id": "WoodenTable_01",
+   "category": "realistic",
+   "file": "props/real/WoodenTable_01.glb",
+   "bytes": 233656,
+   "triangles": 952,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Long side table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.8,
+    0.55,
+    0.66
+   ]
+  },
+  {
+   "id": "dining_table",
+   "category": "realistic",
+   "file": "props/real/dining_table.glb",
+   "bytes": 375024,
+   "triangles": 1048,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Dining table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.26,
+    0.88,
+    1.39
+   ]
+  },
+  {
+   "id": "modern_coffee_table_01",
+   "category": "realistic",
+   "file": "props/real/modern_coffee_table_01.glb",
+   "bytes": 187924,
+   "triangles": 4504,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Coffee table (modern)",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.6,
+    0.39,
+    1.2
+   ]
+  },
+  {
+   "id": "modern_coffee_table_02",
+   "category": "realistic",
+   "file": "props/real/modern_coffee_table_02.glb",
+   "bytes": 345968,
+   "triangles": 12323,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Coffee table (square)",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.2,
+    0.37,
+    1.2
+   ]
+  },
+  {
+   "id": "coffee_table_round_01",
+   "category": "realistic",
+   "file": "props/real/coffee_table_round_01.glb",
+   "bytes": 202928,
+   "triangles": 4044,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Coffee table (round)",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.3,
+    0.49,
+    1.3
+   ]
+  },
+  {
+   "id": "CoffeeTable_01",
+   "category": "realistic",
+   "file": "props/real/CoffeeTable_01.glb",
+   "bytes": 392980,
+   "triangles": 10404,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Coffee table (classic)",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.54,
+    0.52,
+    0.97
+   ]
+  },
+  {
+   "id": "side_table_01",
+   "category": "realistic",
+   "file": "props/real/side_table_01.glb",
+   "bytes": 90524,
+   "triangles": 2756,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Side table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.55,
+    0.55,
+    0.45
+   ]
+  },
+  {
+   "id": "small_wooden_table_01",
+   "category": "realistic",
+   "file": "props/real/small_wooden_table_01.glb",
+   "bytes": 67612,
+   "triangles": 3410,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Small table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.92,
+    0.53,
+    0.44
+   ]
+  },
+  {
+   "id": "metal_office_desk",
+   "category": "realistic",
+   "file": "props/real/metal_office_desk.glb",
+   "bytes": 207296,
+   "triangles": 6898,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Office desk",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2,
+    0.79,
+    0.95
+   ]
+  },
+  {
+   "id": "SchoolDesk_01",
+   "category": "realistic",
+   "file": "props/real/SchoolDesk_01.glb",
+   "bytes": 83404,
+   "triangles": 4162,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Study desk",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.71,
+    0.88,
+    0.55
+   ]
+  },
+  {
+   "id": "ClassicConsole_01",
+   "category": "realistic",
+   "file": "props/real/ClassicConsole_01.glb",
+   "bytes": 363500,
+   "triangles": 7566,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Console table",
+   "group": "tables",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.54,
+    0.95,
+    0.59
+   ]
+  },
+  {
+   "id": "GothicBed_01",
+   "category": "realistic",
+   "file": "props/real/GothicBed_01.glb",
+   "bytes": 364372,
+   "triangles": 9799,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wooden bed",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.49,
+    1.53,
+    2.04
+   ]
+  },
+  {
+   "id": "vintage_day_bed",
+   "category": "realistic",
+   "file": "props/real/vintage_day_bed.glb",
+   "bytes": 466460,
+   "triangles": 2715,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Day bed",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.97,
+    1.13,
+    0.85
+   ]
+  },
+  {
+   "id": "painted_wooden_nightstand",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_nightstand.glb",
+   "bytes": 84872,
+   "triangles": 470,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Nightstand",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.5,
+    0.62,
+    0.51
+   ]
+  },
+  {
+   "id": "ClassicNightstand_01",
+   "category": "realistic",
+   "file": "props/real/ClassicNightstand_01.glb",
+   "bytes": 75668,
+   "triangles": 2002,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Classic nightstand",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.57,
+    0.7,
+    0.42
+   ]
+  },
+  {
+   "id": "GothicCommode_01",
+   "category": "realistic",
+   "file": "props/real/GothicCommode_01.glb",
+   "bytes": 233600,
+   "triangles": 3897,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Chest of drawers",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.2,
+    1.21,
+    0.58
+   ]
+  },
+  {
+   "id": "wooden_bookshelf_worn",
+   "category": "realistic",
+   "file": "props/real/wooden_bookshelf_worn.glb",
+   "bytes": 605616,
+   "triangles": 10106,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Bookshelf",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.37,
+    2.06,
+    0.58
+   ]
+  },
+  {
+   "id": "painted_wooden_shelves",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_shelves.glb",
+   "bytes": 76616,
+   "triangles": 524,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Shelves",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.51,
+    1.13,
+    0.37
+   ]
+  },
+  {
+   "id": "steel_frame_shelves_03",
+   "category": "realistic",
+   "file": "props/real/steel_frame_shelves_03.glb",
+   "bytes": 430812,
+   "triangles": 8396,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Steel shelving",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.35,
+    2.31,
+    0.72
+   ]
+  },
+  {
+   "id": "wooden_display_shelves_01",
+   "category": "realistic",
+   "file": "props/real/wooden_display_shelves_01.glb",
+   "bytes": 171292,
+   "triangles": 3174,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Display shelves",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.37,
+    1.56,
+    1.08
+   ]
+  },
+  {
+   "id": "modern_wooden_cabinet",
+   "category": "realistic",
+   "file": "props/real/modern_wooden_cabinet.glb",
+   "bytes": 430740,
+   "triangles": 13706,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 3,
+   "clipNames": [
+    "modern_wooden_cabinet_body",
+    "modern_wooden_cabinet_path_l",
+    "modern_wooden_cabinet_path_r"
+   ],
+   "label": "Wooden cabinet (modern)",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.44,
+    0.68,
+    0.52
+   ]
+  },
+  {
+   "id": "drawer_cabinet",
+   "category": "realistic",
+   "file": "props/real/drawer_cabinet.glb",
+   "bytes": 253832,
+   "triangles": 9785,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Drawer cabinet",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.14,
+    1.88,
+    0.49
+   ]
+  },
+  {
+   "id": "painted_wooden_cabinet",
+   "category": "realistic",
+   "file": "props/real/painted_wooden_cabinet.glb",
+   "bytes": 111416,
+   "triangles": 2227,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Painted cabinet",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.19,
+    1.18,
+    0.62
+   ]
+  },
+  {
+   "id": "vintage_cabinet_01",
+   "category": "realistic",
+   "file": "props/real/vintage_cabinet_01.glb",
+   "bytes": 485964,
+   "triangles": 9804,
+   "materials": 3,
+   "textures": 7,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Display cabinet",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    2.02,
+    2.24,
+    0.67
+   ]
+  },
+  {
+   "id": "chinese_cabinet",
+   "category": "realistic",
+   "file": "props/real/chinese_cabinet.glb",
+   "bytes": 339128,
+   "triangles": 9794,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Tall cabinet",
+   "group": "storage",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.26,
+    2.87,
+    0.55
+   ]
+  },
+  {
+   "id": "television_02",
+   "category": "realistic",
+   "file": "props/real/television_02.glb",
+   "bytes": 76592,
+   "triangles": 2310,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Television (CRT)",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.4,
+    0.41,
+    0.35
+   ]
+  },
+  {
+   "id": "Television_01",
+   "category": "realistic",
+   "file": "props/real/Television_01.glb",
+   "bytes": 93384,
+   "triangles": 1918,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Television (classic)",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.6,
+    0.46,
+    0.47
+   ]
+  },
+  {
+   "id": "boombox",
+   "category": "realistic",
+   "file": "props/real/boombox.glb",
+   "bytes": 270652,
+   "triangles": 10168,
+   "materials": 2,
+   "textures": 5,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Boombox",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.72,
+    0.47,
+    0.19
+   ]
+  },
+  {
+   "id": "portable_cassette_player",
+   "category": "realistic",
+   "file": "props/real/portable_cassette_player.glb",
+   "bytes": 224880,
+   "triangles": 9805,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Cassette player",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.17,
+    0.13,
+    0.04
+   ]
+  },
+  {
+   "id": "classic_laptop",
+   "category": "realistic",
+   "file": "props/real/classic_laptop.glb",
+   "bytes": 225468,
+   "triangles": 9795,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Laptop",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.65,
+    0.54,
+    0.49
+   ]
+  },
+  {
+   "id": "desk_lamp_arm_01",
+   "category": "realistic",
+   "file": "props/real/desk_lamp_arm_01.glb",
+   "bytes": 233396,
+   "triangles": 9797,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Desk lamp",
+   "group": "lighting",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.2,
+    0.89,
+    0.61
+   ]
+  },
+  {
+   "id": "vintage_radio_transceiver",
+   "category": "realistic",
+   "file": "props/real/vintage_radio_transceiver.glb",
+   "bytes": 477560,
+   "triangles": 12183,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Radio set",
+   "group": "electronics",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.57,
+    0.43,
+    0.41
+   ]
+  },
+  {
+   "id": "electric_stove",
+   "category": "realistic",
+   "file": "props/real/electric_stove.glb",
+   "bytes": 201784,
+   "triangles": 9797,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Electric stove",
+   "group": "appliances",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.5,
+    0.86,
+    0.65
+   ]
+  },
+  {
+   "id": "vintage_microwave",
+   "category": "realistic",
+   "file": "props/real/vintage_microwave.glb",
+   "bytes": 133008,
+   "triangles": 8120,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Microwave",
+   "group": "appliances",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.07,
+    0.53,
+    0.75
+   ]
+  },
+  {
+   "id": "vintage_electric_kettle",
+   "category": "realistic",
+   "file": "props/real/vintage_electric_kettle.glb",
+   "bytes": 205648,
+   "triangles": 9798,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Electric kettle",
+   "group": "appliances",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.32,
+    0.3,
+    0.25
+   ]
+  },
+  {
+   "id": "ceiling_fan",
+   "category": "realistic",
+   "file": "props/real/ceiling_fan.glb",
+   "bytes": 261292,
+   "triangles": 9799,
+   "materials": 1,
+   "textures": 5,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ceiling fan",
+   "group": "appliances",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.46,
+    0.52,
+    1.46
+   ]
+  },
+  {
+   "id": "wall_clock",
+   "category": "realistic",
+   "file": "props/real/wall_clock.glb",
+   "bytes": 107412,
+   "triangles": 3658,
+   "materials": 2,
+   "textures": 4,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Wall clock",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.32,
+    0.32,
+    0.05
+   ]
+  },
+  {
+   "id": "mantel_clock_01",
+   "category": "realistic",
+   "file": "props/real/mantel_clock_01.glb",
+   "bytes": 175836,
+   "triangles": 9799,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Mantel clock",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.34,
+    0.16,
+    0.13
+   ]
+  },
+  {
+   "id": "potted_plant_01",
+   "category": "realistic",
+   "file": "props/real/potted_plant_01.glb",
+   "bytes": 696264,
+   "triangles": 12164,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Large plant",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.59,
+    1.35,
+    0.63
+   ]
+  },
+  {
+   "id": "potted_plant_02",
+   "category": "realistic",
+   "file": "props/real/potted_plant_02.glb",
+   "bytes": 260808,
+   "triangles": 9796,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Potted plant",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.7,
+    0.84,
+    0.66
+   ]
+  },
+  {
+   "id": "potted_plant_04",
+   "category": "realistic",
+   "file": "props/real/potted_plant_04.glb",
+   "bytes": 209392,
+   "triangles": 8929,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Small plant",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.17,
+    0.27,
+    0.18
+   ]
+  },
+  {
+   "id": "ornate_mirror_01",
+   "category": "realistic",
+   "file": "props/real/ornate_mirror_01.glb",
+   "bytes": 139568,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Mirror",
+   "group": "decor",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.49,
+    0.74,
+    0.03
+   ]
+  },
+  {
+   "id": "vintage_oil_lamp",
+   "category": "realistic",
+   "file": "props/real/vintage_oil_lamp.glb",
+   "bytes": 160960,
+   "triangles": 7208,
+   "materials": 3,
+   "textures": 7,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Oil lamp",
+   "group": "lighting",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.22,
+    0.8,
+    0.22
+   ]
   }
  ]
 }

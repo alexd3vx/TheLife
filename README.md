@@ -16,6 +16,7 @@ pnpm test
 ## Try the game
 
 - `#/play` — the playable house: tap the floor to walk, tap furniture to cook, eat, sleep, work, shower and more. Keep your needs up and earn the rent.
+- `#/showroom` — every piece of furniture with its price, and a one-button test that uses all of them.
 - `#/lab` — the Asset Lab: build a character (hair, clothes, skin), preview animations, browse props.
 
 ## Sign-in setup

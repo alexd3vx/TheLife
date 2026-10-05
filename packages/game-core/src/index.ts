@@ -5,3 +5,4 @@ export * from "./actions.js";
 export * from "./sim.js";
 export * from "./absence.js";
 export * from "./persist.js";
+export * from "./catalog.js";

@@ -45,7 +45,8 @@ Actions refuse to start with a clear reason: "You're not hungry", "The fridge is
 | Snack | fridge | 10 min | uses 1 portion, hunger +25 |
 | Cook | stove | 30 min | uses 2 portions, makes 1 meal |
 | Eat a meal | any dining chair or the table | 25 min | uses 1 meal, hunger +65 |
-| Watch TV | sofa, TV | 60 min | fun +32 |
+| Watch TV | sofa, armchair, TV | 60 min | fun +32 |
+| Sit | any chair, stool, bench, ottoman | 30 min | energy +6, fun +2 |
 | Dance to the radio | radio | 30 min | fun +16 |
 | Read | bookshelf | 45 min | fun +20, knowledge skill |
 | Work | desk, monitor, laptop, keyboard | 2 h | earns ₦1,200/h × performance × skill; energy -14, fun -10; computer skill |
@@ -76,4 +77,8 @@ The whole `GameState` is saved on the device every few seconds and when the page
 ## Adding content
 
 - **New activity:** add an entry to `ACTIONS`, add a clip if needed, point a piece of furniture at it in `play/layout.ts`.
-- **New furniture:** add the asset to `tools/assets/sources.mjs`, run the asset build, then add an item (and, if it does something, an interaction) to `play/layout.ts`.
+- **New furniture:** add the model (`tools/assets/sources.mjs` + asset build, or a builder in `furniture/procedural.ts`), add an entry to `packages/game-core/src/catalog.ts` (name, price, action), then place it in a layout. Open `#/showroom` and run the tests to check it works.
+
+## Furniture and prices
+
+Every piece of furniture is a catalog item with a price in naira (a Plastic chair ₦6,500, a Two-seat leather sofa ₦185,000, a Refrigerator ₦290,000...). Players will buy and place them with the shop and home-building tools in a later stage; for now the test house and the showroom use the catalog directly. The catalog also decides what each piece lets you do (sofa and armchairs: watch TV; any chair: sit; bed: sleep; fridge: snack; stove: cook; toilet, basin, shower; boombox or radio: dance; bookshelf: read; desk or laptop: work).

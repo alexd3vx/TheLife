@@ -1,0 +1,25 @@
+.showroom-panel {
+  position: absolute; z-index: 2; left: 12px; top: max(64px, calc(env(safe-area-inset-top) + 56px)); bottom: 12px; width: min(330px, calc(100% - 24px));
+  overflow-y: auto; padding: 12px; border-radius: 14px; background: rgba(20, 17, 15, .84); backdrop-filter: blur(8px);
+  overscroll-behavior: contain;
+}
+.showroom-panel h3 { margin: 14px 0 6px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.showroom-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.showroom-panel li { display: flex; align-items: stretch; gap: 4px; border-radius: 10px; }
+.showroom-panel li.is-selected { background: rgba(255, 255, 255, .08); }
+.showroom-note { margin: 0; font-size: .82rem; color: var(--text-muted); line-height: 1.4; }
+.showroom-name {
+  flex: 1; display: flex; gap: 8px; align-items: flex-start; text-align: left; font: inherit; font-size: .88rem; color: var(--text);
+  background: none; border: 0; padding: 6px 6px; cursor: pointer; border-radius: 10px; min-height: 40px;
+}
+.showroom-name small { display: block; color: var(--text-muted); font-size: .74rem; }
+.showroom-name .showroom-note-line { color: var(--danger); }
+.showroom-dot { width: 18px; flex: none; text-align: center; font-weight: 700; }
+.showroom-pass { color: var(--ok); }
+.showroom-fail { color: var(--danger); }
+.showroom-use {
+  font: inherit; font-size: .8rem; font-weight: 600; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 10px;
+  padding: 0 12px; cursor: pointer; align-self: center; min-height: 36px;
+}
+.showroom-use:disabled, .showroom-run:disabled { opacity: .5; cursor: default; }
+.play-top button.play-chip { font: inherit; font-weight: 600; font-size: .9rem; color: var(--text); border: 0; cursor: pointer; }

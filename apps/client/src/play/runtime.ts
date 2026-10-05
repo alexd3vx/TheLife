@@ -4,10 +4,11 @@ import { isFree } from "@thelife/shared";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
-import { CharacterController, type Status } from "./controller";
+import { CharacterController, type GameBridge, type Status } from "./controller";
 import { GameSession, clearGameSave, type HudSnapshot } from "./gameSession";
 import type { SimEvent } from "@thelife/game-core";
-import { INTERACTIONS, PLAY_AREA } from "./layout";
+import { HOUSE_LAYOUT, buildShowroomLayout, type Layout } from "./layout";
+import { FURNITURE } from "@thelife/game-core";
 import { buildWorld, type PlacedItem } from "./world";
 
 export interface RuntimeEvents {
@@ -31,9 +32,18 @@ export interface PlayRuntime {
   debug: {
     tapGround(x: number, z: number): boolean;
     tapItem(id: string): boolean;
+    /** Placed items with what tapping them does (for the showroom tests). */
+    items(): { id: string; furniture: string; action: string | null; seats: number; x: number; z: number; animated: boolean; approach: [number, number] | null }[];
+    setHour(hour: number): void;
+    /** Runs the simulation faster than real time (tests on slow machines). */
+    setSpeed(scale: number): void;
+    /** Points the camera at a placed item. */
+    focus(id: string, distance?: number): void;
+    /** Where the character's body is right now, for checking it sits on the furniture. */
+    pose(): { hipsY: number | null };
     state(): CharacterController["state"];
     free(x: number, z: number): boolean;
-    session: GameSession;
+    session: GameSession | null;
     canReach(interactionId: string): boolean;
     teleport(x: number, z: number): void;
     setView(azimuthDeg: number, polarDeg: number, distance: number): void;
@@ -43,7 +53,11 @@ export interface PlayRuntime {
 const TAP_MAX_MOVE = 9; // pixels
 const TAP_MAX_TIME = 450; // milliseconds
 
-export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean } = {}): Promise<PlayRuntime | null> {
+export type PlayMode = "house" | "showroom";
+
+export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode } = {}): Promise<PlayRuntime | null> {
+  const showroom = options.mode === "showroom";
+  const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : HOUSE_LAYOUT;
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -58,15 +72,31 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
   container.appendChild(renderer.domElement);
 
-  const world = await buildWorld(manifest, small ? 1024 : 2048);
+  const world = await buildWorld(manifest, layout, renderer, small ? 1024 : 2048);
   const avatar = new Avatar(manifest, loadSavedLook());
   await avatar.load();
   world.scene.add(avatar.root);
 
-  let session = new GameSession(options.fresh);
-  if (session.awaySummary.length) events.onAway(session.awaySummary);
-  const controller = new CharacterController(avatar, world.nav, { start: (id) => session.start(id), cancel: () => session.cancel(), active: () => session.active(), speedFactor: () => session.speedFactor(), notice: (t) => session.notice(t) }, events.onStatus);
-  controller.place(-1, 1, Math.PI);
+  const session = showroom ? null : new GameSession(options.fresh);
+  if (session?.awaySummary.length) events.onAway(session.awaySummary);
+  // The showroom has no needs or money: every activity can always start, and runs until you walk away.
+  let fakeActive: { id: string; forced: boolean } | null = null;
+  const bridge: GameBridge = session
+    ? { start: (id) => session.start(id), cancel: () => session.cancel(), active: () => session.active(), speedFactor: () => session.speedFactor(), notice: (t) => session.notice(t) }
+    : {
+        start: (id) => {
+          fakeActive = { id, forced: false };
+          return { ok: true };
+        },
+        cancel: () => {
+          fakeActive = null;
+        },
+        active: () => fakeActive,
+        speedFactor: () => 1,
+        notice: () => {},
+      };
+  const controller = new CharacterController(avatar, world.nav, bridge, events.onStatus);
+  controller.place(layout.start.x, layout.start.z, layout.start.yaw);
 
   const camera = new THREE.PerspectiveCamera(38, 1, 0.3, 200);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -80,7 +110,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
   let follow = true;
-  const VIEW_TARGET = new THREE.Vector3(-0.5, 0.9, 0.5);
+  const VIEW_TARGET = showroom ? new THREE.Vector3(0, 0.9, -2) : new THREE.Vector3(-0.5, 0.9, 0.5);
   function resetView() {
     controls.target.copy(follow ? new THREE.Vector3(controller.position.x, 0.9, controller.position.z) : VIEW_TARGET);
     camera.position.set(controls.target.x + 4, 9.5, controls.target.z + 11.5);
@@ -114,16 +144,23 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     raycaster.setFromCamera(ndc, camera);
   }
 
-  function interactiveAt(clientX: number, clientY: number): PlacedItem | null {
+  function interactiveAt(clientX: number, clientY: number): { item: PlacedItem; point: THREE.Vector3 } | null {
     pointerRay(clientX, clientY);
     const hits = raycaster.intersectObjects(world.pickables, true);
     for (const h of hits) {
       let o: THREE.Object3D | null = h.object;
       while (o && !o.userData.itemId) o = o.parent;
       const item = world.items.find((i) => i.group === o);
-      if (item) return item;
+      if (item) return { item, point: h.point };
     }
     return null;
+  }
+
+  /** The way of using an item that suits a tap: for a sofa, the seat nearest the finger. */
+  function chooseInteraction(item: PlacedItem, point: THREE.Vector3 | null) {
+    const options = world.interactionsFor(item.def.id);
+    if (!point || options.length < 2) return options[0];
+    return [...options].sort((a, b) => Math.hypot(a.at[0] - point.x, a.at[1] - point.z) - Math.hypot(b.at[0] - point.x, b.at[1] - point.z))[0];
   }
 
   function groundAt(clientX: number, clientY: number): THREE.Vector3 | null {
@@ -132,9 +169,9 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   }
 
   function handleTap(clientX: number, clientY: number) {
-    const item = interactiveAt(clientX, clientY);
-    if (item?.def.interaction) {
-      const interaction = INTERACTIONS[item.def.interaction];
+    const picked = interactiveAt(clientX, clientY);
+    if (picked) {
+      const interaction = chooseInteraction(picked.item, picked.point);
       if (interaction) {
         const ok = controller.tapInteraction(interaction);
         showMarker(interaction.approach[0], interaction.approach[1], ok);
@@ -143,7 +180,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     }
     const point = groundAt(clientX, clientY);
     if (!point) return;
-    if (point.x < PLAY_AREA.minX || point.x > PLAY_AREA.maxX || point.z < PLAY_AREA.minZ || point.z > PLAY_AREA.maxZ) return;
+    const area = layout.area;
+    if (point.x < area.minX || point.x > area.maxX || point.z < area.minZ || point.z > area.maxZ) return;
     const ok = controller.tapGround(point.x, point.z);
     showMarker(point.x, point.z, ok);
   }
@@ -158,11 +196,10 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     const d = down.get(e.pointerId);
     if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_MAX_MOVE) d.moved = true;
     if (e.pointerType === "mouse" && down.size === 0) {
-      const item = interactiveAt(e.clientX, e.clientY);
-      canvas.style.cursor = item ? "pointer" : "crosshair";
-      const lit = item?.def.interaction;
-      for (const placed of world.items) for (const m of placed.materials) m.emissive.setHex(lit && placed.def.interaction === lit ? 0x442200 : 0x000000);
-      events.onHover(item?.def.interaction ? (INTERACTIONS[item.def.interaction]?.hint ?? null) : null);
+      const picked = interactiveAt(e.clientX, e.clientY);
+      canvas.style.cursor = picked ? "pointer" : "crosshair";
+      world.highlight(picked?.item.def.id ?? null);
+      events.onHover(picked ? (chooseInteraction(picked.item, picked.point)?.hint ?? null) : null);
     }
   };
   const onUp = (e: PointerEvent) => {
@@ -200,19 +237,38 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   let acc = 0;
   let hudClock = 1;
   const followTarget = new THREE.Vector3();
+  let elapsed = 0;
+  let timeScale = 1;
+  let showroomHour = 12;
+  const placedById = new Map(world.items.map((i) => [i.def.id, i]));
+  /** Everything that reacts to the character using one item: the item itself, and what it's linked to (a TV when you sit on the sofa). */
+  function usingSet(): Set<string> {
+    const set = new Set<string>();
+    const id = controller.usingItem;
+    if (!id) return set;
+    set.add(id);
+    for (const link of placedById.get(id)?.def.link ?? []) set.add(link);
+    return set;
+  }
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
-    const dt = Math.min(clock.getDelta(), 0.1);
+    const dt = Math.min(clock.getDelta(), 0.1) * timeScale;
     if (document.hidden) return;
 
-    const simEvents = session.step(dt);
-    if (simEvents.length) events.onEvents(simEvents);
-    world.setTimeOfDay(session.sim.clock.hourFloat);
+    elapsed += dt;
+    if (session) {
+      const simEvents = session.step(dt);
+      if (simEvents.length) events.onEvents(simEvents);
+      world.setTimeOfDay(session.sim.clock.hourFloat);
+    } else {
+      world.setTimeOfDay(showroomHour);
+    }
     controller.update(dt);
     avatar.update(dt);
+    world.updateFurniture(dt, elapsed, usingSet());
     hudClock += dt;
-    if (hudClock > 0.2) {
+    if (session && hudClock > 0.2) {
       hudClock = 0;
       events.onHud(session.snapshot());
     }
@@ -241,7 +297,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     }
   }
   loop();
-  const saveNow = () => session.save();
+  const saveNow = () => session?.save();
   window.addEventListener("pagehide", saveNow);
   document.addEventListener("visibilitychange", saveNow);
 
@@ -251,7 +307,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     },
     resetView,
     buyGroceries() {
-      session.buyGroceries();
+      session?.buyGroceries();
     },
     newGame() {
       clearGameSave();
@@ -265,7 +321,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("pointercancel", onCancel);
-      session.save();
+      session?.save();
       window.removeEventListener("pagehide", saveNow);
       document.removeEventListener("visibilitychange", saveNow);
       controls.dispose();
@@ -277,9 +333,41 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     debug: {
       tapGround: (x, z) => controller.tapGround(x, z),
       tapItem(id) {
-        const item = world.items.find((i) => i.def.id === id);
-        const interaction = item?.def.interaction ? INTERACTIONS[item.def.interaction] : undefined;
+        const interaction = world.interactionsFor(id)[0];
         return interaction ? controller.tapInteraction(interaction) : false;
+      },
+      items: () =>
+        world.items.map((i) => {
+          const own = world.interactions.get(i.def.id) ?? [];
+          return {
+            id: i.def.id,
+            furniture: i.def.furniture,
+            action: own[0]?.action ?? null,
+            seats: own.length,
+            x: i.def.x,
+            z: i.def.z,
+            animated: i.instance.animated,
+            approach: own[0]?.approach ?? null,
+          };
+        }),
+      setHour(hour) {
+        showroomHour = hour;
+      },
+      setSpeed(scale) {
+        timeScale = scale;
+      },
+      focus(id, distance = 6) {
+        const item = placedById.get(id);
+        if (!item) return;
+        const c = item.bounds.getCenter(new THREE.Vector3());
+        controls.target.set(c.x, Math.min(c.y, 1.2), c.z);
+        camera.position.set(c.x + distance * 0.45, controls.target.y + distance * 0.6, c.z + distance * 0.8);
+        controls.update();
+      },
+      pose() {
+        const bone = avatar.root.getObjectByName("pelvis") ?? avatar.root.getObjectByName("Hips") ?? avatar.root.getObjectByName("hips");
+        if (!bone) return { hipsY: null };
+        return { hipsY: bone.getWorldPosition(new THREE.Vector3()).y };
       },
       state: () => controller.state,
       free: (x, z) => isFree(world.nav, x, z),
@@ -287,7 +375,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         return session;
       },
       canReach(id) {
-        const i = INTERACTIONS[id];
+        const i = world.interactionsFor(id)[0];
         return i ? controller.canReach(i.approach[0], i.approach[1]) : false;
       },
       teleport(x, z) {

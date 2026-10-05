@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { ACTIONS } from "@thelife/game-core";
 import { findPath, pathLength, type NavGrid, type Point } from "@thelife/shared";
 import type { Avatar } from "../lab/avatar";
-import type { Interaction } from "./layout";
+import type { Interaction } from "./interactions";
 
 /** What the controller needs from the game rules. The simulation implements it; tests can fake it. */
 export interface GameBridge {
@@ -28,7 +28,7 @@ const WALK_SPEED = 1.55; // metres per second
 const RUN_SPEED = 3.3;
 const RUN_DISTANCE = 7; // runs when the trip is longer than this
 const TURN_RATE = 9; // radians per second
-const SEAT_SETBACK = 0.08; // sit this far back from the seat's centre so people sit *on* chairs, not at their edge
+const SLIDE_TIME = 0.5; // seconds to step in front of a seat (or into the shower) from where you stood
 
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
@@ -61,6 +61,8 @@ export class CharacterController {
   private running = false;
   /** A tap that arrived during a short transition (sitting down, standing up); run once it finishes. */
   private queued: { target: Point; interaction: Interaction | null } | null = null;
+  /** A timed pause (waiting for a one-shot clip like Sitting_Enter to finish). */
+  private wait: { left: number; done: () => void } | null = null;
   private tween: { t: number; duration: number; from: THREE.Vector3; to: THREE.Vector3; fromYaw: number; toYaw: number; done: () => void } | null = null;
 
   constructor(
@@ -140,13 +142,28 @@ export class CharacterController {
     const spot = this.interaction;
     this.mode = "leaving";
     this.setStatus(null, null);
-    this.setClip("Idle_Loop");
     this.avatar.setSpeed(1);
     const to = spot ? new THREE.Vector3(spot.approach[0], 0, spot.approach[1]) : new THREE.Vector3(this.position.x, 0, this.position.z);
-    this.startTween(to, this.yaw, 0.45, () => {
-      this.finishActivity();
-      then();
-    });
+    const leave = () => {
+      this.setClip("Idle_Loop");
+      // Face away from the furniture while stepping back out.
+      const away = spot && ACTIONS[spot.action]?.pose === "seat" ? spot.yaw + Math.PI : spot ? Math.atan2(to.x - this.position.x, to.z - this.position.z) : this.yaw;
+      this.startTween(to, away, 0.5, () => {
+        this.finishActivity();
+        then();
+      });
+    };
+    if (spot && ACTIONS[spot.action]?.pose === "seat" && !this.onFloor) {
+      const length = this.avatar.playOnce("Sitting_Exit");
+      this.clip = "Sitting_Exit";
+      this.waitFor(length || 0.1, leave);
+    } else {
+      leave();
+    }
+  }
+
+  private waitFor(seconds: number, done: () => void) {
+    this.wait = { left: seconds, done };
   }
 
   private finishActivity() {
@@ -173,20 +190,45 @@ export class CharacterController {
     this.actionId = def.id;
     this.avatar.setSpeed(1);
     this.mode = "settling";
-    this.setClip(def.clip);
     const pose = interaction.pose;
-    const back = def.pose === "seat" ? SEAT_SETBACK : 0;
-    const target = pose
-      ? new THREE.Vector3(pose[0] - Math.sin(interaction.yaw) * back, pose[1], pose[2] - Math.cos(interaction.yaw) * back)
-      : this.position.clone();
-    this.startTween(target, interaction.yaw, pose ? 0.6 : 0.35, () => {
+    const finish = () => {
       this.mode = "doing";
+      this.setClip(def.clip);
       this.setStatus(def.label, def.pose === "stand" ? null : "Tap anywhere to get up");
-    });
+    };
+
+    if (def.pose === "seat" && pose) {
+      // Step in front of the seat, turn round, and sit down with the real sitting clip.
+      this.setClip("Idle_Loop");
+      this.startTween(new THREE.Vector3(pose[0], 0, pose[2]), interaction.yaw, SLIDE_TIME, () => {
+        this.position.y = pose[1];
+        const length = this.avatar.playOnce("Sitting_Enter");
+        this.clip = "Sitting_Enter";
+        this.waitFor(length || 0.1, finish);
+      });
+      return;
+    }
+    if (def.pose === "lie" && pose) {
+      // Rest the body on the surface using the lowest point of the sleeping pose, so it lies on the mattress, not in it.
+      const low = this.avatar.lowestPoint(def.clip) ?? 0;
+      this.setClip(def.clip);
+      this.startTween(new THREE.Vector3(pose[0], pose[1] - low + 0.01, pose[2]), interaction.yaw, 0.7, finish);
+      return;
+    }
+    this.setClip(def.clip);
+    const target = pose ? new THREE.Vector3(pose[0], pose[1], pose[2]) : this.position.clone();
+    this.startTween(target, interaction.yaw, pose ? 0.6 : 0.35, finish);
   }
 
   update(dt: number) {
-    if (this.tween) {
+    if (this.wait) {
+      this.wait.left -= dt;
+      if (this.wait.left <= 0) {
+        const done = this.wait.done;
+        this.wait = null;
+        done();
+      }
+    } else if (this.tween) {
       const tw = this.tween;
       tw.t = Math.min(1, tw.t + dt / tw.duration);
       const k = tw.t * tw.t * (3 - 2 * tw.t);
@@ -200,7 +242,7 @@ export class CharacterController {
       this.walk(dt);
     }
     this.followGame();
-    if (this.queued && !this.tween && (this.mode === "doing" || this.mode === "idle")) {
+    if (this.queued && !this.tween && !this.wait && (this.mode === "doing" || this.mode === "idle")) {
       const next = this.queued;
       this.queued = null;
       this.go(next.target, next.interaction);
@@ -213,11 +255,11 @@ export class CharacterController {
     const active = this.game.active();
 
     // The rules forced an action on us (collapsed from exhaustion).
-    if (active?.forced && this.actionId !== active.id && this.mode !== "leaving" && !this.tween) {
+    if (active?.forced && this.actionId !== active.id && this.mode !== "leaving" && !this.tween && !this.wait) {
       this.collapse(active.id);
       return;
     }
-    if (this.mode !== "doing" || this.tween) return;
+    if (this.mode !== "doing" || this.tween || this.wait) return;
 
     if (this.actionId && (!active || active.id !== this.actionId)) this.actionEnded();
   }
@@ -344,7 +386,13 @@ export class CharacterController {
     root.rotation.y = this.yaw;
   }
 
-  get state(): { mode: Mode; x: number; y: number; z: number; clip: string; action: string | null; resting: boolean } {
-    return { mode: this.mode, x: this.position.x, y: this.position.y, z: this.position.z, clip: this.clip, action: this.actionId, resting: this.resting };
+  /** The placed item being used right now (so the furniture can react), or null. */
+  get usingItem(): string | null {
+    if (!this.interaction) return null;
+    return this.mode === "doing" || this.mode === "settling" ? this.interaction.itemId : null;
+  }
+
+  get state(): { mode: Mode; x: number; y: number; z: number; clip: string; action: string | null; resting: boolean; item: string | null } {
+    return { mode: this.mode, x: this.position.x, y: this.position.y, z: this.position.z, clip: this.clip, action: this.actionId, resting: this.resting, item: this.interaction?.itemId ?? null };
   }
 }

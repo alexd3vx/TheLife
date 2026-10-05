@@ -1,8 +1,13 @@
-// The prototype house, as data. Units are metres; the camera starts south of the house looking north.
-// Add or move furniture here without touching the scene or controller code.
+// Places are data. A layout lists furniture from the catalog with positions; how each piece is used (where to stand,
+// sit or lie) is worked out from its measured shape in interactions.ts, so nothing here needs hand-tuned poses.
+// Units are metres. The camera looks north from the south; 0 degrees rotation means an item's front faces south (+z).
 
-export const PLAY_AREA = { minX: -8, maxX: 8, minZ: -5, maxZ: 8 };
-export const HOUSE = { minX: -6, maxX: 6, minZ: -4.5, maxZ: 4.5, wallHeight: 2.6, wallThickness: 0.2 };
+export interface Rect {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
 
 export interface WallDef {
   a: [number, number];
@@ -11,11 +16,47 @@ export interface WallDef {
   outward: [number, number] | null;
 }
 
+export interface Placement {
+  /** Unique id of this placed item. */
+  id: string;
+  /** Catalog id (see game-core FURNITURE). */
+  furniture: string;
+  x: number;
+  z: number;
+  /** Degrees; 0 = the front faces south (+z), 90 faces east. */
+  rot?: number;
+  /** Extra height above the floor (or above the item it rests on). */
+  y?: number;
+  /** Rest on top of another placed item. */
+  onTopOf?: string;
+  /** Use a different action than the catalog's default (e.g. a dining chair that means "eat"). */
+  action?: string;
+  /** Tapping this triggers another placed item's use (a TV or a desk sends you to the sofa or chair). */
+  via?: string;
+  /** Other placed items that react while this one is in use (the TV glows when you watch from the sofa). */
+  link?: string[];
+  /** Disable the catalog's default action for this placement. */
+  decor?: boolean;
+}
+
+export interface Layout {
+  name: string;
+  area: Rect;
+  /** House walls; absent for open layouts. */
+  walls: WallDef[];
+  house?: { bounds: Rect; wallHeight: number; wallThickness: number; doorMarker?: [number, number] };
+  items: Placement[];
+  /** Where the character starts. */
+  start: { x: number; z: number; yaw: number };
+}
+
+const HOUSE_WALL_HEIGHT = 2.6;
+
 const DOOR = { x0: -3.7, x1: -2.3 }; // front door gap in the south wall
 const PARTITION = { x: 1.5, z0: -0.8, z1: 0.6 }; // doorway between the living area and the bedroom
 const BATH = { z: 1.6, x0: 2.1, x1: 3.5 }; // wall between bedroom and bathroom, with its door
 
-export const WALLS: WallDef[] = [
+const houseWalls: WallDef[] = [
   { a: [-6, -4.5], b: [6, -4.5], outward: [0, -1] },
   { a: [-6, 4.5], b: [DOOR.x0, 4.5], outward: [0, 1] },
   { a: [DOOR.x1, 4.5], b: [6, 4.5], outward: [0, 1] },
@@ -27,120 +68,126 @@ export const WALLS: WallDef[] = [
   { a: [BATH.x1, BATH.z], b: [6, BATH.z], outward: null },
 ];
 
-export interface Interaction {
-  id: string;
-  /** Id of the game action (see game-core ACTIONS) performed here. */
-  action: string;
-  /** Where the character walks to first. */
-  approach: [number, number];
-  /** Direction faced while performing it (radians; 0 faces south, PI faces north, PI/2 east). */
-  yaw: number;
-  /** Where to stand or sit while performing it (x, y, z); y lifts the character onto the seat or mattress. */
-  pose?: [number, number, number];
-  hint: string;
-}
+const p = (id: string, furniture: string, x: number, z: number, extra: Partial<Placement> = {}): Placement => ({ id, furniture, x, z, ...extra });
 
-export interface ItemDef {
-  id: string;
-  /** Asset id from the asset manifest. */
-  asset: string;
-  x: number;
-  z: number;
-  /** Id of another item to rest on top of (its top surface sets the height). */
-  onTopOf?: string;
-  /** Extra height above the floor (or above the item it rests on). */
-  y?: number;
-  /** Degrees. 0 = the item's front faces south (+z); 90 faces east. */
-  rot?: number;
-  /** Real-world scale. The Kenney kit's models are about half size, so most items use 2. */
-  scale?: number;
-  /** See-through (0-1 opacity), for things you need to see into, like a shower stall. */
-  ghost?: number;
-  /** Does it block walking? Rugs and table-top items don't. */
-  blocks?: boolean;
-  interaction?: string;
-}
+export const HOUSE_LAYOUT: Layout = {
+  name: "House",
+  area: { minX: -8, maxX: 8, minZ: -5, maxZ: 8 },
+  walls: houseWalls,
+  house: { bounds: { minX: -6, maxX: 6, minZ: -4.5, maxZ: 4.5 }, wallHeight: HOUSE_WALL_HEIGHT, wallThickness: 0.2 },
+  start: { x: -1, z: 1, yaw: Math.PI },
+  items: [
+    // ---- Kitchen along the north wall
+    p("fridge", "p_fridge", -5.4, -4.04),
+    p("cab1", "p_kitchen_base", -4.5, -4.09),
+    p("kitchenSink", "p_kitchen_sink", -3.6, -4.09),
+    p("stove", "electric_stove", -2.85, -4.06),
+    p("cab2", "p_kitchen_base", -2.2, -4.09),
+    p("kettle", "vintage_electric_kettle", -2.2, -4.1, { onTopOf: "cab2" }),
+    p("wallCab1", "p_kitchen_wall", -4.5, -4.23, { y: 1.45 }),
+    p("wallCab2", "p_kitchen_wall", -3.6, -4.23, { y: 1.45 }),
+    p("kitchenFan", "ceiling_fan", -4.0, -2.2),
 
-const S = 2;
+    // ---- Dining
+    p("table", "round_wooden_table_01", -4.2, -0.9, { via: "chairS" }),
+    p("chairN", "dining_chair_02", -4.2, -1.95, { action: "eatMeal" }),
+    p("chairS", "dining_chair_02", -4.2, 0.15, { rot: 180, action: "eatMeal" }),
+    p("chairW", "painted_wooden_chair_01", -5.3, -0.9, { rot: 90, action: "eatMeal" }),
+    p("chairE", "painted_wooden_chair_01", -3.1, -0.9, { rot: -90, action: "eatMeal" }),
 
-export const ITEMS: ItemDef[] = [
-  // ---- Kitchen along the north wall
-  { id: "fridge", asset: "kitchenFridge", x: -5.4, z: -3.9, scale: S, interaction: "fridge" },
-  { id: "cab1", asset: "kitchenCabinet", x: -4.5, z: -3.9, scale: S },
-  { id: "kitchenSink", asset: "kitchenSink", x: -3.6, z: -3.9, scale: S },
-  { id: "stove", asset: "kitchenStove", x: -2.7, z: -3.9, scale: S, interaction: "stove" },
-  { id: "hood", asset: "hoodModern", x: -2.7, z: -4.05, y: 1.5, scale: S, blocks: false, interaction: "stove" },
-  { id: "cab2", asset: "kitchenCabinet", x: -1.8, z: -3.9, scale: S },
-  { id: "microwave", asset: "kitchenMicrowave", x: -1.8, z: -3.95, onTopOf: "cab2", scale: S, blocks: false },
-  { id: "toaster", asset: "toaster", x: -4.5, z: -3.95, onTopOf: "cab1", scale: S, blocks: false },
-  { id: "wallCab1", asset: "kitchenCabinetUpper", x: -4.5, z: -4.1, y: 1.45, scale: S, blocks: false },
-  { id: "wallCab2", asset: "kitchenCabinetUpper", x: -3.6, z: -4.1, y: 1.45, scale: S, blocks: false },
-  { id: "bin", asset: "trashcan", x: -1.0, z: -4.0, scale: S },
+    // ---- Living area
+    p("tv", "p_tv_flat", -5.6, 2.3, { rot: 90, via: "sofa" }),
+    p("sofa", "sofa_03", -2.5, 2.3, { rot: -90, link: ["tv"] }),
+    p("armchair", "modern_arm_chair_01", -4.1, 3.75, { rot: 200, link: ["tv"], action: "tv" }),
+    p("rug", "p_rug", -4.0, 2.3, { rot: 90 }),
+    p("coffeeTable", "modern_coffee_table_02", -4.0, 2.3, { rot: 90 }),
+    p("radioTable", "side_table_01", -5.6, 0.7),
+    p("radio", "boombox", -5.6, 0.7, { onTopOf: "radioTable", rot: 90 }),
+    p("floorLamp", "p_floor_lamp", -1.1, 3.9),
+    p("plant1", "potted_plant_02", -5.4, 4.0),
+    p("livingFan", "ceiling_fan", -3.6, 2.4),
 
-  // ---- Dining
-  { id: "table", asset: "table", x: -4.2, z: -0.9, scale: S, interaction: "dineSouth" },
-  { id: "chairN", asset: "chair", x: -4.2, z: -1.85, rot: 0, scale: S, interaction: "dineNorth" },
-  { id: "chairS", asset: "chair", x: -4.2, z: 0.05, rot: 180, scale: S, interaction: "dineSouth" },
-  { id: "chairW", asset: "chair", x: -5.2, z: -0.9, rot: 90, scale: S, interaction: "dineWest" },
-  { id: "chairE", asset: "chair", x: -3.2, z: -0.9, rot: -90, scale: S, interaction: "dineEast" },
+    // ---- Entrance
+    p("doormat", "p_doormat", -3.0, 4.0),
 
-  // ---- Living area
-  { id: "tvCabinet", asset: "cabinetTelevision", x: -5.6, z: 2.4, rot: 90, scale: S, interaction: "sofa" },
-  { id: "tv", asset: "televisionModern", x: -5.6, z: 2.4, onTopOf: "tvCabinet", rot: 90, scale: 1.8, blocks: false, interaction: "sofa" },
-  { id: "radio", asset: "radio", x: -5.6, z: 1.55, onTopOf: "tvCabinet", rot: 90, scale: S, blocks: false, interaction: "radio" },
-  { id: "rug", asset: "rugRectangle", x: -4.0, z: 2.4, rot: 90, scale: 1.7, blocks: false },
-  { id: "coffeeTable", asset: "tableCoffee", x: -4.0, z: 2.4, rot: 90, scale: S, blocks: false },
-  { id: "books", asset: "books", x: -4.0, z: 2.4, onTopOf: "coffeeTable", scale: S, blocks: false },
-  { id: "sofa", asset: "loungeSofa", x: -2.6, z: 2.4, rot: -90, scale: S, interaction: "sofa" },
-  { id: "sideTable", asset: "sideTable", x: -2.6, z: 3.95, scale: S },
-  { id: "tableLamp", asset: "lampRoundTable", x: -2.6, z: 3.95, onTopOf: "sideTable", scale: S, blocks: false },
-  { id: "plant1", asset: "pottedPlant", x: -5.4, z: 4.0, scale: S },
-  { id: "lamp", asset: "lampRoundFloor", x: -5.5, z: 0.7, scale: S },
+    // ---- Desk corner
+    p("desk", "metal_office_desk", 0.3, -3.95, { via: "deskChair" }),
+    p("deskChair", "SchoolChair_01", 0.3, -2.95, { rot: 180, action: "work", link: ["laptop"] }),
+    p("laptop", "classic_laptop", -0.2, -3.95, { onTopOf: "desk", via: "deskChair" }),
+    p("deskLamp", "desk_lamp_arm_01", 0.95, -4.0, { onTopOf: "desk" }),
 
-  // ---- Entrance
-  { id: "doormat", asset: "rugDoormat", x: -3.0, z: 4.0, scale: S, blocks: false },
-  { id: "coatRack", asset: "coatRackStanding", x: -1.3, z: 4.1, scale: S },
-  { id: "plant3", asset: "plantSmall1", x: -1.3, z: 3.2, scale: S },
+    // ---- Bedroom
+    p("bed", "p_bed", 3.9, -3.3),
+    p("nightL", "painted_wooden_nightstand", 2.7, -4.15, { via: "bed" }),
+    p("nightR", "painted_wooden_nightstand", 5.1, -4.15, { via: "bed" }),
+    p("oilLamp", "vintage_oil_lamp", 5.1, -4.15, { onTopOf: "nightR" }),
+    p("wardrobe", "p_wardrobe", 1.95, -2.3, { rot: 90 }),
+    p("bookshelf", "wooden_bookshelf_worn", 5.65, -0.9, { rot: -90 }),
+    p("bedRug", "p_rug", 3.9, -0.7),
+    p("commode", "GothicCommode_01", 5.65, 0.9, { rot: -90 }),
+    p("bedFan", "ceiling_fan", 3.9, -1.7),
+    p("plant2", "potted_plant_01", 2.1, 1.0),
 
-  // ---- Desk corner
-  { id: "desk", asset: "desk", x: 0.2, z: -4.0, scale: S, interaction: "desk" },
-  { id: "deskChair", asset: "chairDesk", x: 0.2, z: -3.1, rot: 180, scale: S, interaction: "desk" },
-  { id: "screen", asset: "computerScreen", x: 0.2, z: -4.1, onTopOf: "desk", scale: S, blocks: false, interaction: "desk" },
-  { id: "keyboard", asset: "computerKeyboard", x: 0.2, z: -3.7, onTopOf: "desk", scale: S, blocks: false, interaction: "desk" },
-  { id: "laptop", asset: "laptop", x: -0.5, z: -3.9, onTopOf: "desk", scale: S, blocks: false, interaction: "desk" },
-  { id: "plant2", asset: "plantSmall2", x: 1.1, z: -4.1, scale: S },
-
-  // ---- Bedroom
-  { id: "bed", asset: "bedDouble", x: 3.9, z: -3.05, scale: 1.4, interaction: "bed" },
-  { id: "nightL", asset: "cabinetBedDrawer", x: 2.3, z: -4.05, scale: S, interaction: "bed" },
-  { id: "nightR", asset: "cabinetBedDrawer", x: 5.5, z: -4.05, scale: S, interaction: "bed" },
-  { id: "bedLamp", asset: "lampSquareTable", x: 5.5, z: -4.05, onTopOf: "nightR", scale: S, blocks: false },
-  { id: "wardrobe", asset: "bookcaseClosedWide", x: 1.95, z: -2.0, rot: 90, scale: S },
-  { id: "bookshelf", asset: "bookcaseOpen", x: 5.55, z: -0.9, rot: -90, scale: S, interaction: "bookshelf" },
-  { id: "rug2", asset: "rugRectangle", x: 3.9, z: -0.9, scale: 1.6, blocks: false },
-  { id: "plant4", asset: "pottedPlant", x: 5.4, z: 0.9, scale: S },
-
-  // ---- Bathroom (south-east)
-  { id: "toilet", asset: "toilet", x: 1.95, z: 3.4, rot: 90, scale: S, interaction: "toilet" },
-  { id: "bathSink", asset: "bathroomSink", x: 3.5, z: 4.15, rot: 180, scale: S, interaction: "bathSink" },
-  { id: "shower", asset: "showerRound", x: 5.25, z: 3.85, rot: 180, scale: S, ghost: 0.28, interaction: "shower" },
-  { id: "washer", asset: "washerDryerStacked", x: 5.4, z: 2.05, rot: -90, scale: S },
-  { id: "bathCabinet", asset: "bathroomCabinet", x: 4.45, z: 4.2, rot: 180, scale: S, interaction: "bathSink" },
-];
-
-export const INTERACTIONS: Record<string, Interaction> = {
-  fridge: { id: "fridge", action: "snack", approach: [-5.4, -2.9], yaw: Math.PI, hint: "Grab a snack" },
-  stove: { id: "stove", action: "cook", approach: [-2.7, -2.9], yaw: Math.PI, hint: "Cook a meal" },
-  dineSouth: { id: "dineSouth", action: "eatMeal", approach: [-4.2, 1.1], yaw: Math.PI, pose: [-4.2, 0, 0.05], hint: "Sit and eat" },
-  dineNorth: { id: "dineNorth", action: "eatMeal", approach: [-5.2, -2.1], yaw: 0, pose: [-4.2, 0, -1.85], hint: "Sit and eat" },
-  dineWest: { id: "dineWest", action: "eatMeal", approach: [-6.0 + 0.55, 0.3], yaw: Math.PI / 2, pose: [-5.2, 0, -0.9], hint: "Sit and eat" },
-  dineEast: { id: "dineEast", action: "eatMeal", approach: [-2.4, -0.9], yaw: -Math.PI / 2, pose: [-3.2, 0, -0.9], hint: "Sit and eat" },
-  sofa: { id: "sofa", action: "tv", approach: [-3.7, 2.4], yaw: -Math.PI / 2, pose: [-2.7, 0.07, 2.4], hint: "Sit and watch TV" },
-  radio: { id: "radio", action: "radio", approach: [-4.6, 1.55], yaw: Math.PI / 2, hint: "Dance to the radio" },
-  desk: { id: "desk", action: "work", approach: [0.2, -2.1], yaw: Math.PI, pose: [0.2, 0, -3.1], hint: "Work at the computer" },
-  bed: { id: "bed", action: "sleep", approach: [3.9, -1.55], yaw: 0, pose: [3.9, 0.46, -3.0], hint: "Go to sleep" },
-  bookshelf: { id: "bookshelf", action: "read", approach: [4.6, -0.9], yaw: Math.PI / 2, hint: "Read a book" },
-  toilet: { id: "toilet", action: "toilet", approach: [3.0, 3.4], yaw: Math.PI / 2, pose: [1.95, 0, 3.4], hint: "Use the toilet" },
-  bathSink: { id: "bathSink", action: "brush", approach: [3.5, 3.4], yaw: 0, hint: "Brush your teeth" },
-  shower: { id: "shower", action: "shower", approach: [5.2, 2.9], yaw: 0, pose: [5.25, 0, 3.85], hint: "Take a shower" },
+    // ---- Bathroom (south-east)
+    p("toilet", "p_toilet", 1.95, 3.4, { rot: 90 }),
+    p("basin", "p_basin", 3.5, 4.15, { rot: 180 }),
+    p("mirror", "ornate_mirror_01", 3.5, 4.38, { y: 1.15, rot: 180, via: "basin" }),
+    p("shower", "p_shower", 5.3, 3.9, { rot: 180 }),
+    p("washer", "p_washer", 5.5, 2.15, { rot: -90 }),
+  ],
 };
+
+// ------------------------------------------------------------------ showroom
+
+/** Items that need a partner to be used (a desk needs a chair), so the showroom sets them up in pairs. */
+const SHOWROOM_SETS: { id: string; furniture: string; dx?: number; dz?: number; rot?: number; extra?: Partial<Placement> }[][] = [];
+void SHOWROOM_SETS;
+
+export function buildShowroomLayout(catalog: { id: string; category: string; action?: string }[]): Layout {
+  const items: Placement[] = [];
+  const cols = 9;
+  const spacingX = 3.4;
+  const spacingZ = 3.6;
+  let index = 0;
+  const place = (id: string, furniture: string, extra: Partial<Placement> = {}) => {
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const x = -((cols - 1) * spacingX) / 2 + col * spacingX;
+    const z = -6 + row * spacingZ;
+    items.push({ id, furniture, x, z, ...extra });
+    return { x, z };
+  };
+
+  const order = ["seating", "tables", "bedroom", "storage", "electronics", "appliances", "kitchen", "bathroom", "lighting", "decor"];
+  const sorted = [...catalog].sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+
+  for (const entry of sorted) {
+    const id = entry.id;
+    if (id === "metal_office_desk" || id === "SchoolDesk_01") {
+      // desk + a chair to sit on it
+      const at = place(`s_${id}`, id, { via: `s_${id}_chair` });
+      items.push({ id: `s_${id}_chair`, furniture: "SchoolChair_01", x: at.x, z: at.z + 1.0, rot: 180, action: "work" });
+    } else if (entry.category === "electronics" && (entry.action === "tv" || entry.action === "work")) {
+      // a TV or laptop works from a seat: put a sofa/chair in front of the TV, and a desk + chair under the laptop
+      if (id === "classic_laptop") {
+        const at = place(`s_${id}`, "metal_office_desk", { via: `s_${id}_chair` });
+        items.push({ id: `s_${id}_laptop`, furniture: id, x: at.x - 0.4, z: at.z, onTopOf: `s_${id}`, via: `s_${id}_chair` });
+        items.push({ id: `s_${id}_chair`, furniture: "SchoolChair_01", x: at.x, z: at.z + 1.0, rot: 180, action: "work", link: [`s_${id}_laptop`] });
+      } else {
+        const at = place(`s_${id}`, id, { via: `s_${id}_sofa` });
+        items.push({ id: `s_${id}_sofa`, furniture: "sofa_02", x: at.x, z: at.z + 1.7, rot: 180, link: [`s_${id}`] });
+      }
+    } else {
+      place(`s_${id}`, id, entry.category === "decor" && id === "p_rug" ? {} : {});
+    }
+    index++;
+  }
+  const rows = Math.ceil(index / cols);
+  return {
+    name: "Showroom",
+    area: { minX: -17, maxX: 17, minZ: -9, maxZ: -6 + rows * spacingZ + 3 },
+    walls: [],
+    items,
+    start: { x: 0, z: -7.5, yaw: 0 },
+  };
+}

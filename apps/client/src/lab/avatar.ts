@@ -460,10 +460,59 @@ export class Avatar {
     const clip = this.clips.get(name);
     if (!clip || !this.mixer) return false;
     const next = this.mixer.clipAction(clip);
+    next.setLoop(THREE.LoopRepeat, Infinity);
+    next.clampWhenFinished = false;
     next.reset().setEffectiveWeight(1).play();
     if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, fade, false);
     this.currentAction = next;
     return true;
+  }
+
+  /** Plays a clip once and holds its last pose. Returns its length in seconds (0 if the clip doesn't exist). */
+  playOnce(name: string, fade = 0.12): number {
+    const clip = this.clips.get(name);
+    if (!clip || !this.mixer) return 0;
+    const next = this.mixer.clipAction(clip);
+    next.setLoop(THREE.LoopOnce, 1);
+    next.clampWhenFinished = true;
+    next.reset().setEffectiveWeight(1).play();
+    if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, fade, false);
+    this.currentAction = next;
+    return clip.duration;
+  }
+
+  /**
+   * How far below the character's origin the lowest point of the body sits when a clip is posed at `time` seconds
+   * (negative = below). Used to rest a lying body exactly on a mattress without hand-tuned offsets.
+   */
+  lowestPoint(name: string, time = 0.5): number | null {
+    const clip = this.clips.get(name);
+    if (!clip || !this.bodyScene) return null;
+    const mixer = new THREE.AnimationMixer(this.bodyScene);
+    const action = mixer.clipAction(clip);
+    action.play();
+    action.time = Math.min(time, clip.duration);
+    mixer.update(0);
+    this.root.updateMatrixWorld(true);
+    const heights: number[] = [];
+    const point = new THREE.Vector3();
+    this.root.traverse((o) => {
+      const mesh = o as THREE.SkinnedMesh;
+      if (!mesh.isSkinnedMesh) return;
+      mesh.skeleton.update();
+      const position = mesh.geometry.getAttribute("position");
+      for (let i = 0; i < position.count; i += 2) {
+        mesh.getVertexPosition(i, point);
+        point.applyMatrix4(mesh.matrixWorld);
+        heights.push(point.y);
+      }
+    });
+    // The 3rd percentile, not the very lowest vertex: heels and fingertips dip below the back that carries the weight.
+    heights.sort((a, b) => a - b);
+    const lowest = heights.length ? heights[Math.floor(heights.length * 0.03)]! : Infinity;
+    action.stop();
+    mixer.uncacheRoot(this.bodyScene);
+    return Number.isFinite(lowest) ? lowest - this.root.position.y : null;
   }
 
   stop(): void {

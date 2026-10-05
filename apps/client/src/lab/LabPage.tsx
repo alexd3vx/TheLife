@@ -9,11 +9,12 @@ import { assetUrl, loadManifest, type AssetManifest, type AssetRecord } from "./
 import { createViewer, LIGHTING_LABELS, type LightingName, type Viewer, type ViewerStats } from "./viewer";
 import "./lab.css";
 
-type Tab = "character" | "props" | "vehicles" | "pipeline";
+type Tab = "character" | "furniture" | "props" | "vehicles" | "pipeline";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "character", label: "People" },
-  { id: "props", label: "Props" },
+  { id: "furniture", label: "Furniture" },
+  { id: "props", label: "Cartoon" },
   { id: "vehicles", label: "Vehicles" },
   { id: "pipeline", label: "Pipeline" },
 ];
@@ -119,7 +120,7 @@ export default function LabPage() {
     if (tab === "character" && avatar) {
       viewer.setSubject(avatar.root);
       setSelected(null);
-    } else if (tab === "props" || tab === "vehicles") {
+    } else if (tab === "props" || tab === "vehicles" || tab === "furniture") {
       viewer.setSubject(null);
       setSelected(null);
     }
@@ -243,9 +244,9 @@ export default function LabPage() {
               onRandom={randomise}
             />
           )}
-          {(tab === "props" || tab === "vehicles") && manifest && (
+          {(tab === "props" || tab === "vehicles" || tab === "furniture") && manifest && (
             <AssetBrowser
-              assets={manifest.assets.filter((a) => a.category === (tab === "props" ? "furniture" : "vehicle"))}
+              assets={manifest.assets.filter((a) => a.category === (tab === "props" ? "furniture" : tab === "furniture" ? "realistic" : "vehicle"))}
               selected={selected}
               onSelect={(a) => void showAsset(a)}
               manifest={manifest}
@@ -522,7 +523,7 @@ function AssetBrowser({
         <section className="lab-card">
           <h3>{selected.label ?? selected.id}</h3>
           <p>
-            {selected.triangles} triangles · {(selected.bytes / 1024).toFixed(0)} KB
+            {selected.triangles} triangles · {(selected.bytes / 1024).toFixed(0)} KB{selected.sizeMetres ? ` · ${selected.sizeMetres.join(" × ")} m` : ""}
           </p>
           {credit && (
             <p className="lab-muted">

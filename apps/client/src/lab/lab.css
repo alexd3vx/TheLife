@@ -24,8 +24,8 @@
 .lab-error { left: 50%; top: 64px; transform: translateX(-50%); background: rgba(120,30,25,.92); max-width: 90%; }
 
 .lab-panel { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--border); }
-.lab-tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
-.lab-tabs button { min-height: 46px; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; }
+.lab-tabs { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--border); }
+.lab-tabs button { min-height: 46px; font-size: .86rem; padding: 0 4px; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-muted); cursor: pointer; font-weight: 600; }
 .lab-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
 .lab-scroll { flex: 1; overflow-y: auto; padding: 14px; overscroll-behavior: contain; }
 .lab-footer { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); display: grid; gap: 8px; background: var(--surface-2); }

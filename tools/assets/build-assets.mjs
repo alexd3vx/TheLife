@@ -3,13 +3,13 @@
 // Run `bash tools/assets/fetch-all.sh` first. Usage: pnpm --filter @thelife/asset-tools build
 import { Logger, NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
-import { dedup, meshopt, prune, reorder, resample, textureCompress } from "@gltf-transform/functions";
-import { MeshoptDecoder, MeshoptEncoder } from "meshoptimizer";
+import { dedup, meshopt, prune, reorder, resample, simplify, textureCompress } from "@gltf-transform/functions";
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer";
 import sharp from "sharp";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUDGETS, CREDITS, FURNITURE, HAIR, OUTFITS, OUTFIT_PARTS, VEHICLES } from "./sources.mjs";
+import { BUDGETS, CREDITS, FURNITURE, HAIR, OUTFITS, OUTFIT_PARTS, REALISTIC, VEHICLES } from "./sources.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SRC = join(root, "assets-src");
@@ -18,6 +18,7 @@ const STAGE = join(root, "assets-src/.stage");
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
+await MeshoptSimplifier.ready;
 const io = new NodeIO()
   .setLogger(new Logger(Logger.Verbosity.WARN))
   .registerExtensions(ALL_EXTENSIONS)
@@ -240,6 +241,63 @@ async function copyKit(kitDir, items, category, outSub, credit) {
 
 await copyKit(join(SRC, "kenney/furniture-kit/extracted/Models/GLTF format"), FURNITURE, "furniture", "props", "kenney-furniture");
 await copyKit(join(SRC, "kenney/car-kit/extracted/Models/GLB format"), VEHICLES, "vehicle", "vehicles", "kenney-cars");
+
+
+// ---------------------------------------------------------------- realistic furniture (Poly Haven)
+{
+  const phRoot = join(SRC, "polyhaven");
+  const worldBounds = (doc) => {
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    let tris = 0;
+    const visit = (node) => {
+      const mesh = node.getMesh();
+      if (mesh) {
+        const m = node.getWorldMatrix();
+        for (const prim of mesh.listPrimitives()) {
+          const pos = prim.getAttribute("POSITION");
+          tris += (prim.getIndices()?.getCount() ?? pos.getCount()) / 3;
+          for (let i = 0; i < pos.getCount(); i++) {
+            const v = pos.getElement(i, []);
+            for (let k = 0; k < 3; k++) {
+              const w = m[k] * v[0] + m[4 + k] * v[1] + m[8 + k] * v[2] + m[12 + k];
+              min[k] = Math.min(min[k], w);
+              max[k] = Math.max(max[k], w);
+            }
+          }
+        }
+      }
+      node.listChildren().forEach(visit);
+    };
+    doc.getRoot().listScenes()[0].listChildren().forEach(visit);
+    return { size: max.map((v, i) => v - min[i]), tris };
+  };
+
+  for (const item of REALISTIC) {
+    const file = join(phRoot, item.id, `${item.id}.gltf`);
+    if (!existsSync(file)) {
+      console.warn(`  missing Poly Haven model ${item.id} (run tools/assets/fetch_polyhaven.py)`);
+      continue;
+    }
+    const doc = await io.read(file);
+    doc.setLogger(new Logger(Logger.Verbosity.WARN));
+    const { size, tris } = worldBounds(doc);
+    const biggest = Math.max(...size);
+    const hasSkin = doc.getRoot().listSkins().length > 0;
+    const budget = BUDGETS.realistic.maxTriangles;
+    if (tris > budget * 0.85 && !hasSkin) {
+      const ratio = (budget * 0.7) / tris;
+      await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.06 }));
+    }
+    await optimise(doc, { textureSize: biggest >= 1.2 ? 1024 : 512, quality: 80 });
+    await write(doc, "realistic", item.id, join(OUT, `props/real/${item.id}.glb`), {
+      label: item.label,
+      group: item.group,
+      credit: "polyhaven",
+      sizeMetres: size.map((v) => Math.round(v * 100) / 100),
+    });
+  }
+}
 
 // ---------------------------------------------------------------- budgets + manifest
 let failures = 0;

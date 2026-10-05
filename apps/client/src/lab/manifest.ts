@@ -28,6 +28,7 @@ export interface AssetRecord {
   sex?: string;
   credit?: string;
   budgetProblems?: string[];
+  sizeMetres?: number[];
 }
 
 export interface AssetManifest {

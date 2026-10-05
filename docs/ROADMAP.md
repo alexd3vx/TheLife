@@ -35,6 +35,7 @@ Total estimate: roughly 14–18 weeks part-time; to be re-estimated at the end o
 - **Stage 1 (Asset Lab):** done for a first version: CC0 bodies, hair, outfits, props, vehicles; procedural African hairstyles and modern clothing; budgets enforced. Gaps: skirts/long clothes, face variety, more realistic props/vehicles.
 - **Stage 2 (Animation):** first pass done: 43 library clips + 8 everyday-life clips. Polish list in `ASSET_PIPELINE.md`.
 - **Playable day (Oct 2026):** the prototype now has needs, a clock, money, rent, skills, consequences, saving and an away summary (`GAMEPLAY_SYSTEMS.md`), a furnished 2-bedroom-style house with 14 working interactions, and a day/night cycle. This is the first thing to put in front of testers.
+- **Realistic furniture (Oct 2026):** the house is now furnished with 60 photoscanned CC0 models and 14 pieces built in code, 77 catalog items with naira prices (to be sold in a shop later), real sitting animations on every seat, animated furniture (fridge/oven doors, fans, shower, TV, lamps) and a `#/showroom` test page.
 - **Stage 3 (Map):** started with the **tap-to-walk prototype** (`#/play`): a small house with kitchen, dining, living, desk, bedroom and a yard; tap the floor to walk, tap furniture to cook, eat, sit, work or sleep. Next: a real district layout, lot loading, travel between lots, day/night.
 
 ## Later phases (from the project brief)

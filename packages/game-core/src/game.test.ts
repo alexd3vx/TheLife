@@ -240,3 +240,17 @@ describe("absence and saving", () => {
     }
   });
 });
+
+describe("furniture catalog", () => {
+  it("has unique ids, positive whole-naira prices and real actions", async () => {
+    const { FURNITURE } = await import("./index.js");
+    const ids = new Set<string>();
+    for (const f of FURNITURE) {
+      expect(ids.has(f.id), `duplicate ${f.id}`).toBe(false);
+      ids.add(f.id);
+      expect(Number.isInteger(f.price) && f.price > 0, `${f.id} price`).toBe(true);
+      if (f.action) expect(ACTIONS[f.action], `${f.id} action ${f.action}`).toBeDefined();
+    }
+    expect(FURNITURE.length).toBeGreaterThan(60);
+  });
+});

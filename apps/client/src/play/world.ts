@@ -1,14 +1,19 @@
 import * as THREE from "three";
-import { blockOutside, blockRect, createNavGrid, type NavGrid } from "@thelife/shared";
-import { loadGLTF } from "../lab/loaders";
-import { assetUrl, type AssetManifest } from "../lab/manifest";
-import { HOUSE, INTERACTIONS, ITEMS, PLAY_AREA, WALLS, type ItemDef } from "./layout";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { blockOutside, blockRect, createNavGrid, findPath, isFree, type NavGrid } from "@thelife/shared";
+import { furnitureById, type FurnitureDef } from "@thelife/game-core";
+import { createFurniture, type FurnitureInstance } from "../furniture/instance";
+import type { AssetManifest } from "../lab/manifest";
+import { deriveInteractions, type DerivedItem, type Interaction } from "./interactions";
+import type { Layout, Placement } from "./layout";
 
 const CHARACTER_RADIUS = 0.27;
 export const NAV_CELL = 0.125; // fine enough that 1.4 m doorways stay open after padding for the character's width
 
 export interface PlacedItem {
-  def: ItemDef;
+  def: Placement;
+  catalog: FurnitureDef;
+  instance: FurnitureInstance;
   group: THREE.Group;
   materials: THREE.MeshStandardMaterial[];
   bounds: THREE.Box3;
@@ -16,14 +21,25 @@ export interface PlacedItem {
 
 export interface World {
   scene: THREE.Scene;
+  layout: Layout;
   nav: NavGrid;
   items: PlacedItem[];
+  /** Placed items that can be tapped (they, or the item they point to, have something to do). */
   pickables: THREE.Object3D[];
+  interactions: Map<string, Interaction[]>;
   ground: THREE.Mesh;
+  /** What tapping this item does: its own interactions, or those of the item it points to. */
+  interactionsFor(itemId: string): Interaction[];
+  /** Furniture reacts to being used: doors open, fans spin, the TV glows. */
+  updateFurniture(dt: number, time: number, using: ReadonlySet<string>): void;
+  /** Lights one item (hover); null clears. */
+  highlight(itemId: string | null): void;
   /** Fades the walls between the camera and the house so you can always see in. */
   updateWalls(camera: THREE.Camera, delta: number): void;
   /** Sun, sky and house lights for a time of day (hours, 0-24). */
   setTimeOfDay(hour: number): void;
+  /** 0 (day) to 1 (night), as last set. */
+  readonly night: number;
   dispose(): void;
 }
 
@@ -100,68 +116,96 @@ interface WallMesh {
   opacity: number;
 }
 
-export async function buildWorld(manifest: AssetManifest, shadowSize: number): Promise<World> {
+const FLOOR_Y = 0;
+
+export async function buildWorld(manifest: AssetManifest, layout: Layout, renderer: THREE.WebGLRenderer, shadowSize: number): Promise<World> {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#a9c9e8");
-  scene.fog = new THREE.Fog("#a9c9e8", 40, 90);
+  scene.fog = new THREE.Fog("#a9c9e8", 40, 110);
+
+  // Image-based light so metal, glass and glossy wood have something to reflect.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = envTexture;
+  scene.environmentIntensity = 0.55;
+  pmrem.dispose();
 
   // ---- lighting
-  const hemi = new THREE.HemisphereLight("#cfe0ff", "#8a7058", 1.05);
+  const hemi = new THREE.HemisphereLight("#cfe0ff", "#8a7058", 0.7);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight("#fff0d6", 2.8);
   sun.position.set(-9, 16, 11);
   sun.castShadow = true;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
+  const area = layout.area;
+  const cx = (area.minX + area.maxX) / 2;
+  const cz = (area.minZ + area.maxZ) / 2;
+  const halfSpan = Math.max(area.maxX - area.minX, area.maxZ - area.minZ) / 2 + 3;
+  sun.target.position.set(cx, 0, cz);
+  scene.add(sun.target);
   const cam = sun.shadow.camera;
-  cam.left = -15;
-  cam.right = 15;
-  cam.top = 15;
-  cam.bottom = -15;
+  cam.left = -halfSpan;
+  cam.right = halfSpan;
+  cam.top = halfSpan;
+  cam.bottom = -halfSpan;
   cam.near = 2;
-  cam.far = 50;
+  cam.far = 60 + halfSpan;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.04;
   scene.add(sun);
 
-  // ---- ground: grass yard, a concrete path from the door, wooden house floor
+  // ---- ground
+  const house = layout.house;
   const grass = grassTexture();
-  grass.repeat.set(20, 20);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
+  grass.repeat.set(24, 24);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.03;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const concrete = concreteTexture();
-  concrete.repeat.set(2, 4);
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95 }));
-  path.rotation.x = -Math.PI / 2;
-  path.position.set(-3, 0.012, 6.6);
-  path.receiveShadow = true;
-  scene.add(path);
-
   const wood = woodTexture();
-  wood.repeat.set(3, 2.25);
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(HOUSE.maxX - HOUSE.minX, HOUSE.maxZ - HOUSE.minZ),
-    new THREE.MeshStandardMaterial({ map: wood, roughness: 0.6 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0.02, 0);
-  floor.receiveShadow = true;
-  scene.add(floor);
+  if (house) {
+    const concrete = concreteTexture();
+    concrete.repeat.set(2, 4);
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95 }));
+    path.rotation.x = -Math.PI / 2;
+    path.position.set(-3, -0.012, 6.6);
+    path.receiveShadow = true;
+    scene.add(path);
+
+    const b = house.bounds;
+    wood.repeat.set(3, 2.25);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(b.maxX - b.minX, b.maxZ - b.minZ), new THREE.MeshStandardMaterial({ map: wood, roughness: 0.6 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set((b.minX + b.maxX) / 2, FLOOR_Y, (b.minZ + b.maxZ) / 2);
+    floor.receiveShadow = true;
+    scene.add(floor);
+  } else {
+    // Showroom: one big light floor, with faint aisle lines so scale is easy to judge.
+    const concrete = concreteTexture();
+    concrete.repeat.set((area.maxX - area.minX) / 2, (area.maxZ - area.minZ) / 2);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(area.maxX - area.minX + 4, area.maxZ - area.minZ + 4),
+      new THREE.MeshStandardMaterial({ map: concrete, color: "#d8d4cc", roughness: 0.85 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(cx, FLOOR_Y, cz);
+    floor.receiveShadow = true;
+    scene.add(floor);
+  }
 
   // ---- walls
   const wallMeshes: WallMesh[] = [];
+  const wallHeight = house?.wallHeight ?? 2.6;
+  const wallThickness = house?.wallThickness ?? 0.2;
   const wallMaterial = new THREE.MeshStandardMaterial({ color: "#efe6d6", roughness: 0.95 });
-  for (const wall of WALLS) {
+  for (const wall of layout.walls) {
     const dx = wall.b[0] - wall.a[0];
     const dz = wall.b[1] - wall.a[1];
     const length = Math.hypot(dx, dz);
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(Math.abs(dx) > 0 ? length : HOUSE.wallThickness, HOUSE.wallHeight, Math.abs(dz) > 0 ? length : HOUSE.wallThickness),
-      wallMaterial.clone(),
-    );
-    const centre = new THREE.Vector3((wall.a[0] + wall.b[0]) / 2, HOUSE.wallHeight / 2, (wall.a[1] + wall.b[1]) / 2);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(dx) > 0 ? length : wallThickness, wallHeight, Math.abs(dz) > 0 ? length : wallThickness), wallMaterial.clone());
+    const centre = new THREE.Vector3((wall.a[0] + wall.b[0]) / 2, wallHeight / 2, (wall.a[1] + wall.b[1]) / 2);
     mesh.position.copy(centre);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -171,18 +215,20 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
 
   // ---- warm lights inside the house, switched on by setTimeOfDay at dusk
   const houseLights: THREE.PointLight[] = [];
-  for (const [x, z] of [[-3.5, -0.5], [-3.5, 3.0], [3.7, -1.5], [3.7, 3.2]] as const) {
-    const light = new THREE.PointLight("#ffcf9a", 0, 9, 1.6);
-    light.position.set(x, 2.3, z);
-    scene.add(light);
-    houseLights.push(light);
+  if (house) {
+    for (const [x, z] of [[-3.5, -0.5], [-3.5, 3.0], [3.7, -1.5], [3.7, 3.2]] as const) {
+      const light = new THREE.PointLight("#ffcf9a", 0, 9, 1.6);
+      light.position.set(x, 2.3, z);
+      scene.add(light);
+      houseLights.push(light);
+    }
   }
 
   // ---- navigation grid: walls and furniture block, the play area edge blocks
-  const nav = createNavGrid(PLAY_AREA, NAV_CELL);
-  blockOutside(nav, PLAY_AREA, 0.4);
-  for (const wall of WALLS) {
-    const t = HOUSE.wallThickness / 2;
+  const nav = createNavGrid(layout.area, NAV_CELL);
+  blockOutside(nav, layout.area, 0.4);
+  for (const wall of layout.walls) {
+    const t = wallThickness / 2;
     blockRect(
       nav,
       { minX: Math.min(wall.a[0], wall.b[0]) - t, maxX: Math.max(wall.a[0], wall.b[0]) + t, minZ: Math.min(wall.a[1], wall.b[1]) - t, maxZ: Math.max(wall.a[1], wall.b[1]) + t },
@@ -192,89 +238,121 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
 
   // ---- furniture
   const items: PlacedItem[] = [];
-  const pickables: THREE.Object3D[] = [];
-  await Promise.all(
-    ITEMS.map(async (def) => {
-      const record = manifest.assets.find((a) => a.id === def.asset);
-      if (!record) {
-        console.warn(`play: unknown asset ${def.asset}`);
-        return;
-      }
-      const gltf = await loadGLTF(assetUrl(record.file));
-      const model = gltf.scene.clone(true);
-      const box = new THREE.Box3().setFromObject(model);
-      const centre = box.getCenter(new THREE.Vector3());
-      model.position.set(-centre.x, -box.min.y, -centre.z); // centred on its footprint, resting on the floor
-
-      const group = new THREE.Group();
-      group.add(model);
-      group.scale.setScalar(def.scale ?? 2);
-      group.rotation.y = ((def.rot ?? 0) * Math.PI) / 180;
-      group.position.set(def.x, (def.y ?? 0) + 0.02, def.z);
-      group.userData.itemId = def.id;
-
-      const materials: THREE.MeshStandardMaterial[] = [];
-      group.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        const material = (mesh.material as THREE.MeshStandardMaterial).clone();
-        if (def.ghost !== undefined) {
-          material.transparent = true;
-          material.opacity = def.ghost;
-          material.depthWrite = false;
-          mesh.castShadow = false;
-        }
-        mesh.material = material;
-        materials.push(material);
-      });
-      scene.add(group);
-      group.updateMatrixWorld(true);
-      const bounds = new THREE.Box3().setFromObject(group);
-      items.push({ def, group, materials, bounds });
-      if (def.interaction) pickables.push(group);
+  const built = await Promise.all(
+    layout.items.map(async (def) => {
+      const catalog = furnitureById(def.furniture);
+      if (!catalog) throw new Error(`Layout item "${def.id}" uses unknown furniture "${def.furniture}"`);
+      const instance = await createFurniture(def.furniture, manifest);
+      return { def, catalog, instance };
     }),
   );
+  for (const { def, catalog, instance } of built) {
+    const group = instance.object;
+    group.userData.itemId = def.id;
+    group.rotation.y = ((def.rot ?? 0) * Math.PI) / 180;
+    const ceiling = instance.meta.ceiling;
+    group.position.set(def.x, FLOOR_Y + (def.y ?? 0) + (ceiling ? wallHeight - instance.size.y : 0), def.z);
+    const materials: THREE.MeshStandardMaterial[] = [];
+    group.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const clone = (m: THREE.Material) => {
+        const c = m.clone();
+        const std = c as THREE.MeshStandardMaterial;
+        if (std.isMeshStandardMaterial) {
+          std.userData.baseEmissive = std.emissive.clone();
+          materials.push(std);
+        }
+        return c;
+      };
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(clone) : clone(mesh.material);
+    });
+    scene.add(group);
+    group.updateMatrixWorld(true);
+    items.push({ def, catalog, instance, group, materials, bounds: new THREE.Box3().setFromObject(group) });
+  }
 
   // Items that rest on others take their height from the item below (resolved in dependency order).
-  const placed = new Set(items.filter((i) => !i.def.onTopOf).map((i) => i.def.id));
+  const byId = new Map(items.map((i) => [i.def.id, i]));
+  const settled = new Set(items.filter((i) => !i.def.onTopOf).map((i) => i.def.id));
   let remaining = items.filter((i) => i.def.onTopOf);
   for (let pass = 0; pass < 4 && remaining.length; pass++) {
     const next: PlacedItem[] = [];
     for (const item of remaining) {
-      const base = items.find((i) => i.def.id === item.def.onTopOf);
-      if (!base || !placed.has(base.def.id)) {
+      const base = byId.get(item.def.onTopOf!);
+      if (!base || !settled.has(base.def.id)) {
         next.push(item);
         continue;
       }
       item.group.position.y = base.bounds.max.y + (item.def.y ?? 0);
       item.group.updateMatrixWorld(true);
       item.bounds = new THREE.Box3().setFromObject(item.group);
-      placed.add(item.def.id);
+      settled.add(item.def.id);
     }
     remaining = next;
   }
 
+  // Only things you'd bump into block walking: not rugs, wall-hung pieces, fans or things on tables.
   for (const item of items) {
-    if (item.def.blocks === false) continue;
     const b = item.bounds;
+    if (item.def.onTopOf || b.max.y - b.min.y < 0.12 || b.min.y > 0.7) continue;
     blockRect(nav, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z }, CHARACTER_RADIUS);
   }
+
+  // ---- what you can do with each piece, worked out from its shape
+  const derived: DerivedItem[] = items.map((item) => {
+    const base = item.def.onTopOf ? byId.get(item.def.onTopOf) : undefined;
+    return { def: item.def, category: item.catalog.category, action: item.catalog.action, meta: item.instance.meta, group: item.group, box: item.bounds, reach: base?.bounds ?? item.bounds };
+  });
+  const start = { x: layout.start.x, z: layout.start.z };
+  const reachable = (x: number, z: number) => isFree(nav, x, z) && findPath(nav, start, { x, z }) !== null;
+  const interactions = deriveInteractions(derived, reachable);
+
   // Interaction spots must always be reachable, even if furniture padding covered them.
-  for (const interaction of Object.values(INTERACTIONS)) {
-    const [x, z] = interaction.approach;
-    blockRect(nav, { minX: x, maxX: x, minZ: z, maxZ: z }, 0);
-    const cx = Math.floor((x - nav.minX) / nav.cell);
-    const cz = Math.floor((z - nav.minZ) / nav.cell);
-    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) nav.blocked[(cz + dz) * nav.width + (cx + dx)] = 0;
+  for (const list of interactions.values()) {
+    for (const interaction of list) {
+      const [x, z] = interaction.approach;
+      const cellX = Math.floor((x - nav.minX) / nav.cell);
+      const cellZ = Math.floor((z - nav.minZ) / nav.cell);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) nav.blocked[(cellZ + dz) * nav.width + (cellX + dx)] = 0;
+    }
   }
+
+  function interactionsFor(itemId: string): Interaction[] {
+    const own = interactions.get(itemId);
+    if (own?.length) return own;
+    const via = byId.get(itemId)?.def.via;
+    return via ? (interactions.get(via) ?? []) : [];
+  }
+  const pickables = items.filter((i) => interactionsFor(i.def.id).length > 0).map((i) => i.group);
+
+  // ---- furniture reactions and hover
+  function updateFurniture(dt: number, t: number, using: ReadonlySet<string>) {
+    for (const item of items) {
+      if (!item.instance.animated) continue;
+      item.instance.update(dt, { using: using.has(item.def.id), night: currentNight, time: t });
+    }
+  }
+  function highlight(itemId: string | null) {
+    for (const item of items) {
+      const on = item.def.id === itemId;
+      for (const m of item.materials) {
+        const base = m.userData.baseEmissive as THREE.Color;
+        m.emissive.copy(base);
+        if (on) m.emissive.add(new THREE.Color(0x442200));
+      }
+    }
+  }
+
+  const ceilingItems = items.filter((i) => i.instance.meta.ceiling);
 
   // Walls fade out when the camera is outside them.
   const camPos = new THREE.Vector3();
   const toCamera = new THREE.Vector3();
   function updateWalls(camera: THREE.Camera, delta: number) {
     camera.getWorldPosition(camPos);
+    // Like any life sim, the ceiling is cut away: ceiling fans only show when the camera is below the ceiling.
+    if (house) for (const item of ceilingItems) item.group.visible = camPos.y < wallHeight;
     for (const wall of wallMeshes) {
       if (!wall.outward) continue;
       toCamera.copy(camPos).sub(wall.centre);
@@ -289,23 +367,22 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
     }
   }
 
-
-
   // ---- time of day
-  const keys: { hour: number; sky: string; sun: string; sunPower: number; hemi: number; hemiSky: string; exposure: number }[] = [
-    { hour: 0, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.35, hemiSky: "#3a4a8a", exposure: 1 },
-    { hour: 5, sky: "#1d2750", sun: "#8da0e8", sunPower: 0.3, hemi: 0.4, hemiSky: "#4a5a9a", exposure: 1 },
-    { hour: 6.5, sky: "#f0a06a", sun: "#ffb072", sunPower: 1.6, hemi: 0.75, hemiSky: "#e8b8a0", exposure: 1 },
-    { hour: 9, sky: "#a9c9e8", sun: "#fff0d6", sunPower: 2.8, hemi: 1.05, hemiSky: "#cfe0ff", exposure: 1 },
-    { hour: 14, sky: "#9fc4ea", sun: "#fff6e6", sunPower: 3.1, hemi: 1.1, hemiSky: "#cfe4ff", exposure: 1 },
-    { hour: 17.5, sky: "#e8b078", sun: "#ffb06a", sunPower: 2.2, hemi: 0.85, hemiSky: "#f0c8a0", exposure: 1 },
-    { hour: 19, sky: "#6a3a52", sun: "#ff8a5a", sunPower: 0.9, hemi: 0.5, hemiSky: "#8a6a9a", exposure: 1 },
-    { hour: 20.5, sky: "#141b3a", sun: "#6f86d8", sunPower: 0.3, hemi: 0.38, hemiSky: "#3a4a8a", exposure: 1 },
-    { hour: 24, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.35, hemiSky: "#3a4a8a", exposure: 1 },
+  const keys: { hour: number; sky: string; sun: string; sunPower: number; hemi: number; hemiSky: string }[] = [
+    { hour: 0, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.3, hemiSky: "#3a4a8a" },
+    { hour: 5, sky: "#1d2750", sun: "#8da0e8", sunPower: 0.3, hemi: 0.34, hemiSky: "#4a5a9a" },
+    { hour: 6.5, sky: "#f0a06a", sun: "#ffb072", sunPower: 1.6, hemi: 0.55, hemiSky: "#e8b8a0" },
+    { hour: 9, sky: "#a9c9e8", sun: "#fff0d6", sunPower: 2.8, hemi: 0.7, hemiSky: "#cfe0ff" },
+    { hour: 14, sky: "#9fc4ea", sun: "#fff6e6", sunPower: 3.1, hemi: 0.75, hemiSky: "#cfe4ff" },
+    { hour: 17.5, sky: "#e8b078", sun: "#ffb06a", sunPower: 2.2, hemi: 0.6, hemiSky: "#f0c8a0" },
+    { hour: 19, sky: "#6a3a52", sun: "#ff8a5a", sunPower: 0.9, hemi: 0.4, hemiSky: "#8a6a9a" },
+    { hour: 20.5, sky: "#141b3a", sun: "#6f86d8", sunPower: 0.3, hemi: 0.32, hemiSky: "#3a4a8a" },
+    { hour: 24, sky: "#0b1226", sun: "#6f86d8", sunPower: 0.25, hemi: 0.3, hemiSky: "#3a4a8a" },
   ];
   const skyColor = new THREE.Color();
   const tmpA = new THREE.Color();
   const tmpB = new THREE.Color();
+  let currentNight = 0;
   function setTimeOfDay(hour: number) {
     const h = ((hour % 24) + 24) % 24;
     let i = 0;
@@ -320,24 +397,35 @@ export async function buildWorld(manifest: AssetManifest, shadowSize: number): P
     sun.intensity = a.sunPower + (b.sunPower - a.sunPower) * t;
     hemi.intensity = a.hemi + (b.hemi - a.hemi) * t;
     hemi.color.set(a.hemiSky).lerp(tmpB.set(b.hemiSky), t);
+    scene.environmentIntensity = 0.12 + (hemi.intensity - 0.3) * 1.0;
     // The sun crosses the sky from east (6:00) to west (18:00); at night it becomes a dim moon from the same side.
     const day = Math.max(0, Math.sin(((h - 6) / 12) * Math.PI));
     const angle = ((h - 6) / 12) * Math.PI;
-    sun.position.set(Math.cos(angle) * 16 * -1, 6 + day * 12, 9);
+    sun.position.set(cx + Math.cos(angle) * 16 * -1, 6 + day * 12, cz + 9);
     const dark = h < 6.5 || h > 19.5 ? 1 : h < 8 ? (8 - h) / 1.5 : h > 18 ? (h - 18) / 1.5 : 0;
-    for (const light of houseLights) light.intensity = Math.min(1, Math.max(0, dark)) * 14;
+    currentNight = Math.min(1, Math.max(0, dark));
+    for (const light of houseLights) light.intensity = currentNight * 14;
   }
   setTimeOfDay(9);
 
   return {
     scene,
+    layout,
     nav,
     items,
     pickables,
+    interactions,
     ground,
+    interactionsFor,
+    updateFurniture,
+    highlight,
     updateWalls,
     setTimeOfDay,
+    get night() {
+      return currentNight;
+    },
     dispose() {
+      envTexture.dispose();
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;
         mesh.geometry?.dispose?.();
