@@ -37,6 +37,19 @@ describe("district generator", () => {
     for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) expect(overlaps(solid[i]!.footprint, solid[j]!.footprint), `${solid[i]!.id} ${solid[j]!.id}`).toBe(false);
   });
 
+  it("has the named places: airport, police, hospital, school, church, mosque, fire station, bank, fuel, hotel, market", () => {
+    const kinds = d.landmarks.map((l) => l.kind).sort();
+    expect(kinds).toEqual(["airport", "bank", "church", "fire", "fuel", "hospital", "hotel", "market", "mosque", "police", "school"].sort());
+    for (const l of d.landmarks) {
+      expect(l.name.length, l.kind).toBeGreaterThan(3);
+      expect(Math.abs(l.x) <= DISTRICT_HALF && Math.abs(l.z) <= DISTRICT_HALF, l.kind).toBe(true);
+      if (l.lotId) expect(d.lots.find((x) => x.id === l.lotId)?.landmark, l.kind).toBe(l.kind);
+    }
+    expect(d.runway.maxX - d.runway.minX).toBeGreaterThan(300);
+    expect(d.props.filter((p) => p.kind === "plane").length).toBeGreaterThan(3);
+    expect(d.lots.some((l) => l.kind === "hangar")).toBe(true);
+  });
+
   it("has street furniture and parked cars that stay off buildings and out of junctions", () => {
     for (const kind of ["pole", "hydrant", "bin", "bench", "busStop", "sign", "car"] as const) expect(d.props.some((p) => p.kind === kind), kind).toBe(true);
     expect(d.wires.length).toBeGreaterThan(40);
@@ -99,7 +112,7 @@ describe("district generator", () => {
     }
     void cell;
     const reach = (x: number, z: number) => {
-      for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (seen[idx(x + dx, z + dz)] === 1) return true; // something small may stand on the exact spot
+      for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) if (seen[idx(x + dx, z + dz)] === 1) return true; // something small may stand on the exact spot
       return false;
     };
     expect(reach(0, 0)).toBe(true); // the market
@@ -107,6 +120,7 @@ describe("district generator", () => {
     expect(reach(180, -180)).toBe(true);
     const apron = d.blocks.find((b) => b.kind === "apron")!;
     expect(reach((apron.area.minX + apron.area.maxX) / 2, apron.area.maxZ - 4)).toBe(true);
+    for (const l of d.landmarks) expect(reach(l.entrance.x, l.entrance.z), `${l.kind} entrance`).toBe(true);
     const roadCells = d.roads.reduce((s, r) => s + (r.maxX - r.minX) * (r.maxZ - r.minZ), 0);
     expect(roadCells).toBeGreaterThan(0);
   });

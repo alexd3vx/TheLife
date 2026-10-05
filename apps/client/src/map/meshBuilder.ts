@@ -54,6 +54,21 @@ export class MeshBuilder {
     }
   }
 
+  /** Adds any three.js geometry (a dome, say) transformed by `matrix` and painted one colour (lit a little from above). */
+  geometry(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, color: THREE.Color): void {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    g.applyMatrix4(matrix);
+    g.computeVertexNormals();
+    const p = g.getAttribute("position");
+    const n = g.getAttribute("normal");
+    for (let i = 0; i < p.count; i++) {
+      const lit = 0.8 + 0.25 * Math.max(0, n.getY(i));
+      this.pos.push(p.getX(i), p.getY(i), p.getZ(i));
+      this.col.push(color.r * lit, color.g * lit, color.b * lit);
+    }
+    g.dispose();
+  }
+
   build(): THREE.BufferGeometry | null {
     if (!this.pos.length) return null;
     const g = new THREE.BufferGeometry();

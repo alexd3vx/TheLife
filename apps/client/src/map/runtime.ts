@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { blockRect, createNavGrid } from "@thelife/shared";
-import { generateDistrict, walkBlockers, DISTRICT_HALF } from "@thelife/game-core";
+import { walkBlockers, DISTRICT_HALF } from "@thelife/game-core";
+import { getDistrict } from "./districtData";
+import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
@@ -37,6 +39,8 @@ export interface MapRuntime {
   dispose(): void;
   resetView(): void;
   zoomOut(): void;
+  /** Walk or run to the front door of a named place. */
+  goTo(id: string, pace: "walk" | "run"): boolean;
   quality(): Quality;
   setQuality(q: Quality): void;
   /** Switches between day and night (street lamps light up). */
@@ -46,8 +50,10 @@ export interface MapRuntime {
   debug: {
     stats(): MapStats;
     teleport(x: number, z: number): void;
+    lookAt(x: number, z: number, height?: number, back?: number): void;
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
+    landmarks: import("@thelife/game-core").Landmark[];
     state(): CharacterController["state"];
     night(): boolean;
   };
@@ -79,7 +85,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
   container.appendChild(renderer.domElement);
 
-  const district = generateDistrict(1);
+  const district = getDistrict();
   const scene = new THREE.Scene();
   const SKY = new THREE.Color("#a9cbe8");
   scene.background = SKY;
@@ -110,6 +116,22 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(ground);
   const groundDetail = buildGroundDetail(district, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
   scene.add(groundDetail.group);
+
+  // Map pins floating above every named place.
+  const pinSprites: THREE.Sprite[] = [];
+  for (const lm of district.landmarks) {
+    const lot = district.lots.find((l) => l.id === lm.lotId);
+    const top = lot ? lot.floors * lot.storey : 6;
+    const extra = lm.kind === "airport" ? 18 : lm.kind === "mosque" ? 7 : lm.kind === "church" ? 5 : 3;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: pinTexture(lm.kind), transparent: true, depthWrite: false, depthTest: false, sizeAttenuation: false, fog: false }));
+    sprite.center.set(0.5, 0);
+    sprite.scale.set(0.045, 0.06, 1);
+    sprite.position.set(lm.x, top + extra + 2, lm.z);
+    sprite.renderOrder = 50;
+    sprite.userData.landmarkId = lm.id;
+    scene.add(sprite);
+    pinSprites.push(sprite);
+  }
 
   const streamer = new ChunkStreamer(district);
   scene.add(streamer.root);
@@ -175,8 +197,37 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     raycaster.setFromCamera(ndc, camera);
     return raycaster.ray.intersectPlane(plane, hit) ? hit.clone() : null;
   }
+  function pinAt(clientX: number, clientY: number): string | null {
+    const rect = renderer.domElement.getBoundingClientRect();
+    ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(pinSprites, false);
+    return hits[0]?.object.userData.landmarkId ?? null;
+  }
+  function goTo(id: string, pace: "walk" | "run"): boolean {
+    const lm = district.landmarks.find((l) => l.id === id);
+    if (!lm) return false;
+    const ok = controller.tapGround(lm.entrance.x, lm.entrance.z, pace);
+    showMarker(lm.entrance.x, lm.entrance.z, ok);
+    return ok;
+  }
   function handleTap(clientX: number, clientY: number) {
     const rect = renderer.domElement.getBoundingClientRect();
+    const pinHit = pinAt(clientX, clientY);
+    if (pinHit) {
+      const lm = district.landmarks.find((l) => l.id === pinHit)!;
+      showMarker(lm.entrance.x, lm.entrance.z, controller.canReach(lm.entrance.x, lm.entrance.z));
+      events.onMenu({
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+        title: lm.name,
+        options: [
+          { label: "Walk there", icon: "🚶", run: () => { events.onMenu(null); goTo(lm.id, "walk"); } },
+          { label: "Run there", icon: "🏃", run: () => { events.onMenu(null); goTo(lm.id, "run"); } },
+        ],
+      });
+      return;
+    }
     const point = groundAt(clientX, clientY);
     if (!point || Math.abs(point.x) > DISTRICT_HALF || Math.abs(point.z) > DISTRICT_HALF) return events.onMenu(null);
     const { x, z } = point;
@@ -352,6 +403,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   return {
     resetView,
+    goTo,
     quality: () => quality.mode,
     setQuality(q) {
       quality.setQuality(q);
@@ -388,8 +440,14 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     debug: {
       stats: currentStats,
       teleport: (x, z) => controller.place(x, z, 0),
+      lookAt: (x, z, height = 40, back = 60) => {
+        controls.target.set(x, 0, z);
+        camera.position.set(x + back * 0.4, height, z + back);
+        controls.update();
+      },
       tapGround: (x, z) => controller.tapGround(x, z),
       streamer,
+      landmarks: district.landmarks,
       state: () => controller.state,
       night: () => night,
     },

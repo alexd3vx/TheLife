@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, type ChunkData, type District, type Facing, type Lamp, type Lot, type Rect } from "@thelife/game-core";
 import { MeshBuilder } from "./meshBuilder";
 import { addProp } from "./props";
+import { LANDMARK_WALL, addHangar, addLandmark } from "./landmarks";
 import { asphaltTexture, concreteTexture, glowTexture, pavingTexture } from "./groundTextures";
 
 /** How much detail a chunk is built with: 0 = full (windows, doors, fences, lamps), 1 = shells and trees, 2 = plain blocks. */
@@ -24,28 +25,7 @@ export const buildingMaterial = new THREE.MeshStandardMaterial({ vertexColors: t
 export const lampMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: new THREE.Color("#ffd58a"), emissiveIntensity: 0 });
 export const treeMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
 
-const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-
-const OUT: Record<Facing, THREE.Vector3Like> = { 0: { x: 0, y: 0, z: -1 }, 1: { x: 1, y: 0, z: 0 }, 2: { x: 0, y: 0, z: 1 }, 3: { x: -1, y: 0, z: 0 } };
-
-/** A rectangle on a wall: `u0..u1` along the wall from its start, `v0..v1` up, pushed `off` metres out from the surface. */
-function wallRect(b: MeshBuilder, fp: Rect, side: Facing, u0: number, u1: number, v0: number, v1: number, off: number, color: THREE.Color) {
-  let p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3;
-  if (side === 0) {
-    const z = fp.minZ - off;
-    [p0, p1, p2, p3] = [V(fp.minX + u0, v0, z), V(fp.minX + u1, v0, z), V(fp.minX + u1, v1, z), V(fp.minX + u0, v1, z)];
-  } else if (side === 2) {
-    const z = fp.maxZ + off;
-    [p0, p1, p2, p3] = [V(fp.minX + u0, v0, z), V(fp.minX + u1, v0, z), V(fp.minX + u1, v1, z), V(fp.minX + u0, v1, z)];
-  } else if (side === 1) {
-    const x = fp.maxX + off;
-    [p0, p1, p2, p3] = [V(x, v0, fp.minZ + u0), V(x, v0, fp.minZ + u1), V(x, v1, fp.minZ + u1), V(x, v1, fp.minZ + u0)];
-  } else {
-    const x = fp.minX - off;
-    [p0, p1, p2, p3] = [V(x, v0, fp.minZ + u0), V(x, v0, fp.minZ + u1), V(x, v1, fp.minZ + u1), V(x, v1, fp.minZ + u0)];
-  }
-  b.quad(p0, p1, p2, p3, OUT[side], color);
-}
+import { V, wallRect } from "./wall";
 
 function addRoof(b: MeshBuilder, lot: Lot, top: number, lod: Lod) {
   const f = lot.footprint;
@@ -90,11 +70,12 @@ function addBuilding(b: MeshBuilder, lot: Lot, lod: Lod) {
     b.box(f.minX - 0.2, 2.4, f.minZ - 0.2, f.maxX + 0.2, 2.6, f.maxZ + 0.2, canopy);
     return;
   }
-  const wall = lot.kind === "terminal" ? C("#d9dde0") : WALLS[lot.colour % WALLS.length]!;
+  const wall = lot.landmark ? LANDMARK_WALL[lot.landmark] : lot.kind === "terminal" ? C("#d9dde0") : lot.kind === "hangar" ? C("#9aa3ab") : WALLS[lot.colour % WALLS.length]!;
   b.box(f.minX, 0, f.minZ, f.maxX, height, f.maxZ, wall, 0.78);
   addRoof(b, lot, height, lod);
   if (lod === 2) return;
-
+  if (lot.landmark) addLandmark(b, lot, lot.landmark, lod === 0);
+  if (lot.kind === "hangar") addHangar(b, lot, lod === 0);
   if (lod === 1) return;
   // ---- full detail: windows, door, garage, shop sign, fence
   const sides: Facing[] = [0, 1, 2, 3];
@@ -297,8 +278,18 @@ export function buildGroundDetail(d: District, anisotropy = 4): GroundDetail {
   for (const r of d.roads) roads.flat(r.minX, r.minZ, r.maxX, r.maxZ, 0.02, white, 8);
 
   // Paint: dashed centre lines, solid edge lines, zebra crossings. Drawn just above the asphalt.
+  const rw = d.runway;
+  roads.flat(rw.minX, rw.minZ, rw.maxX, rw.maxZ, 0.022, white, 8);
   const paint = new MeshBuilder();
   const line = C("#e8e2c4");
+  {
+    // Runway markings: edge lines, a dashed centre line and threshold stripes at both ends.
+    const zc = (rw.minZ + rw.maxZ) / 2;
+    paint.flat(rw.minX, rw.minZ + 0.4, rw.maxX, rw.minZ + 0.55, 0.036, line);
+    paint.flat(rw.minX, rw.maxZ - 0.55, rw.maxX, rw.maxZ - 0.4, 0.036, line);
+    for (let x = rw.minX + 20; x < rw.maxX - 20; x += 14) paint.flat(x, zc - 0.2, x + 7, zc + 0.2, 0.036, line);
+    for (const end of [rw.minX + 4, rw.maxX - 16]) for (let k = 0; k < 6; k++) paint.flat(end, rw.minZ + 1.2 + k * 1.5, end + 12, rw.minZ + 1.9 + k * 1.5, 0.036, line);
+  }
   const edge = C("#d9d6c8");
   const near = (t: number) => ROAD_CENTRES.some((c) => Math.abs(t - c) < half + 0.2);
   const H = d.bounds.maxX;

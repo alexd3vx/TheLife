@@ -5,3 +5,20 @@
 }
 .map-stats b { color: var(--accent-strong); }
 .play-controls button:disabled { opacity: .6; cursor: default; }
+.play-controls { flex-wrap: wrap; max-width: calc(100% - 24px); }
+
+/* The drawn map: a corner minimap and a big version. */
+.dmap { position: relative; width: 100%; height: 100%; touch-action: none; user-select: none; }
+.dmap svg { width: 100%; height: 100%; display: block; }
+.dmap-tools { position: absolute; right: 8px; bottom: 8px; display: grid; gap: 6px; }
+.dmap-tools button { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: #222; font-size: 1.2rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 190px; height: 190px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }
+.map-mini .dmap { pointer-events: none; }
+.map-big { position: absolute; z-index: 5; inset: 56px 12px 72px; border-radius: 18px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .9); background: #d9e6c6; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
+.map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(20, 17, 15, .92); backdrop-filter: blur(10px); display: grid; gap: 8px; }
+.map-sheet strong { font-size: 1rem; }
+.map-sheet span { color: var(--text-muted); font-size: .82rem; }
+.map-sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.map-sheet-actions button { font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 12px; min-height: 40px; padding: 0 14px; background: var(--accent); color: var(--accent-ink); }
+.map-sheet-actions button.is-ghost { background: rgba(255, 255, 255, .14); color: var(--text); }
+.map-close { position: absolute; z-index: 7; right: 20px; top: 64px; font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer; background: rgba(20, 17, 15, .88); color: var(--text); }

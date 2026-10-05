@@ -16,7 +16,22 @@ export interface Rect {
   maxZ: number;
 }
 
-export type LotKind = "house" | "flats" | "shop" | "stall" | "terminal";
+export type LotKind = "house" | "flats" | "shop" | "stall" | "terminal" | "hangar";
+
+/** Places that get their own look, a name and a pin on the map. */
+export type LandmarkKind = "airport" | "police" | "hospital" | "school" | "church" | "mosque" | "fire" | "bank" | "fuel" | "hotel" | "market";
+
+export interface Landmark {
+  id: string;
+  kind: LandmarkKind;
+  name: string;
+  /** The middle of the place (where the pin floats). */
+  x: number;
+  z: number;
+  /** A walkable spot just outside the front door. */
+  entrance: { x: number; z: number };
+  lotId: string | null;
+}
 /** Which way the front door faces: 0 north (-z), 1 east (+x), 2 south (+z), 3 west (-x). */
 export type Facing = 0 | 1 | 2 | 3;
 
@@ -36,6 +51,8 @@ export interface Lot {
   colour: number;
   garage: boolean;
   fence: boolean;
+  /** Set when this lot is one of the named places. */
+  landmark?: LandmarkKind;
 }
 
 export interface Tree {
@@ -54,7 +71,7 @@ export interface Lamp {
   facing: Facing;
 }
 
-export type PropKind = "pole" | "hydrant" | "bin" | "bench" | "busStop" | "sign" | "car";
+export type PropKind = "pole" | "hydrant" | "bin" | "bench" | "busStop" | "sign" | "car" | "plane";
 
 /** Street furniture and parked cars. `yaw` is a multiple of 90 degrees (0 faces +x along the crossarm/length, 90 turns it). */
 export interface Prop {
@@ -71,6 +88,9 @@ export type BlockKind = "residential" | "commercial" | "market" | "park" | "farm
 export interface Block {
   kind: BlockKind;
   area: Rect;
+  /** Position in the block grid (0 to 6 each way). */
+  i: number;
+  j: number;
 }
 
 export interface District {
@@ -82,6 +102,9 @@ export interface District {
   lots: Lot[];
   trees: Tree[];
   lamps: Lamp[];
+  landmarks: Landmark[];
+  /** The runway along the south edge. */
+  runway: Rect;
   props: Prop[];
   /** Overhead cable spans between power poles: [x1, z1, x2, z2]. */
   wires: [number, number, number, number][];
@@ -141,6 +164,7 @@ export function generateDistrict(seed = 1): District {
   const paving: Rect[] = [];
   const fields: Rect[] = [];
   let lotNo = 0;
+  const planeSpots: { x: number; z: number }[] = [];
 
   const lo = (c: number) => c + half + SIDEWALK; // first buildable metre after a road at c
   const hi = (c: number) => c - half - SIDEWALK; // last buildable metre before a road at c
@@ -162,7 +186,7 @@ export function generateDistrict(seed = 1): District {
       else if (centre) kind = "market";
       else if (j === edges.length - 3) kind = "commercial";
       else kind = rand() < 0.14 ? "park" : "residential";
-      blocks.push({ kind, area });
+      blocks.push({ kind, area, i, j });
 
       if (kind === "farm") {
         // Crop strips with a margin, the odd tree on the verge.
@@ -172,11 +196,14 @@ export function generateDistrict(seed = 1): District {
         }
         for (let n = 0; n < 6; n++) trees.push({ x: between(x0 + 3, x1 - 3), z: between(z0 + 3, z1 - 3), scale: between(0.9, 1.4), variant: pick([0, 1, 2] as const) });
       } else if (kind === "apron") {
-        paving.push(rect(x0 + 2, x1 - 2, z0 + 14, z1 - 2));
-        const w = Math.min(54, x1 - x0 - 8);
+        // Terminal or hangar along the town side, a parking apron with planes, and the runway beyond (added once, below).
+        paving.push(rect(x0 + 2, x1 - 2, z0 + 9, z0 + 17));
+        const main = i === 3;
+        const w = main ? Math.min(54, x1 - x0 - 8) : 26;
         const cx = (x0 + x1) / 2;
-        const fp = rect(cx - w / 2, cx + w / 2, z0 + 2, z0 + 14);
-        lots.push({ id: `L${lotNo++}`, kind: "terminal", plot: rect(cx - w / 2 - 2, cx + w / 2 + 2, z0, z0 + 16), footprint: fp, floors: 2, storey: 4.2, roof: "flat", facing: 2, colour: 6, garage: false, fence: false });
+        const fp = rect(cx - w / 2, cx + w / 2, z0 + 2, z0 + 9);
+        lots.push({ id: `L${lotNo++}`, kind: main ? "terminal" : "hangar", plot: rect(cx - w / 2 - 2, cx + w / 2 + 2, z0, z0 + 10), footprint: fp, floors: main ? 2 : 1, storey: main ? 4.2 : 7, roof: "flat", facing: 0, colour: main ? 6 : 2, garage: false, fence: false, landmark: main ? "airport" : undefined });
+        for (const px of main ? [cx - 16, cx + 6, cx + 22] : [cx - 8, cx + 10]) planeSpots.push({ x: px, z: z0 + 13 });
       } else if (kind === "park") {
         for (let n = 0; n < 18; n++) trees.push({ x: between(x0 + 3, x1 - 3), z: between(z0 + 3, z1 - 3), scale: between(0.8, 1.5), variant: pick([0, 1, 2] as const) });
       } else if (kind === "market") {
@@ -230,6 +257,49 @@ export function generateDistrict(seed = 1): District {
     }
   }
 
+  // ---- named places: the widest plot in a chosen block becomes a police station, hospital and so on.
+  const landmarks: Landmark[] = [];
+  const entranceOf = (lot: Lot) => {
+    const f = lot.footprint;
+    const mx = (f.minX + f.maxX) / 2;
+    const mz = (f.minZ + f.maxZ) / 2;
+    return lot.facing === 0 ? { x: mx, z: f.minZ - 1.5 } : lot.facing === 2 ? { x: mx, z: f.maxZ + 1.5 } : lot.facing === 1 ? { x: f.maxX + 1.5, z: mz } : { x: f.minX - 1.5, z: mz };
+  };
+  const claim = (kind: LandmarkKind, name: string, bi: number, bj: number, floors: number) => {
+    const candidates = blocks
+      .filter((b) => b.kind === "residential" || b.kind === "commercial")
+      .sort((p, q) => Math.hypot(p.i - bi, p.j - bj) - Math.hypot(q.i - bi, q.j - bj));
+    for (const b of candidates) {
+      const inBlock = lots.filter((l) => !l.landmark && (l.kind === "house" || l.kind === "flats" || l.kind === "shop") && l.plot.minX >= b.area.minX - 0.01 && l.plot.maxX <= b.area.maxX + 0.01 && l.plot.minZ >= b.area.minZ - 0.01 && l.plot.maxZ <= b.area.maxZ + 0.01);
+      if (!inBlock.length) continue;
+      const lot = inBlock.sort((p, q) => q.plot.maxX - q.plot.minX - (p.plot.maxX - p.plot.minX))[0]!;
+      lot.landmark = kind;
+      lot.floors = floors;
+      lot.fence = kind === "school" || kind === "fire" || kind === "police" || kind === "hospital";
+      lot.garage = false;
+      lot.roof = kind === "church" ? "gable" : "flat";
+      lot.storey = 3.4;
+      const f = lot.footprint;
+      lot.footprint = lot.facing === 0 ? rect(lot.plot.minX + 1.2, lot.plot.maxX - 1.2, f.minZ, f.maxZ) : rect(lot.plot.minX + 1.2, lot.plot.maxX - 1.2, f.minZ, f.maxZ);
+      landmarks.push({ id: `P${landmarks.length}`, kind, name, x: (lot.footprint.minX + lot.footprint.maxX) / 2, z: (lot.footprint.minZ + lot.footprint.maxZ) / 2, entrance: entranceOf(lot), lotId: lot.id });
+      return;
+    }
+  };
+  claim("police", "Central Police Station", 2, 1, 2);
+  claim("hospital", "General Hospital", 4, 2, 3);
+  claim("school", "Unity Primary School", 1, 2, 2);
+  claim("church", "Grace Chapel", 3, 1, 1);
+  claim("mosque", "Central Mosque", 5, 1, 1);
+  claim("fire", "Fire Station", 2, 5, 2);
+  claim("bank", "City Bank", 4, 5, 2);
+  claim("fuel", "Palm Fuel Station", 1, 5, 1);
+  claim("hotel", "Palm Court Hotel", 3, 5, 3);
+  const airportLot = lots.find((l) => l.landmark === "airport");
+  if (airportLot) landmarks.push({ id: `P${landmarks.length}`, kind: "airport", name: "Alexion International Airport", x: (airportLot.footprint.minX + airportLot.footprint.maxX) / 2, z: (airportLot.footprint.minZ + airportLot.footprint.maxZ) / 2, entrance: entranceOf(airportLot), lotId: airportLot.id });
+  landmarks.push({ id: `P${landmarks.length}`, kind: "market", name: "Central Market", x: 0, z: 0, entrance: { x: -34, z: 0 }, lotId: null });
+  const southZ = Math.max(...blocks.filter((b) => b.kind === "apron").map((b) => b.area.maxZ));
+  const runway = rect(-H + 4, H - 4, southZ - 11, southZ - 1);
+
   // Street trees and lamps along every road, kept clear of the junctions.
   const nearJunction = (t: number) => ROAD_CENTRES.some((c) => Math.abs(t - c) < half + 6);
   for (const c of ROAD_CENTRES) {
@@ -249,7 +319,7 @@ export function generateDistrict(seed = 1): District {
   }
 
   // Trees that landed on a building or the road are dropped (the random yard trees are not planned around lots).
-  const props: Prop[] = [];
+  const props: Prop[] = planeSpots.map((p, k) => ({ kind: "plane" as const, x: p.x, z: p.z, yaw: 0 as const, variant: k % 3 }));
   const wires: District["wires"] = [];
   const outerLimit = H - 8;
   const propBox = (x: number, z: number, r: number) => rect(x - r, x + r, z - r, z + r);
@@ -321,7 +391,7 @@ export function generateDistrict(seed = 1): District {
     return !lots.some((l) => overlaps(l.footprint, box, 1));
   });
 
-  return { seed, bounds, roads, sidewalks, blocks, lots, trees: keep, lamps, props: placed, wires, paving, fields, spawn: { x: ROAD_CENTRES[2]! + 0.5, z: ROAD_CENTRES[2]! + 12, yaw: 0 } };
+  return { seed, bounds, roads, sidewalks, blocks, lots, trees: keep, lamps, landmarks, runway, props: placed, wires, paving, fields, spawn: { x: ROAD_CENTRES[2]! + 0.5, z: ROAD_CENTRES[2]! + 12, yaw: 0 } };
 }
 
 // ---------------------------------------------------------------- chunks
@@ -373,7 +443,7 @@ export function walkBlockers(d: District): Rect[] {
   for (const t of d.trees) out.push(rect(t.x - 0.35, t.x + 0.35, t.z - 0.35, t.z + 0.35));
   for (const l of d.lamps) out.push(rect(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15));
   for (const p of d.props) {
-    const r = { pole: [0.15, 0.15], hydrant: [0.2, 0.2], bin: [0.3, 0.3], sign: [0.1, 0.1], bench: [0.9, 0.3], busStop: [1.5, 0.8], car: [0.95, 2.2] }[p.kind];
+    const r = { pole: [0.15, 0.15], hydrant: [0.2, 0.2], bin: [0.3, 0.3], sign: [0.1, 0.1], bench: [0.9, 0.3], busStop: [1.5, 0.8], car: [0.95, 2.2], plane: [4.8, 5.2] }[p.kind];
     const [hx, hz] = p.yaw === 90 ? [r[1]!, r[0]!] : [r[0]!, r[1]!];
     // A car is long along the road: yaw 0 means the road runs north-south (z), so its long side is z; the table above is (x, z) for yaw 0.
     out.push(rect(p.x - hx, p.x + hx, p.z - hz, p.z + hz));

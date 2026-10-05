@@ -265,7 +265,7 @@
 .pa-story { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 4px; padding: 14px; width: 100%; }
 .pa-story small { color: var(--muted); line-height: 1.4; }
 .pa-maps { position: relative; display: flex; flex-direction: column; }
-.pa-map { flex: 1; min-height: 0; width: 100%; display: block; }
+.pa-map { flex: 1; min-height: 0; width: 100%; position: relative; }
 .pa-sheet { position: relative; flex: none; max-height: 52%; overflow-y: auto; padding: 8px 14px 16px; border-radius: 22px 22px 0 0; background: var(--bg); box-shadow: 0 -8px 24px rgba(0, 0, 0, .18); display: grid; gap: 8px; scrollbar-width: none; }
 .pa-grabber { width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 4px; }
 .pa-place { all: unset; cursor: pointer; display: block; }

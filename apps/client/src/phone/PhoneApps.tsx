@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  BILL_PER_WEEK, CHARGERS, JOBS, PLACES, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS,
+  BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS,
   applyForJob, balance, beatById, bestCharger, billPerWeek, borrow, clockOf, contactsFor, deliveryFee, deposit, isPowerCut, itemPrice, loanLimit,
   markThreadRead, modelOf, newsFor, payBill, payRent, placeOrder, plug, powerCutOn, quitJob, repay, replyToThread, sendMoney, setAutoPay,
   setBankCharging, shopItemById, skillLevel, topUp, wallPower, withdraw,
@@ -8,6 +8,10 @@ import {
 } from "@thelife/game-core";
 import type { GameSession } from "../play/gameSession";
 import { Icon, type IconName } from "./icons";
+import DistrictMap from "../map/DistrictMap";
+import { getDistrict } from "../map/districtData";
+import { PIN_STYLE } from "../map/pins";
+import "../map/map.css";
 
 export type Act = (fn: (s: GameState) => PhoneResult) => PhoneResult;
 
@@ -455,39 +459,39 @@ export function News({ state }: { state: GameState }) {
 }
 
 export function Maps({ state }: { state: GameState }) {
-  const [pick, setPick] = useState(0);
-  const pins = [[50, 54], [28, 30], [74, 32], [70, 76], [24, 72], [84, 56]];
-  const where = state.profile?.hometown ? `Near ${state.profile.hometown}` : "Your area";
+  const district = getDistrict();
+  const [pick, setPick] = useState<string | null>(null);
+  const home = { x: district.spawn.x, z: district.spawn.z };
+  const dark = state.phone.model === "flagship";
+  const walk = (lm: { entrance: { x: number; z: number } }) => Math.round(Math.hypot(lm.entrance.x - home.x, lm.entrance.z - home.z));
+  const list = [...district.landmarks].sort((a, b) => walk(a) - walk(b));
+  const chosen = district.landmarks.find((l) => l.id === pick) ?? null;
   return (
     <div className="pa-maps">
-      <svg className="pa-map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of your area">
-        <rect width="100" height="100" fill="var(--map-land)" />
-        <path d="M-5 42 C25 36 55 52 105 44 L105 54 C60 62 28 46 -5 52z" fill="var(--map-water)" />
-        <g stroke="var(--map-road)" strokeLinecap="round" fill="none">
-          <path d="M0 22H100M0 66H100M0 88H100" strokeWidth="2.2" />
-          <path d="M36 0V100M62 0V100M86 0V100" strokeWidth="2.2" />
-          <path d="M0 0 100 100" strokeWidth="1.2" />
-        </g>
-        <g fill="var(--map-block)">
-          <rect x="40" y="25" width="19" height="14" rx="2" /><rect x="66" y="69" width="16" height="15" rx="2" /><rect x="6" y="70" width="26" height="14" rx="2" /><rect x="6" y="3" width="26" height="15" rx="2" />
-        </g>
-        {PLACES.map((p, i) => (
-          <g key={p.name} onClick={() => setPick(i)} style={{ cursor: "pointer" }}>
-            <circle cx={pins[i]![0]} cy={pins[i]![1]} r={i === pick ? 5 : 3.4} fill={i === 0 ? "#2f7bff" : "#e0594b"} stroke="#fff" strokeWidth="1.4" />
-          </g>
-        ))}
-      </svg>
+      <div className="pa-map">
+        <DistrictMap district={district} home={home} player={home} selected={pick} onSelect={setPick} dark={dark} />
+      </div>
       <div className="pa-sheet">
         <div className="pa-grabber" />
-        <p className="pa-section">{where}</p>
-        <div className="pa-group">
-          {PLACES.map((p, i) => (
-            <button key={p.name} className="pa-place" aria-pressed={pick === i} onClick={() => setPick(i)}>
-              <Row icon="maps" tone={i === 0 ? "#2f7bff" : "#e0594b"} title={p.name} sub={`${p.kind} · ${p.note}`} right={<small>{p.minutes === 0 ? "here" : `${p.minutes} min`}</small>} />
-            </button>
-          ))}
-        </div>
-        <p className="pa-fine">The full city map arrives later. This is what is close.</p>
+        {chosen ? (
+          <div className="pa-card-soft">
+            <span>{PIN_STYLE[chosen.kind].label}</span>
+            <strong>{chosen.name}</strong>
+            <small>{walk(chosen)} m from home · about {Math.max(1, Math.round(walk(chosen) / 90))} min on foot</small>
+            <Btn kind="soft" onClick={() => setPick(null)}>Back to places</Btn>
+          </div>
+        ) : (
+          <>
+            <p className="pa-section">Places around you</p>
+            <div className="pa-group">
+              {list.map((lm) => (
+                <button key={lm.id} className="pa-place" onClick={() => setPick(lm.id)}>
+                  <Row icon="maps" tone={PIN_STYLE[lm.kind].colour} title={lm.name} sub={PIN_STYLE[lm.kind].label} right={<small>{walk(lm)} m</small>} />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

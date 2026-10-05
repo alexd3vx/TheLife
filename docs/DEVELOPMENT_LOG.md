@@ -2,6 +2,12 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Named places, map pins and the drawn map, graphics quality
+- **Named places (district data + client):** an airport (terminal, control tower, hangars, parked planes, runway with markings along the south edge), police station, hospital (red cross, helipad), school, church (bell tower), mosque (dome and minarets), fire station (bay doors, hose tower), bank (columns), fuel station (canopy and pumps), hotel and the central market. Each is a lot in the generated data with its own look, a name and a front-door spot, so tests check that every entrance can be reached on foot.
+- **Map pins:** a teardrop marker with a symbol floats over every place in 3D (tap one: walk or run to its door), and a drawn map (`DistrictMap`, from the same data: blocks, roads, buildings, pins, you) shows as a corner minimap and a big map with zoom, drag, pick a place, walk there. The phone's LifeMaps now uses the same map with the places sorted by distance from home.
+- **Graphics quality (reported "not clear"):** the old adaptive mode could drop to 55% resolution. New: **Auto** never goes below one pixel per screen pixel and gives up shadow refreshes first, **High** never trades anything, **Low** renders at 75% with cheap shadows. A "Graphics" button in the house and the map cycles them and remembers the choice.
+- **Phone:** the status bar no longer pushes the battery under the camera cut-out (icons drop out on narrow phones), the dock fits narrow phones, and the home screen stays visible when an app closes.
+
 ## 2026-10-05 — Map step 2: streets, street furniture, night; phone drawer and recent apps
 - **Streets:** textured asphalt (grit, patches, cracks), paving-slab sidewalks (they now stop at crossings), concrete for the market and apron, zebra crossings on every junction arm, dashed centre lines and solid edge lines, low kerbs. All procedural, no downloads; built once as about ten draw calls.
 - **Street furniture and parked cars (district data + chunk meshes):** power poles with sagging overhead cables, fire hydrants, bins, benches, bus shelters, stop signs, and parked cars along the kerbs (never across a junction). They merge into the chunk mesh at full detail, so they add no draw calls; poles and car bodies also show at medium range. They block walking, and tests check they stay off plots, junctions and each other.

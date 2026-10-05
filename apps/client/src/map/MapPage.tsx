@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { loadManifest } from "../lab/manifest";
 import type { TapMenu } from "../play/runtime";
+import { getDistrict } from "./districtData";
+import DistrictMap from "./DistrictMap";
+import { PIN_STYLE } from "./pins";
+import { NEXT_QUALITY, QUALITY_LABEL, loadQuality, type Quality } from "../graphics";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -16,6 +20,10 @@ export default function MapPage() {
   const [touring, setTouring] = useState<number | null>(null);
   const [result, setResult] = useState<TourResult | null>(null);
   const [night, setNight] = useState(false);
+  const [bigMap, setBigMap] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [quality, setQuality] = useState<Quality>(loadQuality());
+  const district = getDistrict();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -81,6 +89,35 @@ export default function MapPage() {
         </div>
       )}
 
+      {stats && !bigMap && (
+        <button className="map-mini" onClick={() => setBigMap(true)} aria-label="Open the map">
+          <DistrictMap district={district} player={stats.position} compact />
+        </button>
+      )}
+      {bigMap && (
+        <>
+          <div className="map-big">
+            <DistrictMap district={district} player={stats?.position ?? null} selected={picked} onSelect={setPicked} />
+          </div>
+          <button className="map-close" onClick={() => setBigMap(false)}>Close map</button>
+          {picked && (() => {
+            const lm = district.landmarks.find((l) => l.id === picked)!;
+            const dist = stats ? Math.round(Math.hypot(lm.entrance.x - stats.position.x, lm.entrance.z - stats.position.z)) : 0;
+            return (
+              <div className="map-sheet">
+                <strong>{lm.name}</strong>
+                <span>{PIN_STYLE[lm.kind].label} · {dist} m away</span>
+                <div className="map-sheet-actions">
+                  <button onClick={() => { runtimeRef.current?.goTo(lm.id, "walk"); setBigMap(false); }}>Walk there</button>
+                  <button onClick={() => { runtimeRef.current?.goTo(lm.id, "run"); setBigMap(false); }}>Run there</button>
+                  <button className="is-ghost" onClick={() => setPicked(null)}>Back</button>
+                </div>
+              </div>
+            );
+          })()}
+        </>
+      )}
+
       {menu && (
         <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (containerRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, menu.y + 10) }}>
           {menu.options.map((o, i) => (
@@ -95,6 +132,8 @@ export default function MapPage() {
       <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
         <button onClick={() => runtimeRef.current?.zoomOut()}>Whole district</button>
+        <button onClick={() => setBigMap(true)}>Map</button>
+        <button onClick={() => { const q = NEXT_QUALITY[quality]; runtimeRef.current?.setQuality(q); setQuality(q); }} title="Graphics quality">Graphics: {QUALITY_LABEL[quality]}</button>
         <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day" : "Night"}</button>
         <button onClick={runTour} disabled={touring !== null}>
           {touring === null ? "Run the performance tour" : `Touring… ${touring}%`}

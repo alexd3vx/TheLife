@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Prop } from "@thelife/game-core";
 import type { MeshBuilder } from "./meshBuilder";
+import { addPlane } from "./landmarks";
 
 const C = (hex: string) => new THREE.Color(hex);
 const CAR_COLOURS = ["#c9ced4", "#2d3a4f", "#a63a32", "#d8d4c6", "#3d5f48", "#1c1f24"].map(C);
@@ -61,6 +62,9 @@ export function addProp(b: MeshBuilder, p: Prop, full: boolean): void {
       if (!full) return;
       boxAt(b, p.x, p.z, 0, 0, 2.6, 0.07, 0.07, STEEL);
       boxAt(b, p.x, p.z, 0, 2.05, 2.65, 0.55, 0.05, SIGN_RED);
+      return;
+    case "plane":
+      addPlane(b, p.x, p.z, p.variant, full);
       return;
     case "car": {
       // yaw 0: the car's long side runs along z.
