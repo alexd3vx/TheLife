@@ -1,0 +1,286 @@
+import { ACTIONS, ECONOMY, skillPayMultiplier } from "./actions";
+import { MINT, PLAYER, SINK, balance, createLedger, transfer } from "./ledger";
+import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./needs";
+import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
+
+const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped"
+
+const WARNINGS: Record<NeedId, string> = {
+  hunger: "You're getting hungry.",
+  energy: "You're getting tired.",
+  hygiene: "You could use a shower.",
+  bladder: "You really need the toilet!",
+  fun: "You're bored.",
+};
+
+export function createGameState(): GameState {
+  const ledger = createLedger();
+  transfer(ledger, MINT, PLAYER, ECONOMY.startingMoney, "Starting money", 0);
+  return {
+    version: 1,
+    minute: 8 * 60, // Day 1, 08:00
+    needs: createNeeds(),
+    ledger,
+    inventory: { portions: 3, meals: 0 },
+    skills: {},
+    incomeCarry: 0,
+    rentOwed: 0,
+    lastRentDay: 0,
+    warned: {},
+    stats: { daysSurvived: 0, totalEarned: 0, totalSpent: 0, timesPassedOut: 0 },
+  };
+}
+
+export interface ActiveAction {
+  def: ActionDef;
+  /** Game minutes done so far. */
+  done: number;
+  forced: boolean;
+}
+
+export type StartResult = { ok: true } | { ok: false; reason: string };
+
+export interface ClockInfo {
+  day: number;
+  hour: number;
+  minute: number;
+  /** Hours as a fraction, 0-24. */
+  hourFloat: number;
+  label: string;
+}
+
+export function clockOf(minute: number): ClockInfo {
+  const day = Math.floor(minute / DAY_MINUTES) + 1;
+  const inDay = minute % DAY_MINUTES;
+  const hour = Math.floor(inDay / 60);
+  const min = Math.floor(inDay % 60);
+  return { day, hour, minute: min, hourFloat: inDay / 60, label: `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}` };
+}
+
+export interface StepResult {
+  /** Game minutes that passed. */
+  minutes: number;
+  /** Set when an action ended during this step. */
+  finished: ActiveAction | null;
+}
+
+export class Sim {
+  state: GameState;
+  active: ActiveAction | null = null;
+  private events: SimEvent[] = [];
+  /** Offline catch-up softens decay and removes accidents; see simulateAbsence. */
+  offline = false;
+
+  constructor(state?: GameState) {
+    this.state = state ?? createGameState();
+  }
+
+  get clock(): ClockInfo {
+    return clockOf(this.state.minute);
+  }
+
+  get money(): number {
+    return balance(this.state.ledger);
+  }
+
+  drainEvents(): SimEvent[] {
+    const out = this.events;
+    this.events = [];
+    return out;
+  }
+
+  private emit(kind: SimEventKind, text: string) {
+    this.events.push({ kind, text, minute: this.state.minute });
+  }
+
+  // -------------------------------------------------------------- starting and stopping actions
+
+  canStart(actionId: string): StartResult {
+    const def = ACTIONS[actionId];
+    if (!def) return { ok: false, reason: "Unknown activity." };
+    const { needs, inventory } = this.state;
+    if (def.blockedIf && needs[def.blockedIf.need] >= def.blockedIf.atLeast) return { ok: false, reason: def.blockedIf.message };
+    if (def.needsAtLeast && needs[def.needsAtLeast.need] < def.needsAtLeast.atLeast) return { ok: false, reason: def.needsAtLeast.message };
+    if (def.cost?.portions && inventory.portions < def.cost.portions) {
+      return { ok: false, reason: def.id === "snack" ? "The fridge is empty. Order groceries first." : `Not enough ingredients (need ${def.cost.portions}). Order groceries first.` };
+    }
+    if (def.cost?.meals && inventory.meals < def.cost.meals) return { ok: false, reason: "There's no cooked meal. Cook something first." };
+    if (def.cost?.money && this.money < def.cost.money) return { ok: false, reason: "Not enough money." };
+    return { ok: true };
+  }
+
+  start(actionId: string, forced = false): StartResult {
+    const check = forced ? ({ ok: true } as const) : this.canStart(actionId);
+    if (!check.ok) return check;
+    if (this.active) this.cancel();
+    const def = ACTIONS[actionId]!;
+    if (def.cost?.portions) this.state.inventory.portions -= def.cost.portions;
+    if (def.cost?.meals) this.state.inventory.meals -= def.cost.meals;
+    this.active = { def, done: 0, forced };
+    return { ok: true };
+  }
+
+  /** Stops the current action. Effects so far are kept; nothing is refunded and nothing is granted at the end. */
+  cancel(): void {
+    this.active = null;
+  }
+
+  // -------------------------------------------------------------- shop
+
+  buyGroceries(): StartResult {
+    const result = transfer(this.state.ledger, PLAYER, SINK, ECONOMY.groceriesPrice, "Groceries", this.state.minute);
+    if (!result.ok) return { ok: false, reason: `Groceries cost ₦${ECONOMY.groceriesPrice.toLocaleString()}. You don't have enough.` };
+    this.state.inventory.portions += ECONOMY.groceriesPortions;
+    this.state.stats.totalSpent += ECONOMY.groceriesPrice;
+    this.emit("info", `Ordered groceries: +${ECONOMY.groceriesPortions} portions (−₦${ECONOMY.groceriesPrice.toLocaleString()}).`);
+    return { ok: true };
+  }
+
+  // -------------------------------------------------------------- time
+
+  /** Advance by real seconds of play. Returns the game minutes that passed and any action that finished. */
+  step(realSeconds: number): StepResult {
+    const rate = this.active ? this.active.def.minutesPerSecond : FREE_MINUTES_PER_SECOND;
+    let minutes = realSeconds * rate;
+    let finished: ActiveAction | null = null;
+    if (this.active) {
+      const remaining = this.active.def.minutes - this.active.done;
+      if (minutes >= remaining) minutes = remaining;
+    }
+    if (minutes > 0) finished = this.advance(minutes);
+    return { minutes, finished };
+  }
+
+  /** Advance by game minutes (in small slices so rent, warnings and needs stay accurate). */
+  advance(gameMinutes: number): ActiveAction | null {
+    let left = gameMinutes;
+    let finished: ActiveAction | null = null;
+    while (left > 1e-9) {
+      const slice = Math.min(left, 10);
+      left -= slice;
+      this.applySlice(slice);
+      const done = this.checkFinished();
+      if (done) {
+        finished = done;
+        break;
+      }
+    }
+    return finished;
+  }
+
+  private checkFinished(): ActiveAction | null {
+    const act = this.active;
+    if (!act) return null;
+    const reachedTime = act.done >= act.def.minutes - 1e-6;
+    const until = act.def.until;
+    const reachedGoal = until ? this.state.needs[until.need] >= until.atLeast - 1e-6 : false;
+    if (!reachedTime && !reachedGoal) return null;
+    if (act.def.gives?.meals) {
+      this.state.inventory.meals += act.def.gives.meals;
+      this.emit("good", "Your meal is ready.");
+    }
+    this.active = null;
+    return act;
+  }
+
+  private applySlice(minutes: number) {
+    const s = this.state;
+    const act = this.active;
+    const hours = minutes / 60;
+
+    for (const id of NEED_IDS) {
+      const decayScale = (act?.def.decay?.[id] ?? 1) * (this.offline ? 0.5 : 1);
+      let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale;
+      if (act) perHour += ((act.def.needs[id] ?? 0) / act.def.minutes) * 60;
+      if (id === "energy" && s.needs.hunger <= 0) perHour -= 3; // starving drains energy
+      s.needs[id] = clampNeed(s.needs[id] + perHour * hours);
+    }
+
+    if (act) {
+      act.done += minutes;
+      if (act.def.incomePerHour) this.earn(act.def.incomePerHour * performance(s.needs) * skillPayMultiplier(s.skills.computer ?? 0) * hours);
+      if (act.def.skill) {
+        const before = Math.floor(Math.sqrt((s.skills[act.def.skill.id] ?? 0) / 8));
+        s.skills[act.def.skill.id] = (s.skills[act.def.skill.id] ?? 0) + act.def.skill.xpPerHour * hours;
+        const after = Math.floor(Math.sqrt(s.skills[act.def.skill.id]! / 8));
+        if (after > before) this.emit("good", `Your ${act.def.skill.id} skill reached level ${after}.`);
+      }
+    }
+
+    const previousDay = Math.floor(s.minute / DAY_MINUTES);
+    s.minute += minutes;
+    if (Math.floor(s.minute / DAY_MINUTES) > previousDay) s.stats.daysSurvived += 1;
+
+    this.checkNeeds();
+    this.checkRent();
+  }
+
+  private earn(amount: number) {
+    const s = this.state;
+    s.incomeCarry += amount;
+    const whole = Math.floor(s.incomeCarry);
+    if (whole >= 1) {
+      s.incomeCarry -= whole;
+      transfer(s.ledger, MINT, PLAYER, whole, "Freelance pay", s.minute);
+      s.stats.totalEarned += whole;
+    }
+  }
+
+  private checkNeeds() {
+    const s = this.state;
+    for (const id of NEED_IDS) {
+      if (s.needs[id] < 25 && !s.warned[id] && !(this.offline && id !== "hunger")) {
+        s.warned[id] = true;
+        this.emit("warn", WARNINGS[id]);
+      } else if (s.needs[id] >= 40) {
+        s.warned[id] = false;
+      }
+    }
+    if (this.offline) return;
+
+    if (s.needs.bladder <= 0 && this.active?.def.id !== "toilet") {
+      s.needs.bladder = 60;
+      s.needs.hygiene = clampNeed(s.needs.hygiene - 25);
+      s.needs.fun = clampNeed(s.needs.fun - 10);
+      this.emit("bad", "You didn't make it to the toilet in time. How embarrassing.");
+    }
+    if (s.needs.energy <= 0 && this.active?.def.id !== "passout" && this.active?.def.id !== "sleep") {
+      s.stats.timesPassedOut += 1;
+      this.emit("bad", "You collapsed from exhaustion.");
+      this.start("passout", true);
+    }
+  }
+
+  // -------------------------------------------------------------- rent
+
+  private evictionWarned = false;
+
+  private checkRent() {
+    const s = this.state;
+    const day = Math.floor(s.minute / DAY_MINUTES) + 1;
+    const hourOfDay = (s.minute % DAY_MINUTES) / 60;
+    const due = day % ECONOMY.rentDay === 0 && day > s.lastRentDay && hourOfDay >= ECONOMY.rentHour;
+
+    if (due) {
+      s.lastRentDay = day;
+      s.rentOwed += ECONOMY.rentPerWeek;
+      this.emit("warn", `Rent is due: ₦${ECONOMY.rentPerWeek.toLocaleString()}.`);
+    }
+    if (s.rentOwed > 0 && this.money > 0) {
+      const pay = Math.min(this.money, s.rentOwed);
+      transfer(s.ledger, PLAYER, SINK, pay, "Rent", s.minute);
+      s.rentOwed -= pay;
+      s.stats.totalSpent += pay;
+      if (s.rentOwed === 0) this.emit("info", `Rent paid (₦${pay.toLocaleString()}).`);
+    }
+    if (due && s.rentOwed > 0) {
+      s.rentOwed += ECONOMY.lateFee;
+      this.emit("bad", `You couldn't cover the rent. ₦${s.rentOwed.toLocaleString()} is owed, including a late fee.`);
+    }
+    if (s.rentOwed >= ECONOMY.rentPerWeek * 2 && !this.evictionWarned) {
+      this.evictionWarned = true;
+      this.emit("bad", "Your landlord has sent an eviction warning.");
+    }
+    if (s.rentOwed === 0) this.evictionWarned = false;
+  }
+}
