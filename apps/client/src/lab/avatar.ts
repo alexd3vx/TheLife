@@ -8,6 +8,7 @@ import { fabricTexture, type FabricId } from "./procedural/fabrics";
 import { buildGarment, isProceduralGarment } from "./procedural/garments";
 import { buildHair } from "./procedural/hair";
 import { hairTexture } from "./procedural/hairTextures";
+import { buildLifeClips } from "./procedural/lifeClips";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
 type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment";
@@ -57,6 +58,7 @@ export class Avatar {
   private mixer: THREE.AnimationMixer | null = null;
   private currentAction: THREE.AnimationAction | null = null;
   private clips = new Map<string, THREE.AnimationClip>();
+  private libraryClips = new Map<string, THREE.AnimationClip>();
   private builtInBrows: THREE.Object3D[] = [];
   private loadToken = 0;
   look: Look;
@@ -120,12 +122,24 @@ export class Avatar {
     this.applyBuiltInBrows();
     await this.syncParts();
     if (token !== this.loadToken) return;
+    this.addLifeClips();
     if (wasPlaying) this.play(wasPlaying, 0);
   }
 
   private async loadAnimations(): Promise<void> {
     const gltf = await loadGLTF(assetUrl(this.asset("ual1").file));
+    this.libraryClips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
     for (const clip of gltf.animations) this.clips.set(clip.name, clip);
+    this.addLifeClips();
+  }
+
+  /** Everyday-life clips (sleep, eat, type...) are built against this body's bind pose. */
+  private addLifeClips(): void {
+    if (!this.bodyScene || !this.skeleton || this.libraryClips.size === 0) return;
+    const bones = new Map<string, THREE.Bone>(this.skeleton.bones.map((b) => [b.name, b]));
+    const playing = this.currentAction?.getClip().name;
+    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) this.clips.set(clip.name, clip);
+    if (playing) this.play(playing, 0);
   }
 
   async setLook(patch: Partial<Look>): Promise<void> {

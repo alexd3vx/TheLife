@@ -2,6 +2,12 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Everyday-life animations (roadmap stage 2, first pass)
+- Audit of the 43 CC0 clips: sitting, talking, interact, pick-up, driving, dancing already exist. Missing life-sim actions were authored in code: sleep, eat (seated + standing), drink, type, phone, wave, cook (8 clips, `procedural/lifeClips.ts`). 51 clips total, available in the Lab on both bodies.
+- Method: base clip (Idle/Sitting) + keyframed joint offsets. First attempt assumed fixed hinge axes and posed elbows sideways; fixed by measuring on the posed skeleton which local axis moves the hand toward a goal direction.
+- Verified in a browser: eat reaches the mouth, type puts hands at keyboard height, sleep lies flat with straight legs, cook works on the female body. Wave and phone are approximate (see polish list in `ASSET_PIPELINE.md`).
+- Next: the map (district layout, lots, tap-to-move with pathfinding, interactions with objects).
+
 ## 2026-10-05 — African hairstyles and modern clothing (procedural)
 - Hair generated in code and rigidly attached to the head: low fade, afro, afro puffs, cornrows, box braids, locs, top bun, head wrap. Fits both bodies by measuring the body's own head.
 - Garments cut from the body mesh with plane clipping (`geometryClip.ts`): T-shirt, tank top, long sleeve, kaftan, shorts, trousers, sneakers. They share the body skeleton, so they animate correctly. Fabrics: plain, stripes, ankara print, denim, tinted by any of 13 colours.

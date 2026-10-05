@@ -6,6 +6,8 @@ export interface BodyRest {
   geometry: THREE.BufferGeometry;
   /** Joint position by bone name, in the mesh's local space. */
   joint: Map<string, THREE.Vector3>;
+  /** Joint rotation by bone name in the bind pose (world, mesh-local space). */
+  jointQuat: Map<string, THREE.Quaternion>;
   /** Dominant bone index for each vertex. */
   vertexBone: Uint16Array;
   boneIndex: Map<string, number>;
@@ -16,16 +18,19 @@ export interface BodyRest {
 export function readBodyRest(mesh: THREE.SkinnedMesh, pristine: THREE.BufferGeometry, vertexBone: Uint16Array): BodyRest {
   const skeleton = mesh.skeleton;
   const joint = new Map<string, THREE.Vector3>();
+  const jointQuat = new Map<string, THREE.Quaternion>();
   const boneIndex = new Map<string, number>();
   skeleton.bones.forEach((bone, i) => {
     boneIndex.set(bone.name, i);
     const world = new THREE.Matrix4().copy(skeleton.boneInverses[i]!).invert();
     const local = new THREE.Matrix4().multiplyMatrices(mesh.bindMatrixInverse, world);
     joint.set(bone.name, new THREE.Vector3().setFromMatrixPosition(local));
+    jointQuat.set(bone.name, new THREE.Quaternion().setFromRotationMatrix(local));
   });
   return {
     geometry: pristine,
     joint,
+    jointQuat,
     vertexBone,
     boneIndex,
     toBoneSpace(name) {

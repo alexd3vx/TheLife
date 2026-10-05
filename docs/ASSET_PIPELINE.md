@@ -67,6 +67,13 @@ The free packs have no African hairstyles and no modern clothing, so these are g
 
 Limits: garments are body-hugging plus a few mm (kaftan is looser but follows the legs, so it reads as a short dress); no skirts or long flowing garments (need cloth simulation or a skinned mesh made by an artist); braids/locs are rigid on the head, so they don't swing and may touch the shoulders; sneakers are a simple shell without a separate sole.
 
+## Animation
+
+- **Library clips (43, CC0):** idle, walk, jog, sprint, crouch, sit (enter/idle/talk/exit), talk, interact, pick up, fix (kneeling), push, drive, dance, jump, swim, combat, spell casting, death.
+- **Everyday-life clips (made in code, `procedural/lifeClips.ts`):** `Life_Sleep_Loop` (lying on the back, legs straight, breathing), `Life_Eat_Loop` (seated), `Life_Eat_Standing_Loop`, `Life_Drink_Loop`, `Life_Type_Loop` (hands at a keyboard, alternating taps), `Life_Phone_Loop`, `Life_Wave_Loop`, `Life_Cook_Loop` (stirring).
+- **How they're built:** start from an Idle or Sitting clip (keeps breathing and sway), then add or replace motion on a few joints. Joint axes differ between rigs, so each bend is chosen by posing the real skeleton and testing which local axis moves the hand toward a goal direction (forward, up). Works on both bodies.
+- **Polish list:** the phone clip holds the hand near the chin rather than the ear; the wave is a raised-arm greeting without a convincing hand wobble; no hands/fingers poses; no facial expressions; no lying-down transitions (get in/out of bed); no sit-down/stand-up blend onto arbitrary chairs yet (that arrives with the map and object interactions).
+
 ## Character system
 
 One shared 65-bone skeleton. A person is assembled from parts that are all bound to the body's skeleton **by bone name** at runtime (`apps/client/src/lab/avatar.ts`):
