@@ -5,6 +5,15 @@ export class MeshBuilder {
   private readonly pos: number[] = [];
   private readonly col: number[] = [];
   private readonly uv: number[] = [];
+  private readonly lotIds: number[] = [];
+  private currentLot = -1;
+  private tagged = false;
+
+  /** Tags everything added from now on with a building number (used to hide one building's roof when someone is inside). */
+  setLot(id: number): void {
+    this.currentLot = id;
+    this.tagged = true;
+  }
 
   get triangles(): number {
     return this.pos.length / 9;
@@ -12,6 +21,7 @@ export class MeshBuilder {
 
   tri(a: THREE.Vector3Like, b: THREE.Vector3Like, c: THREE.Vector3Like, ca: THREE.Color, cb = ca, cc = ca): void {
     this.pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    this.lotIds.push(this.currentLot, this.currentLot, this.currentLot);
     this.col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b);
   }
 
@@ -64,6 +74,7 @@ export class MeshBuilder {
     for (let i = 0; i < p.count; i++) {
       const lit = 0.8 + 0.25 * Math.max(0, n.getY(i));
       this.pos.push(p.getX(i), p.getY(i), p.getZ(i));
+      this.lotIds.push(this.currentLot);
       this.col.push(color.r * lit, color.g * lit, color.b * lit);
     }
     g.dispose();
@@ -74,6 +85,7 @@ export class MeshBuilder {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.tagged) g.setAttribute("lotId", new THREE.Float32BufferAttribute(this.lotIds, 1));
     if (this.uv.length && this.uv.length / 2 === this.pos.length / 3) g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
     g.computeVertexNormals(); // non-indexed: one normal per face, so flat shading
     g.computeBoundingSphere();

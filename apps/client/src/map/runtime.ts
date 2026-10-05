@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { blockRect, createNavGrid } from "@thelife/shared";
-import { walkBlockers, DISTRICT_HALF } from "@thelife/game-core";
+import { blockRectCentres, createNavGrid } from "@thelife/shared";
+import { walkBlockers, hasInterior, generatePlan, DISTRICT_HALF } from "@thelife/game-core";
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
@@ -10,7 +10,7 @@ import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
-import { buildGroundDetail } from "./chunkBuilder";
+import { buildGroundDetail, capHide } from "./chunkBuilder";
 import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 
@@ -54,6 +54,7 @@ export interface MapRuntime {
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
     landmarks: import("@thelife/game-core").Landmark[];
+    houses(): { id: string; floors: number; garage: boolean; facing: number; inside: { x: number; z: number }; kind: string }[];
     state(): CharacterController["state"];
     night(): boolean;
   };
@@ -137,8 +138,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(streamer.root);
 
   // Walking: a 1 m navigation grid from the same data the server will have.
-  const nav = createNavGrid(district.bounds, 1);
-  for (const r of walkBlockers(district)) blockRect(nav, r, 0.45);
+  const interiorLots = district.lots.filter(hasInterior);
+  const nav = createNavGrid(district.bounds, 0.5);
+  for (const r of walkBlockers(district)) blockRectCentres(nav, r, 0.25);
   // Keep the playable area's outer ring walkable but not the void beyond it.
 
   const avatar = new Avatar(manifest, loadSavedLook());
@@ -314,6 +316,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     controller.update(dt);
     avatar.update(dt);
     streamer.update(controller.position.x, controller.position.z);
+    // Take the roof off the building the player is standing in, so its rooms can be seen.
+    const px = controller.position.x, pz = controller.position.z;
+    const inside = interiorLots.find((l) => px > l.footprint.minX - 0.3 && px < l.footprint.maxX + 0.3 && pz > l.footprint.minZ - 0.3 && pz < l.footprint.maxZ + 0.3);
+    capHide.value = inside ? Number(inside.id.slice(1)) : -1;
 
     // Shadows follow the player, snapped to the shadow-map texels so they don't shimmer.
     const texel = (span * 2) / shadowSize;
@@ -448,6 +454,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       tapGround: (x, z) => controller.tapGround(x, z),
       streamer,
       landmarks: district.landmarks,
+      houses: () => interiorLots.map((l) => ({ id: l.id, floors: l.floors, garage: l.garage, facing: l.facing, inside: generatePlan(l).inside, kind: l.kind })),
       state: () => controller.state,
       night: () => night,
     },

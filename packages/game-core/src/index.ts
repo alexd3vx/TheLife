@@ -11,3 +11,4 @@ export * from "./traits.js";
 export * from "./phone.js";
 export * from "./phoneData.js";
 export * from "./district.js";
+export * from "./buildingPlan.js";

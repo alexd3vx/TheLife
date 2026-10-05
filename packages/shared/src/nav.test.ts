@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockOutside, blockRect, createNavGrid, findPath, isFree, nearestFree, pathLength } from "./nav.js";
+import { blockOutside, blockRect, blockRectCentres, createNavGrid, findPath, isFree, nearestFree, pathLength } from "./nav.js";
 
 const bounds = { minX: 0, maxX: 10, minZ: 0, maxZ: 10 };
 
@@ -50,5 +50,20 @@ describe("grid helpers", () => {
     blockOutside(grid, { minX: 2, maxX: 8, minZ: 2, maxZ: 8 });
     expect(isFree(grid, 1, 1)).toBe(false);
     expect(isFree(grid, 5, 5)).toBe(true);
+  });
+});
+
+describe("blockRectCentres", () => {
+  it("leaves a doorway as wide as the gap minus the walker's radius walkable on a coarse grid", () => {
+    const grid = createNavGrid({ minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, 0.5);
+    // A wall along x at z = 5 with a 1.2 m door from x = 4.3 to 5.5, 0.2 m thick.
+    blockRectCentres(grid, { minX: 0, maxX: 4.3, minZ: 4.9, maxZ: 5.1 }, 0.25);
+    blockRectCentres(grid, { minX: 5.5, maxX: 10, minZ: 4.9, maxZ: 5.1 }, 0.25);
+    const route = findPath(grid, { x: 5, z: 1 }, { x: 5, z: 9 });
+    expect(route).not.toBeNull();
+    // Without the door the way is shut.
+    const shut = createNavGrid({ minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, 0.5);
+    blockRectCentres(shut, { minX: 0, maxX: 10, minZ: 4.9, maxZ: 5.1 }, 0.25);
+    expect(findPath(shut, { x: 5, z: 1 }, { x: 5, z: 9 })).toBeNull();
   });
 });

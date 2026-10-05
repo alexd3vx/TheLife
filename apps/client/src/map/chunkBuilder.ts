@@ -1,7 +1,8 @@
 import * as THREE from "three";
-import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, type ChunkData, type District, type Facing, type Lamp, type Lot, type Rect } from "@thelife/game-core";
+import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, generatePlan, hasInterior, type ChunkData, type District, type Facing, type Lamp, type Lot, type Rect } from "@thelife/game-core";
 import { MeshBuilder } from "./meshBuilder";
 import { addProp } from "./props";
+import { addInterior } from "./interior";
 import { LANDMARK_WALL, addHangar, addLandmark } from "./landmarks";
 import { asphaltTexture, concreteTexture, glowTexture, pavingTexture } from "./groundTextures";
 
@@ -23,6 +24,24 @@ const POLE = C("#4a4f55");
 export const buildingMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
 /** The lamp heads glow at night (emissive); the poles are part of the chunk mesh. */
 export const lampMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: new THREE.Color("#ffd58a"), emissiveIntensity: 0 });
+/**
+ * Roofs and upper floors of buildings with interiors. Every vertex carries its building's number, and one shared value
+ * (`capHide`) says which building to hide, so the roof comes off the building the player is standing in.
+ */
+export const capHide = { value: -1 };
+function patchHide(material: THREE.Material) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uHideLot = capHide;
+    shader.vertexShader = `attribute float lotId;\nvarying float vLotId;\n${shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLotId = lotId;")}`;
+    shader.fragmentShader = `uniform float uHideLot;\nvarying float vLotId;\n${shader.fragmentShader.replace("void main() {", "void main() {\nif (abs(vLotId - uHideLot) < 0.5) discard;")}`;
+  };
+  material.customProgramCacheKey = () => "cap-hide";
+}
+export const capMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+patchHide(capMaterial);
+const capDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+patchHide(capDepthMaterial);
+
 export const treeMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
 
 import { V, wallRect } from "./wall";
@@ -56,7 +75,7 @@ function addRoof(b: MeshBuilder, lot: Lot, top: number, lod: Lod) {
   }
 }
 
-function addBuilding(b: MeshBuilder, lot: Lot, lod: Lod) {
+function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
   const f = lot.footprint;
   const height = lot.floors * lot.storey;
   if (lot.kind === "stall") {
@@ -68,6 +87,13 @@ function addBuilding(b: MeshBuilder, lot: Lot, lod: Lod) {
     b.box(f.minX + 0.2, 0, f.minZ + 0.2, f.maxX - 0.2, 1.0, f.maxZ - 0.2, C("#a57a52")); // counter
     for (const [x, z] of [[f.minX, f.minZ], [f.maxX - 0.15, f.minZ], [f.minX, f.maxZ - 0.15], [f.maxX - 0.15, f.maxZ - 0.15]] as const) b.box(x, 0, z, x + 0.15, 2.4, z + 0.15, POLE);
     b.box(f.minX - 0.2, 2.4, f.minZ - 0.2, f.maxX + 0.2, 2.6, f.maxZ + 0.2, canopy);
+    return;
+  }
+  if (lod === 0 && hasInterior(lot)) {
+    // A real interior: ground floor in the chunk mesh, upper floors and roof in the hideable cap.
+    cap.setLot(Number(lot.id.slice(1)));
+    addInterior(b, cap, lot, generatePlan(lot), WALLS[lot.colour % WALLS.length]!);
+    addRoof(cap, lot, height, lod);
     return;
   }
   const wall = lot.landmark ? LANDMARK_WALL[lot.landmark] : lot.kind === "terminal" ? C("#d9dde0") : lot.kind === "hangar" ? C("#9aa3ab") : WALLS[lot.colour % WALLS.length]!;
@@ -232,7 +258,8 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
   const geometries: THREE.BufferGeometry[] = [];
   let triangles = 0;
   const b = new MeshBuilder();
-  for (const lot of chunk.lots) addBuilding(b, lot, lod);
+  const cap = new MeshBuilder();
+  for (const lot of chunk.lots) addBuilding(b, cap, lot, lod);
   if (lod <= 1) for (const p of chunk.props) addProp(b, p, lod === 0);
   if (lod === 0) for (const l of chunk.lamps) b.box(l.x - 0.06, 0, l.z - 0.06, l.x + 0.06, 6.2, l.z + 0.06, POLE, 0.9);
   const geo = b.build();
@@ -243,6 +270,16 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
     group.add(mesh);
     geometries.push(geo);
     triangles += b.triangles;
+  }
+  const capGeo = cap.build();
+  if (capGeo) {
+    const mesh = new THREE.Mesh(capGeo, capMaterial);
+    mesh.customDepthMaterial = capDepthMaterial;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    geometries.push(capGeo);
+    triangles += cap.triangles;
   }
   if (lod <= 1 && chunk.trees.length) {
     group.add(instancedTrees(chunk.trees, lod === 0));

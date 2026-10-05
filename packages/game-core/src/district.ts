@@ -1,3 +1,5 @@
+import { generatePlan, hasInterior, planBlockers } from "./buildingPlan.js";
+
 // The neighbourhood as data: roads, lots, trees, lamps. A deterministic generator turns a seed into the same district
 // everywhere (the browser today, the server later), and a chunk index lets the renderer stream it in square pieces.
 // Pure data and functions: no rendering, no browser APIs. Coordinates are metres on the ground plane (x east, z south).
@@ -439,7 +441,10 @@ export function indexChunks(d: District): Map<string, ChunkData> {
 /** Things a walking character can't pass: buildings, fences' footprints are the plots' edges (kept simple), tree trunks. */
 export function walkBlockers(d: District): Rect[] {
   const out: Rect[] = [];
-  for (const l of d.lots) out.push(l.footprint);
+  for (const l of d.lots) {
+    if (hasInterior(l)) out.push(...planBlockers(generatePlan(l)));
+    else out.push(l.footprint);
+  }
   for (const t of d.trees) out.push(rect(t.x - 0.35, t.x + 0.35, t.z - 0.35, t.z + 0.35));
   for (const l of d.lamps) out.push(rect(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15));
   for (const p of d.props) {

@@ -46,6 +46,22 @@ export function blockRect(grid: NavGrid, rect: Rect, inflate = 0): void {
   }
 }
 
+/**
+ * Like blockRect, but a cell is blocked only when its centre falls inside the rectangle grown by `inflate`. Thin walls
+ * and doorways then keep a free corridor of at least one cell, so a 1.2 m door stays walkable on a 0.5 m grid.
+ */
+export function blockRectCentres(grid: NavGrid, rect: Rect, inflate = 0): void {
+  const [x0, z0] = toCell(grid, rect.minX - inflate, rect.minZ - inflate);
+  const [x1, z1] = toCell(grid, rect.maxX + inflate, rect.maxZ + inflate);
+  for (let cz = Math.max(0, z0); cz <= Math.min(grid.height - 1, z1); cz++) {
+    for (let cx = Math.max(0, x0); cx <= Math.min(grid.width - 1, x1); cx++) {
+      const x = grid.minX + (cx + 0.5) * grid.cell;
+      const z = grid.minZ + (cz + 0.5) * grid.cell;
+      if (x > rect.minX - inflate && x < rect.maxX + inflate && z > rect.minZ - inflate && z < rect.maxZ + inflate) grid.blocked[cz * grid.width + cx] = 1;
+    }
+  }
+}
+
 /** Blocks everything outside `rect`, so characters can't walk off the playable area. */
 export function blockOutside(grid: NavGrid, rect: Rect, inflate = 0): void {
   for (let cz = 0; cz < grid.height; cz++) {
