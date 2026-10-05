@@ -1,0 +1,81 @@
+/* Alexion Studios splash and loading screen. Dark, warm, matches the game's palette. */
+.boot {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(70% 55% at 50% 42%, #2a1c10 0%, #14110f 62%, #0c0a08 100%);
+  color: var(--text); transition: opacity .6s ease;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+.boot-leaving { opacity: 0; pointer-events: none; }
+.boot-credit {
+  position: absolute; bottom: max(14px, env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center;
+  font-size: .72rem; letter-spacing: .22em; text-transform: uppercase; color: var(--text-muted); opacity: .7;
+}
+
+/* ---- brand */
+.boot-brand {
+  display: grid; justify-items: center; gap: 18px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+  width: 100%; height: 100%; align-content: center;
+}
+.boot-mark { width: 104px; height: 104px; overflow: visible; filter: drop-shadow(0 0 18px rgba(242, 164, 58, .35)); }
+.boot-mark path { fill: none; stroke: url(#boot-grad); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.boot-mark-a { animation: boot-draw 1s .15s cubic-bezier(.6, .1, .2, 1) forwards; }
+.boot-mark-bar { animation: boot-draw .5s .95s ease forwards; }
+.boot-mark-orbit { stroke-width: 3 !important; animation: boot-draw .9s 1.2s ease forwards; }
+.boot-mark-dot { fill: #ffd27a; opacity: 0; animation: boot-pop .4s 1.1s ease forwards; transform-origin: 50px 14px; }
+.boot-brand-name {
+  font-family: var(--font-display); font-weight: 600; font-size: clamp(1.3rem, 5vw, 1.9rem); letter-spacing: .38em; text-transform: uppercase;
+  padding-left: .38em; opacity: 0; animation: boot-rise .9s 1.5s ease forwards;
+}
+.boot-brand-sub { font-size: .8rem; letter-spacing: .3em; text-transform: uppercase; color: var(--text-muted); opacity: 0; animation: boot-rise .8s 2.1s ease forwards; }
+
+@keyframes boot-draw { to { stroke-dashoffset: 0; } }
+@keyframes boot-pop { 0% { opacity: 0; transform: scale(.2); } 70% { opacity: 1; transform: scale(1.5); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes boot-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- loading */
+.boot-load {
+  width: min(560px, 100%); display: grid; gap: 34px; justify-items: center; text-align: center; animation: boot-rise .7s ease both;
+}
+.boot-title h1 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(2.8rem, 12vw, 4.4rem); line-height: 1; letter-spacing: .005em; }
+.boot-title p { margin: 10px 0 0; color: var(--accent-strong); font-size: 1rem; }
+
+.boot-features { position: relative; width: 100%; min-height: 108px; }
+.boot-feature {
+  position: absolute; inset: 0 0 24px; display: grid; align-content: start; gap: 6px; opacity: 0; transform: translateY(6px);
+  transition: opacity .5s ease, transform .5s ease; pointer-events: none;
+}
+.boot-feature.is-on { opacity: 1; transform: none; }
+.boot-feature strong { font-size: 1.05rem; }
+.boot-feature span { color: var(--text-muted); font-size: .95rem; max-width: 42ch; margin: 0 auto; text-wrap: balance; }
+.boot-dots { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; justify-content: center; }
+.boot-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background .3s, transform .3s; }
+.boot-dots i.is-on { background: var(--accent); transform: scale(1.25); }
+
+.boot-progress { width: 100%; display: grid; gap: 10px; }
+.boot-bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.boot-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #e8782a, #ffd27a); transition: width .35s ease; }
+.boot-status { display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; color: var(--text-muted); min-height: 1.5em; }
+.boot-num { font-variant-numeric: tabular-nums; color: var(--text); }
+.boot-note { margin: 0; font-size: .82rem; color: var(--text-muted); }
+.boot-error { margin: 0; color: var(--danger); }
+.boot-welcome { margin: 0 auto; font-family: var(--font-display); font-size: 1.5rem; color: var(--accent-strong); animation: boot-welcome 1s ease both; }
+.boot-dotsline::after { content: ""; animation: boot-dots 1.2s steps(4) infinite; }
+
+@keyframes boot-welcome { from { opacity: 0; transform: scale(.92); letter-spacing: .2em; } to { opacity: 1; transform: none; letter-spacing: .02em; } }
+@keyframes boot-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+/* ---- update banner */
+.update-banner {
+  position: fixed; z-index: 1100; left: 16px; right: 16px; margin-inline: auto; bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(480px, calc(100% - 32px)); display: flex; gap: 14px; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--accent); box-shadow: 0 10px 40px rgba(0, 0, 0, .5);
+  animation: boot-rise .5s ease both;
+}
+.update-banner div { display: grid; gap: 2px; min-width: 0; }
+.update-banner span { font-size: .85rem; color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .boot *, .boot { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
+  .boot-mark path { stroke-dashoffset: 0; }
+  .boot-mark-dot, .boot-brand-name, .boot-brand-sub { opacity: 1; }
+}

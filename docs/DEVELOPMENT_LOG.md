@@ -2,6 +2,13 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-05 — Splash, loading screen, device cache, update prompt
+- **Launch sequence:** Alexion Studios splash (original animated mark, tap to skip), then a loading screen with the title, four rotating feature highlights and a progress bar, then a "Welcome" and into the game.
+- **Cache on the device:** first launch downloads the 91 model files the game needs (21 MB incl. textures) with live "X of Y MB" progress; later launches only run "Finding your assets / Loading animations / Setting up your home". Browser test: first launch fetched 91 models over the network, second launch fetched 0. Offline start uses a stored copy of the asset list.
+- **Updates without maintenance:** each build writes `version.json`; the running game compares it with its own build id (every 5 min and on tab focus) and shows "A new version of TheLife is ready, Reload". Tested by publishing a different id while the page was open.
+- Bugs found in testing: the final fade-out timer was cancelled by a state change (screen stuck at "leaving"); the update banner was pushed off-screen because an animation overrode its centring transform.
+- Limits: same-size changed assets are not re-downloaded (needs a per-asset revision); the browser may clear the cache under storage pressure; no service worker yet (comes with hosted build); the repeat-launch sequence is about 5 s long, which can be shortened if it feels slow.
+
 ## 2026-10-05 — Realistic furniture, priced catalog, showroom
 - **Realistic furniture replaces the cartoon set in the house:** 60 CC0 Poly Haven models (sofas, chairs, tables, shelves, lamps, TV, radio, stove, fan...) fetched and compressed by the asset pipeline (`fetch_polyhaven.py`), plus 14 pieces built in code (fridge, toilet, basin, shower cabin, bed, wardrobe, flat TV, washer, kitchen units, lamp, rug, doormat). Image-based lighting makes metal, glass and wood read as real.
 - **Catalog (game-core):** 77 pieces with name, category, naira price and the action they enable. Players will buy these in a shop later; for now the house and showroom place them directly. Tests check every item has a model and every model is sold.

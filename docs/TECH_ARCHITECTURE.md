@@ -131,6 +131,21 @@ Sims-style control. The player never steers; they say *where*, and the character
 - **Code map:** `play/controller.ts` (walk, turn, run, sit/lie tweens, action timers), `play/runtime.ts` (renderer, camera, picking, loop), `play/world.ts` (scene, furniture, nav grid), `play/interactions.ts` (seat/lie/stand derivation), `furniture/` (models, procedural pieces, furniture animation), `play/PlayPage.tsx` (UI), `play/ShowroomPage.tsx` (`#/showroom`, test every piece).
 - **Look sharing:** the character built in the Lab is saved on the device and shows up in the prototype.
 
+## 5d. Launch, caching and updates
+
+What the player sees when the game opens (`apps/client/src/boot/`):
+
+1. **Alexion Studios splash** (about 2.6 s, tap to skip): the studio mark draws itself, then the name.
+2. **Loading screen:** game title, rotating feature highlights, a progress bar. **First launch:** "Downloading game assets" with MB loaded of total (about 21 MB: characters, hair, clothing, animations and the realistic furniture), with a note that it is a one-time download. **Later launches:** "Finding your assets", "Loading animations", "Setting up your home", then "Welcome", with no download.
+3. **The game.** `?splash=0` skips all of this (tests, development).
+
+How it works:
+
+- **Device cache:** files are stored with the browser's Cache API (`boot/assetCache.ts`), plus a small index of file name and size. At launch the game lists what it needs (`boot/plan.ts`, unit-tested), downloads only what is missing or changed size, and deletes files no longer used. A patched `fetch` looks on the device first for models and textures and keeps a copy of the asset list so the game starts offline. If the browser blocks the Cache API, the game still runs and loads files as it needs them.
+- **Lab-only assets** (cartoon props, vehicles) are not part of the launch download.
+- **Updates without maintenance:** every build has an id, compiled into the app and written to `version.json` beside it. While the game is open it checks `version.json` every 5 minutes and whenever the tab becomes visible again; if the id differs it shows "A new version of TheLife is ready - Reload". Nobody is interrupted; the game is saved automatically first. Changed assets are fetched on the next launch because their sizes differ in the index.
+- **Limits:** a changed asset with exactly the same byte size would not be re-downloaded (a revision id per asset is the fix when that matters); Cache API storage can be cleared by the browser under storage pressure, in which case the next launch downloads again; a real service worker (for offline loading of the app code itself) comes with the hosted build.
+
 ## 6. Multiplayer model
 
 - **Lot instances:** the world is one logical world; each lot has one or more *instances* (rooms) capped at ~100 players. Players in the same instance see each other live.
