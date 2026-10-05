@@ -1,0 +1,7 @@
+.map-stats {
+  position: absolute; z-index: 2; left: 12px; top: 64px; display: grid; gap: 4px; padding: 10px 12px; max-width: 330px;
+  border-radius: 14px; background: rgba(20, 17, 15, .72); backdrop-filter: blur(8px); font-size: .78rem; pointer-events: none;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.map-stats b { color: var(--accent-strong); }
+.play-controls button:disabled { opacity: .6; cursor: default; }

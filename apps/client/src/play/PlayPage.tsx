@@ -123,6 +123,9 @@ export default function PlayPage() {
         <a className="play-chip" href="#/" aria-label="Back">
           ←<span className="play-chip-label"> Back</span>
         </a>
+        <a className="play-chip" href="#/map" aria-label="Map test">
+          🗺️<span className="play-chip-label"> Map test</span>
+        </a>
         <a className="play-chip" href="#/lab" aria-label="Customise your character">
           🎨<span className="play-chip-label"> Customise</span>
         </a>

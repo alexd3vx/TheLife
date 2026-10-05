@@ -8,6 +8,7 @@ import { LIFE_CHANGED, hasLife } from "./play/gameSession";
 const LabPage = lazy(() => import("./lab/LabPage"));
 const PlayPage = lazy(() => import("./play/PlayPage"));
 const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
+const MapPage = lazy(() => import("./map/MapPage"));
 const CreatorPage = lazy(() => import("./creator/CreatorPage"));
 
 function useHashRoute(): string {
@@ -40,6 +41,13 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <LabPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/map")) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <MapPage />
       </Suspense>
     );
   }

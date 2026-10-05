@@ -82,7 +82,7 @@ function woodTexture(): THREE.CanvasTexture {
   });
 }
 
-function grassTexture(): THREE.CanvasTexture {
+export function grassTexture(): THREE.CanvasTexture {
   return canvasTexture(256, (ctx) => {
     ctx.fillStyle = "#5c8a3c";
     ctx.fillRect(0, 0, 256, 256);
