@@ -10,5 +10,8 @@ export * from "./profile.js";
 export * from "./traits.js";
 export * from "./phone.js";
 export * from "./phoneData.js";
+export * from "./phoneStoreData.js";
+export * from "./phoneContent.js";
+export * from "./phoneStore.js";
 export * from "./district.js";
 export * from "./buildingPlan.js";

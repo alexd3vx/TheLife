@@ -5,6 +5,8 @@ import {
   chargerById, contactsFor, groceryPromo, isPowerCut, shopItemById, startingCharger,
   type AppId, type Beat, type PhoneModel, type ShopItem,
 } from "./phoneData";
+import { STORE_IDS, storeAppById, tierAtLeast, type StoreAppId } from "./phoneStoreData";
+import { tickDownloads, connection } from "./phoneStore";
 import type { PhoneTier, Profile } from "./profile";
 import type { GameState } from "./types";
 import { DAY_MINUTES } from "./types";
@@ -28,9 +30,20 @@ export interface Thread {
   pending: string | null;
 }
 
+/** Any app on the phone: the built-in ones and the ones downloaded from LifeStore. */
+export type AnyAppId = AppId | StoreAppId;
+
+const isCoreApp = (app: string): app is AppId => Object.prototype.hasOwnProperty.call(APP_INFO, app);
+
+export function appInfo(app: AnyAppId): { name: string; blurb: string; dataMB: number } {
+  if (isCoreApp(app)) return APP_INFO[app];
+  const s = storeAppById(app);
+  return s ? { name: s.name, blurb: s.blurb, dataMB: s.dataMB } : { name: app, blurb: "", dataMB: 0 };
+}
+
 export interface PhoneNotification {
   id: number;
-  app: AppId;
+  app: AnyAppId;
   title: string;
   text: string;
   minute: number;
@@ -73,6 +86,23 @@ export interface PhoneState {
   application: { jobId: string; decideAt: number } | null;
   loan: { owed: number; sinceDay: number } | null;
   lowWarned: number;
+  /** Apps downloaded from LifeStore. */
+  installed: StoreAppId[];
+  /** The download queue: the first one is being downloaded. */
+  downloads: { appId: StoreAppId; doneMB: number; paused: boolean }[];
+  wifiOn: boolean;
+  mobileOn: boolean;
+  /** The home internet plan: it works until this game minute, if the router has power. */
+  homeNet: { plan: string; until: number } | null;
+  notes: string[];
+  scores: Record<string, number>;
+  /** Shares owned, by symbol. */
+  holdings: Record<string, number>;
+  ajo: { contributed: number; payoutAt: number; lastWeek: number; paidOut: boolean } | null;
+  /** Lessons finished per course, and when the last one was done. */
+  courses: Record<string, number>;
+  lastLessonAt: number;
+  diary: { day: number; mood: number; text: string }[];
 }
 
 export type PhoneResult = { ok: true; text?: string } | { ok: false; reason: string };
@@ -107,6 +137,18 @@ export function createPhone(profile: Profile | null): PhoneState {
     application: null,
     loan: null,
     lowWarned: 0,
+    installed: [],
+    downloads: [],
+    wifiOn: true,
+    mobileOn: true,
+    homeNet: null,
+    notes: [],
+    scores: {},
+    holdings: {},
+    ajo: null,
+    courses: {},
+    lastLessonAt: -1e9,
+    diary: [],
   };
 }
 
@@ -149,7 +191,7 @@ export function parsePhone(raw: unknown, profile: Profile | null): PhoneState {
       ? r.scheduled.slice(0, 20).map((s) => ({ minute: num(s?.minute, 0, 1e9, 0), contact: str(s?.contact, 20), text: str(s?.text), pay: s?.pay ? Math.floor(num(s.pay, 0, 1e6, 0)) : undefined, reason: s?.reason ? str(s.reason, 60) : undefined }))
       : [],
     notifications: Array.isArray(r.notifications)
-      ? r.notifications.slice(-30).map((n, i) => ({ id: Math.floor(num(n?.id, 0, 1e9, i)), app: (n?.app && n.app in APP_INFO ? n.app : "chat") as AppId, title: str(n?.title, 60), text: str(n?.text), minute: num(n?.minute, 0, 1e9, 0), read: n?.read === true }))
+      ? r.notifications.slice(-30).map((n, i) => ({ id: Math.floor(num(n?.id, 0, 1e9, i)), app: (n?.app && (isCoreApp(n.app) || STORE_IDS.has(n.app)) ? n.app : "chat") as AnyAppId, title: str(n?.title, 60), text: str(n?.text), minute: num(n?.minute, 0, 1e9, 0), read: n?.read === true }))
       : [],
     nextId: Math.floor(num(r.nextId, 1, 1e9, 1)),
     orders: Array.isArray(r.orders) ? r.orders.slice(0, 10).filter((o) => o && shopItemById(String(o.itemId))).map((o) => ({ id: Math.floor(num(o.id, 0, 1e9, 0)), itemId: String(o.itemId), arrivesAt: num(o.arrivesAt, 0, 1e9, 0) })) : [],
@@ -161,6 +203,20 @@ export function parsePhone(raw: unknown, profile: Profile | null): PhoneState {
     application: r.application && JOBS.some((j) => j.id === r.application?.jobId) ? { jobId: r.application.jobId, decideAt: num(r.application.decideAt, 0, 1e9, 0) } : null,
     loan,
     lowWarned: 0,
+    installed: strings(r.installed, 40).filter((id): id is StoreAppId => STORE_IDS.has(id)),
+    downloads: Array.isArray(r.downloads)
+      ? r.downloads.slice(0, 6).filter((d) => d && STORE_IDS.has(String(d.appId))).map((d) => ({ appId: d.appId, doneMB: num(d.doneMB, 0, 1e6, 0), paused: d.paused === true }))
+      : [],
+    wifiOn: r.wifiOn !== false,
+    mobileOn: r.mobileOn !== false,
+    homeNet: r.homeNet && typeof r.homeNet.plan === "string" && typeof r.homeNet.until === "number" ? { plan: r.homeNet.plan.slice(0, 20), until: r.homeNet.until } : null,
+    notes: Array.isArray(r.notes) ? r.notes.filter((x): x is string => typeof x === "string").slice(0, 40).map((x) => x.slice(0, 400)) : [],
+    scores: r.scores && typeof r.scores === "object" ? Object.fromEntries(Object.entries(r.scores).filter(([k, v]) => STORE_IDS.has(k) && typeof v === "number" && Number.isFinite(v)).map(([k, v]) => [k, Math.max(0, Math.min(1e9, v as number))])) : {},
+    holdings: r.holdings && typeof r.holdings === "object" ? Object.fromEntries(Object.entries(r.holdings).filter(([, v]) => typeof v === "number" && Number.isFinite(v) && v > 0).slice(0, 12).map(([k, v]) => [k.slice(0, 8), Math.min(1e6, Math.floor(v as number))])) : {},
+    ajo: r.ajo && typeof r.ajo === "object" ? { contributed: Math.floor(num(r.ajo.contributed, 0, 6, 0)), payoutAt: Math.floor(num(r.ajo.payoutAt, 1, 6, 3)), lastWeek: Math.floor(num(r.ajo.lastWeek, -1, 1e6, -1)), paidOut: r.ajo.paidOut === true } : null,
+    courses: r.courses && typeof r.courses === "object" ? Object.fromEntries(Object.entries(r.courses).filter(([, v]) => typeof v === "number").slice(0, 10).map(([k, v]) => [k.slice(0, 30), Math.max(0, Math.min(20, Math.floor(v as number)))])) : {},
+    lastLessonAt: typeof r.lastLessonAt === "number" && Number.isFinite(r.lastLessonAt) ? r.lastLessonAt : -1e9,
+    diary: Array.isArray(r.diary) ? r.diary.slice(-60).map((d) => ({ day: Math.floor(num(d?.day, 0, 1e6, 0)), mood: Math.floor(num(d?.mood, 1, 5, 3)), text: str(d?.text, 160) })) : [],
   };
 }
 
@@ -170,8 +226,10 @@ export function modelOf(phone: PhoneState): PhoneModel {
   return PHONE_MODELS[phone.model];
 }
 
-export function hasApp(phone: PhoneState, app: AppId): boolean {
-  return modelOf(phone).apps.includes(app);
+export function hasApp(phone: PhoneState, app: AnyAppId): boolean {
+  if (isCoreApp(app)) return modelOf(phone).apps.includes(app);
+  const s = storeAppById(app);
+  return !!s && phone.installed.includes(s.id) && tierAtLeast(phone.model, s.minTier);
 }
 
 export function isDead(phone: PhoneState): boolean {
@@ -219,7 +277,7 @@ export function loanLimit(profile: Profile | null): number {
 
 // ---------------------------------------------------------------- notifications and chat
 
-export function notify(state: GameState, app: AppId, title: string, text: string): void {
+export function notify(state: GameState, app: AnyAppId, title: string, text: string): void {
   const p = state.phone;
   p.notifications.push({ id: p.nextId++, app, title, text, minute: state.minute, read: false });
   if (p.notifications.length > 30) p.notifications.splice(0, p.notifications.length - 30);
@@ -294,13 +352,19 @@ export function markNotificationsRead(state: GameState): void {
 // ---------------------------------------------------------------- using the phone
 
 /** Opening an app uses a little data. LifePay works without data. */
-export function openApp(state: GameState, app: AppId): PhoneResult {
+export function openApp(state: GameState, app: AnyAppId): PhoneResult {
   const p = state.phone;
   if (isDead(p)) return fail("The battery is empty. Plug it in.");
-  if (!hasApp(p, app)) return fail(`${APP_INFO[app].name} isn't supported on the ${modelOf(p).name}.`);
-  const cost = APP_INFO[app].dataMB;
-  if (cost > 0 && p.dataMB < cost) return fail("You're out of data. Buy a bundle in LifePay.");
-  p.dataMB -= cost;
+  if (!hasApp(p, app)) return fail(`${appInfo(app).name} isn't available on the ${modelOf(p).name}.`);
+  const cost = appInfo(app).dataMB;
+  if (cost > 0) {
+    const link = connection(state);
+    if (link.kind === "none") return fail(p.mobileOn && p.dataMB <= 0 ? "You're out of data. Buy a bundle in LifePay, or use Wi-Fi." : "You're offline. Turn on Wi-Fi or mobile data in Settings.");
+    if (link.kind === "data") {
+      if (p.dataMB < cost) return fail("You're out of data. Buy a bundle in LifePay, or use Wi-Fi.");
+      p.dataMB -= cost;
+    }
+  }
   return done();
 }
 
@@ -454,6 +518,7 @@ function receive(state: GameState, order: Order): void {
   if (!item) return;
   const p = state.phone;
   if (item.kind === "grocery") state.inventory.portions += item.amount ?? 0;
+  else if (item.kind === "meal") state.inventory.meals += item.amount ?? 1;
   else if (item.kind === "charger") p.chargers.push(item.id);
   else if (item.kind === "powerbank") p.powerBank.owned = true;
   else if (item.kind === "phone" && item.tier) {
@@ -510,6 +575,7 @@ export function tickPhone(state: GameState, minutes: number): void {
   }
   if (p.bankCharging && power) p.powerBank.charge = Math.min(POWER_BANK.capacity, p.powerBank.charge + POWER_BANK.inRate * hours);
   if (p.bankCharging && p.powerBank.charge >= POWER_BANK.capacity) p.bankCharging = false;
+  tickDownloads(state, minutes);
   const before = p.battery;
   p.battery = Math.max(0, Math.min(100, p.battery + charge - drain));
   if (p.plugged && p.battery >= 100 && before < 100) {

@@ -1,10 +1,11 @@
+import { mealById } from "./phoneContent";
 import type { PhoneTier, Profile } from "./profile";
 
 // The phone's content as data: models, chargers, the shop, NPC chats, jobs, news. Rules live in phone.ts.
 // Brand names are our own ("Life" family) so nothing here is a real company's product.
 
 export type PortId = "micro" | "usbc" | "lifelink";
-export type AppId = "chat" | "pay" | "shop" | "jobs" | "news" | "maps";
+export type AppId = "chat" | "pay" | "shop" | "jobs" | "news" | "maps" | "settings" | "store";
 
 export interface PhoneModel {
   tier: PhoneTier;
@@ -31,17 +32,17 @@ export const PHONE_MODELS: Record<PhoneTier, PhoneModel> = {
   basic: {
     tier: "basic", name: "LifePhone Go", tagline: "Simple. Tough. Lasts.", price: 45_000,
     ports: ["micro"], maxCharge: 25, screenHours: 9, standbyHours: 72,
-    apps: ["chat", "pay", "shop", "news"], banking: false, screen: "LCD 60Hz", slowness: 1.5, startBattery: 70,
+    apps: ["chat", "pay", "shop", "news", "settings", "store"], banking: false, screen: "LCD 60Hz", slowness: 1.5, startBattery: 70,
   },
   mid: {
     tier: "mid", name: "LifePhone Plus", tagline: "Everything you need.", price: 150_000,
     ports: ["usbc"], maxCharge: 60, screenHours: 7, standbyHours: 48,
-    apps: ["chat", "pay", "shop", "news", "jobs", "maps"], banking: true, screen: "AMOLED 90Hz", slowness: 1, startBattery: 85,
+    apps: ["chat", "pay", "shop", "news", "jobs", "maps", "settings", "store"], banking: true, screen: "AMOLED 90Hz", slowness: 1, startBattery: 85,
   },
   flagship: {
     tier: "flagship", name: "LifePhone Max", tagline: "The one everyone notices.", price: 480_000,
     ports: ["lifelink", "usbc"], maxCharge: 150, screenHours: 6, standbyHours: 36,
-    apps: ["chat", "pay", "shop", "news", "jobs", "maps"], banking: true, screen: "AMOLED 120Hz", slowness: 0.7, startBattery: 100,
+    apps: ["chat", "pay", "shop", "news", "jobs", "maps", "settings", "store"], banking: true, screen: "AMOLED 120Hz", slowness: 0.7, startBattery: 100,
   },
 };
 
@@ -52,6 +53,8 @@ export const APP_INFO: Record<AppId, { name: string; blurb: string; dataMB: numb
   jobs: { name: "LifeJobs", blurb: "Gigs and jobs", dataMB: 6 },
   news: { name: "LifeNews", blurb: "Headlines and alerts", dataMB: 12 },
   maps: { name: "LifeMaps", blurb: "Around you", dataMB: 20 },
+  settings: { name: "Settings", blurb: "Wi-Fi, data, storage", dataMB: 0 },
+  store: { name: "LifeStore", blurb: "Download apps", dataMB: 2 },
 };
 
 export interface ChargerDef {
@@ -82,7 +85,7 @@ export function startingCharger(tier: PhoneTier): string {
 
 // ---------------------------------------------------------------- shop
 
-export type ShopKind = "grocery" | "phone" | "charger" | "powerbank" | "airtime" | "data";
+export type ShopKind = "grocery" | "phone" | "charger" | "powerbank" | "airtime" | "data" | "meal";
 
 export interface ShopItem {
   id: string;
@@ -120,7 +123,10 @@ export const DELIVERY_FEE = 500;
 export const FREE_DELIVERY_OVER = 10_000;
 
 export function shopItemById(id: string): ShopItem | undefined {
-  return SHOP_ITEMS.find((i) => i.id === id) ?? TOPUPS.find((i) => i.id === id);
+  const found = SHOP_ITEMS.find((i) => i.id === id) ?? TOPUPS.find((i) => i.id === id);
+  if (found) return found;
+  const meal = mealById(id); // LifeEats orders ride on the same delivery queue
+  return meal ? { id: meal.id, name: meal.name, blurb: meal.blurb, kind: "meal", price: meal.price, deliveryMinutes: meal.minutes, amount: meal.meals } : undefined;
 }
 
 // ---------------------------------------------------------------- people
