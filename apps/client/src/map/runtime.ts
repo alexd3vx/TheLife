@@ -13,6 +13,7 @@ import type { TapMenu } from "../play/runtime";
 import { buildGroundDetail, capHideLevel, capHideLot } from "./chunkBuilder";
 import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
+import { RemotePlayers } from "./remotePlayers";
 
 export interface MapStats {
   fps: number;
@@ -47,6 +48,13 @@ export interface MapRuntime {
   setNight(on: boolean): void;
   /** Flies over the whole district while measuring the frame rate. */
   tour(onProgress?: (fraction: number) => void): Promise<TourResult>;
+  /** Other players in the shared world, and the local player's pose to send to the server. */
+  online: {
+    remotes: RemotePlayers;
+    pose(): { x: number; y: number; z: number; yaw: number; clip: string; level: number };
+    /** The server moved us back: put the character at the corrected spot. */
+    correct(x: number, z: number): void;
+  };
   debug: {
     stats(): MapStats;
     teleport(x: number, z: number): void;
@@ -140,6 +148,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   const streamer = new ChunkStreamer(district);
   scene.add(streamer.root);
+  const remotes = new RemotePlayers();
+  scene.add(remotes.root);
 
   // Walking: a 1 m navigation grid from the same data the server will have.
   const interiorLots = district.lots.filter(hasInterior);
@@ -390,6 +400,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     };
   }
 
+  let lastX = controller.position.x, lastZ = controller.position.z, localSpeed = 0;
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
@@ -397,6 +408,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const dt = Math.min(rawDt, 0.1);
     if (document.hidden) return;
     controller.update(dt);
+    remotes.update(dt);
+    localSpeed += (Math.hypot(controller.position.x - lastX, controller.position.z - lastZ) / Math.max(dt, 0.001) - localSpeed) * Math.min(1, dt * 8);
+    lastX = controller.position.x;
+    lastZ = controller.position.z;
     avatar.update(dt);
     streamer.update(controller.position.x, controller.position.z);
     // Take the roof (and any floors above the player's) off the building they are standing in, and follow the stairs up and down.
@@ -510,7 +525,20 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       controls.update();
     },
     tour,
+    online: {
+      remotes,
+      pose: () => ({
+        x: controller.position.x,
+        y: controller.position.y,
+        z: controller.position.z,
+        yaw: controller.yaw,
+        clip: localSpeed > 2.6 ? "Run_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
+        level: floorLevel,
+      }),
+      correct: (x, z) => controller.place(x, z, controller.yaw),
+    },
     dispose() {
+      remotes.dispose();
       stopped = true;
       tourCancel = true;
       cancelAnimationFrame(raf);

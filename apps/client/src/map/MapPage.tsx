@@ -5,6 +5,7 @@ import { getDistrict } from "./districtData";
 import DistrictMap from "./DistrictMap";
 import { PIN_STYLE } from "./pins";
 import { NEXT_QUALITY, QUALITY_LABEL, loadQuality, type Quality } from "../graphics";
+import OnlinePanel from "../net/OnlinePanel";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -75,6 +76,8 @@ export default function MapPage() {
         <span className="play-chip">Neighbourhood test</span>
         {stats && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
+
+      {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && (
         <div className="map-stats" aria-label="Map statistics">
