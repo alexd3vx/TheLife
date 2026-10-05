@@ -316,3 +316,81 @@ export const DIARY_MOODS = [
   { id: 4, label: "Good", face: "🙂" },
   { id: 5, label: "Great", face: "😄" },
 ];
+
+// ---------------------------------------------------------------- more apps
+
+export function fuelPrices(day: number) {
+  const w = (base: number, seed: number) => Math.round(base * (1 + 0.05 * Math.sin(day * 0.21 + seed) + 0.02 * Math.sin(day * 0.77 + seed)));
+  return [
+    { id: "petrol", name: "Petrol (per litre)", naira: w(900, 1) },
+    { id: "diesel", name: "Diesel (per litre)", naira: w(1_200, 2) },
+    { id: "gas", name: "Cooking gas (per kg)", naira: w(1_400, 3) },
+  ];
+}
+
+export const STORIES = [
+  { id: "s1", title: "The Last Bus to Ibadan", minutes: 4, text: "Tunde ran the last hundred metres with his bag bumping against his back. The conductor was already shouting the final call. He jumped on as the door rattled shut, found a seat by the window and let out a long breath. The road to Ibadan stretched out in the dusk, orange and dusty and full of promise. He had a job interview in the morning, one shirt that was still clean, and a mother who had prayed for him at the gate. That was enough." },
+  { id: "s2", title: "Mama Ngozi's Pot", minutes: 3, text: "Every Sunday the smell of Mama Ngozi's stew climbed the stairs and knocked on every door in the compound. Nobody was ever invited, and nobody ever went hungry. 'A big pot,' she liked to say, 'is just a small pot with more friends.' When the light went off, they ate by candle and nobody complained. When it came back, they cheered like they had won a match." },
+  { id: "s3", title: "Power Cut", minutes: 3, text: "At 7:42 the whole street went dark. For a moment there was silence, then a chorus of groans, then somebody's generator coughing into life. Chioma lit a candle and found her old radio. The static cleared into a highlife song her father used to hum. She turned it up a little. Outside, children were already playing in the dark, shrieking happily, and the night did not feel so long at all." },
+  { id: "s4", title: "First Salary", minutes: 4, text: "When the alert finally came, Bisi read the message three times to make sure the zeros were real. She did not spend it on anything for an hour. She just sat on the edge of the bed, holding the phone. Then she called her mother, who cried, and then her brother, who asked for a loan. She laughed so hard she had to put the phone down. It was the best Friday of the year." },
+];
+
+export const PODCASTS = [
+  { id: "p1", title: "Hustle Radio", host: "Kemi & Tobi", ep: "How I saved my first ₦100,000", minutes: 22 },
+  { id: "p2", title: "Gist Everyday", host: "Uche", ep: "Is okada coming back?", minutes: 18 },
+  { id: "p3", title: "Small Biz Naija", host: "Aisha", ep: "Pricing without fear", minutes: 25 },
+  { id: "p4", title: "Code & Chill", host: "Femi", ep: "Your first remote job", minutes: 30 },
+  { id: "p5", title: "Naija Football Talk", host: "Big Dayo", ep: "The derby, dissected", minutes: 35 },
+];
+
+export const RECIPES = [
+  { id: "r1", name: "Party jollof rice", time: "1 h 15", steps: ["Blend tomatoes, pepper and onion; fry until the oil floats.", "Add stock, thyme, curry and the washed parboiled rice.", "Cover tightly and cook on low heat; do not stir.", "Let it catch a little at the bottom for the smoky taste."] },
+  { id: "r2", name: "Egusi soup", time: "50 min", steps: ["Fry onions and ground egusi in palm oil until it clumps.", "Add stock, pepper, meat and fish.", "Simmer, then add spinach or bitter leaf for the last five minutes."] },
+  { id: "r3", name: "Moi moi", time: "1 h", steps: ["Peel and blend beans with pepper and onion.", "Mix with oil, stock cube and spices.", "Pour into leaves or foil and steam for 45 minutes."] },
+  { id: "r4", name: "Puff-puff", time: "40 min", steps: ["Mix flour, sugar, yeast and warm water into a loose batter.", "Let it rise for 30 minutes.", "Drop spoonfuls into hot oil and fry until golden."] },
+  { id: "r5", name: "Beans porridge", time: "1 h 10", steps: ["Boil beans until soft.", "Add palm oil, pepper, crayfish and onions.", "Add chopped plantain or yam and simmer until it thickens."] },
+];
+
+export const WORDS = ["MANGO", "RICES", "STEAM", "CHAIR", "LIGHT", "PLANT", "MONEY", "DANCE", "HAPPY", "BREAD", "SMILE", "RIVER", "TRAIN", "PHONE", "HOUSE", "FLOUR", "SUGAR", "BEANS", "FRUIT", "TOWEL", "STORE", "MARKET"].filter((w) => w.length === 5 && w !== "RICES");
+export const HANG_WORDS = ["JOLLOF", "LAGOS", "MARKET", "DANFO", "GENERATOR", "PLANTAIN", "ABUJA", "HARMATTAN", "OKADA", "CASSAVA", "SUYA", "NAIRA", "COMPOUND", "BALCONY", "SCHOOL"];
+
+export function wordOfDay(day: number): string {
+  return WORDS[Math.floor(seeded(day, 61) * WORDS.length)]!;
+}
+
+export interface Gig {
+  id: string;
+  title: string;
+  blurb: string;
+  pay: number;
+  energy: number;
+}
+
+export const GIGS: Gig[] = [
+  { id: "g1", title: "Transcribe a short audio", blurb: "Type what you hear. 30 minutes of work.", pay: 1_200, energy: 8 },
+  { id: "g2", title: "Deliver a parcel nearby", blurb: "Quick errand across the street.", pay: 1_500, energy: 12 },
+  { id: "g3", title: "Tutor a student", blurb: "One hour of maths help.", pay: 2_500, energy: 14 },
+  { id: "g4", title: "Help a stall set up", blurb: "Carry boxes for the market lady.", pay: 2_000, energy: 18 },
+  { id: "g5", title: "Design a flyer", blurb: "A quick poster for a church event.", pay: 3_000, energy: 12 },
+];
+
+export const GIG_GAP_MINUTES = 90;
+
+export interface Workout {
+  id: string;
+  name: string;
+  blurb: string;
+  energy: number;
+  fun: number;
+  hunger: number;
+  hygiene: number;
+}
+
+export const WORKOUTS: Workout[] = [
+  { id: "w1", name: "Brisk walk", blurb: "20 minutes around the compound", energy: 4, fun: 6, hunger: 3, hygiene: 2 },
+  { id: "w2", name: "Skipping", blurb: "A 10-minute rope session", energy: 8, fun: 8, hunger: 5, hygiene: 6 },
+  { id: "w3", name: "Home circuit", blurb: "Push-ups, squats and planks", energy: 12, fun: 10, hunger: 7, hygiene: 10 },
+];
+export const WORKOUT_GAP_MINUTES = 120;
+export const WATER_GOAL = 8;
+export const FOCUS_XP = 12;

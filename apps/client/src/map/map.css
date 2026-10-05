@@ -12,7 +12,7 @@
 .dmap svg { width: 100%; height: 100%; display: block; }
 .dmap-tools { position: absolute; right: 8px; bottom: 8px; display: grid; gap: 6px; }
 .dmap-tools button { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: #222; font-size: 1.2rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
-.map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 190px; height: 190px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }
+.map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 118px; height: 118px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }
 .map-mini .dmap { pointer-events: none; }
 .map-big { position: absolute; z-index: 5; inset: 56px 12px 72px; border-radius: 18px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .9); background: #d9e6c6; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
 .map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(20, 17, 15, .92); backdrop-filter: blur(10px); display: grid; gap: 8px; }

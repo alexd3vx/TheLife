@@ -103,6 +103,10 @@ export interface PhoneState {
   courses: Record<string, number>;
   lastLessonAt: number;
   diary: { day: number; mood: number; text: string }[];
+  todos: { text: string; done: boolean }[];
+  water: { day: number; glasses: number };
+  lastGigAt: number;
+  lastWorkoutAt: number;
 }
 
 export type PhoneResult = { ok: true; text?: string } | { ok: false; reason: string };
@@ -149,6 +153,10 @@ export function createPhone(profile: Profile | null): PhoneState {
     courses: {},
     lastLessonAt: -1e9,
     diary: [],
+    todos: [],
+    water: { day: 0, glasses: 0 },
+    lastGigAt: -1e9,
+    lastWorkoutAt: -1e9,
   };
 }
 
@@ -216,6 +224,10 @@ export function parsePhone(raw: unknown, profile: Profile | null): PhoneState {
     ajo: r.ajo && typeof r.ajo === "object" ? { contributed: Math.floor(num(r.ajo.contributed, 0, 6, 0)), payoutAt: Math.floor(num(r.ajo.payoutAt, 1, 6, 3)), lastWeek: Math.floor(num(r.ajo.lastWeek, -1, 1e6, -1)), paidOut: r.ajo.paidOut === true } : null,
     courses: r.courses && typeof r.courses === "object" ? Object.fromEntries(Object.entries(r.courses).filter(([, v]) => typeof v === "number").slice(0, 10).map(([k, v]) => [k.slice(0, 30), Math.max(0, Math.min(20, Math.floor(v as number)))])) : {},
     lastLessonAt: typeof r.lastLessonAt === "number" && Number.isFinite(r.lastLessonAt) ? r.lastLessonAt : -1e9,
+    todos: Array.isArray(r.todos) ? r.todos.slice(0, 40).map((t) => ({ text: str(t?.text, 120), done: t?.done === true })).filter((t) => t.text) : [],
+    water: { day: Math.floor(num(r.water?.day, 0, 1e6, 0)), glasses: Math.floor(num(r.water?.glasses, 0, 99, 0)) },
+    lastGigAt: typeof r.lastGigAt === "number" && Number.isFinite(r.lastGigAt) ? r.lastGigAt : -1e9,
+    lastWorkoutAt: typeof r.lastWorkoutAt === "number" && Number.isFinite(r.lastWorkoutAt) ? r.lastWorkoutAt : -1e9,
     diary: Array.isArray(r.diary) ? r.diary.slice(-60).map((d) => ({ day: Math.floor(num(d?.day, 0, 1e6, 0)), mood: Math.floor(num(d?.mood, 1, 5, 3)), text: str(d?.text, 160) })) : [],
   };
 }

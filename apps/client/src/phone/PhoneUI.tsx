@@ -7,7 +7,7 @@ import {
 import type { GameSession } from "../play/gameSession";
 import { Battery, Chat, Jobs, Maps, News, Pay, Shop, naira, type Act } from "./PhoneApps";
 import { ExtraApp } from "./PhoneExtras";
-import { LifeStore, Settings } from "./PhoneSystem";
+import { LifeStore, Ring, Settings } from "./PhoneSystem";
 import { Icon } from "./icons";
 import { nameOf, styleOf, type ClientApp } from "./appStyle";
 import { AppActive } from "./active";
@@ -19,7 +19,7 @@ const APP_NAME = nameOf;
 /** The dock holds four apps on every model; the grid holds the rest, then anything you download. */
 const DOCK: ClientApp[] = ["chat", "pay", "shop", "news"];
 const GRID: ClientApp[] = ["store", "jobs", "maps", "settings", "battery"];
-const PAGE_SIZE: Record<PhoneTier, number> = { basic: 9, mid: 12, flagship: 12 };
+const PAGE_SIZE: Record<PhoneTier, number> = { basic: 20, mid: 16, flagship: 16 };
 
 /** If an app throws while drawing, show what happened and a restart button instead of a blank screen. */
 class AppBoundary extends Component<{ name: string; children: ReactNode }, { error: Error | null; attempt: number }> {
@@ -447,18 +447,25 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
   const phone = state.phone;
   const clock = clockOf(state.minute);
   const apps: ClientApp[] = [...GRID, ...phone.installed];
+  const ghosts = phone.downloads.map((d) => ({ id: d.appId, progress: d.doneMB / (storeAppById(d.appId)?.sizeMB ?? 1), paused: d.paused }));
+  const known = useRef<Set<string> | null>(null);
+  if (known.current === null) known.current = new Set(apps);
+  const fresh = apps.filter((a) => !known.current!.has(a));
+  useEffect(() => {
+    for (const a of apps) known.current!.add(a);
+  });
   const size = PAGE_SIZE[tier];
-  const pages = Math.max(1, Math.ceil(apps.length / size));
+  const pages = Math.max(1, Math.ceil((apps.length + ghosts.length) / size));
   const [pageRaw, setPage] = useState(0);
   const page = Math.min(pageRaw, pages - 1);
   const swipe = useRef<number | null>(null);
   const cut = powerCutOn(clock.day);
   const upcoming = cut && state.minute < cut.endMinute ? cut : null;
-  const icon = (id: ClientApp) => {
+  const icon = (id: ClientApp, isNew = false) => {
     const supported = id === "battery" || hasApp(phone, id as AnyAppId);
     const badge = id === "chat" ? Object.values(phone.threads).reduce((s, t) => s + t.unread, 0) : 0;
     return (
-      <button key={id} className={`phone-icon${supported ? "" : " is-locked"}`} onClick={() => onOpen(id)} tabIndex={hidden ? -1 : 0}>
+      <button key={id} className={`phone-icon${supported ? "" : " is-locked"}${isNew ? " is-new" : ""}`} onClick={() => onOpen(id)} tabIndex={hidden ? -1 : 0}>
         <span className="phone-icon-tile" style={{ background: `linear-gradient(150deg, ${styleOf(id).from}, ${styleOf(id).to})` }}>
           <Icon name={styleOf(id).icon} size={tier === "basic" ? 30 : 28} />
           {!supported && (
@@ -503,14 +510,28 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
         const dx = e.clientX - x0;
         if (Math.abs(dx) > 50) setPage((n) => Math.max(0, Math.min(pages - 1, n + (dx < 0 ? 1 : -1))));
       }}>
-        <div className="phone-grid">{apps.slice(page * size, page * size + size).map(icon)}</div>
+        <div className="phone-grid">
+          {[...apps.map((id) => ({ id, ghost: null as null | { progress: number; paused: boolean } })), ...ghosts.map((g) => ({ id: g.id as ClientApp, ghost: g }))].slice(page * size, page * size + size).map((e) =>
+            e.ghost ? (
+              <div key={`g_${e.id}`} className="phone-icon is-ghost" aria-label={`Installing ${nameOf(e.id)}`}>
+                <span className="phone-icon-tile" style={{ background: `linear-gradient(150deg, ${styleOf(e.id).from}, ${styleOf(e.id).to})` }}>
+                  <Icon name={styleOf(e.id).icon} size={tier === "basic" ? 26 : 26} />
+                  <Ring value={e.ghost.progress} paused={e.ghost.paused} size={tier === "basic" ? 44 : 50} />
+                </span>
+                <span className="phone-icon-name">{e.ghost.paused ? "Paused" : "Installing…"}</span>
+              </div>
+            ) : (
+              icon(e.id, fresh.includes(e.id))
+            ),
+          )}
+        </div>
       </div>
       {pages > 1 && (
         <div className="pa-dots" role="tablist" aria-label="Home screens">
           {Array.from({ length: pages }, (_, i) => <i key={i} className={i === page ? "is-on" : ""} onClick={() => setPage(i)} />)}
         </div>
       )}
-      <div className="phone-dock">{DOCK.map(icon)}</div>
+      <div className="phone-dock">{DOCK.map((id) => icon(id))}</div>
     </div>
   );
 }

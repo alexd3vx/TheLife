@@ -2,7 +2,7 @@ import { MINT, PLAYER, SINK, balance, transfer } from "./ledger";
 import { skillLevel } from "./actions";
 import { isDead, modelOf, notify, wallPower, type PhoneResult } from "./phone";
 import {
-  COURSES, DIARY_MOODS, LESSON_GAP_MINUTES, LESSON_XP, STOCKS, mealById, seeded, stockPrice,
+  COURSES, DIARY_MOODS, FOCUS_XP, GIGS, GIG_GAP_MINUTES, LESSON_GAP_MINUTES, LESSON_XP, STOCKS, WATER_GOAL, WORKOUTS, WORKOUT_GAP_MINUTES, mealById, seeded, stockPrice,
 } from "./phoneContent";
 import { MOBILE_SPEED, STORAGE_MB, homePlanById, storeAppById, tierAtLeast, type StoreAppId } from "./phoneStoreData";
 import type { GameState } from "./types";
@@ -338,4 +338,94 @@ export function buyTicket(state: GameState, label: string, price: number, fun: n
   }
   addFun(state, fun);
   return done(price > 0 ? `Ticket booked: ${label}.` : `You're going: ${label}.`);
+}
+
+// --- Reminders, Hydrate, Focus
+
+export function addTodo(state: GameState, text: string): PhoneResult {
+  const t = text.trim().slice(0, 120);
+  if (!t) return fail("Write something first.");
+  if (state.phone.todos.length >= 40) return fail("Too many reminders.");
+  state.phone.todos.unshift({ text: t, done: false });
+  return done("Added.");
+}
+
+export function toggleTodo(state: GameState, index: number): PhoneResult {
+  const t = state.phone.todos[index];
+  if (!t) return fail("No such reminder.");
+  t.done = !t.done;
+  return done();
+}
+
+export function deleteTodo(state: GameState, index: number): PhoneResult {
+  if (index < 0 || index >= state.phone.todos.length) return fail("No such reminder.");
+  state.phone.todos.splice(index, 1);
+  return done();
+}
+
+export function glassesToday(state: GameState): number {
+  return state.phone.water.day === dayOf(state) ? state.phone.water.glasses : 0;
+}
+
+export function drinkWater(state: GameState): PhoneResult {
+  const w = state.phone.water;
+  const day = dayOf(state);
+  if (w.day !== day) {
+    w.day = day;
+    w.glasses = 0;
+  }
+  if (w.glasses >= WATER_GOAL + 4) return fail("That's plenty of water for today.");
+  w.glasses += 1;
+  if (w.glasses === WATER_GOAL) {
+    addFun(state, 4);
+    state.needs.energy = Math.min(100, state.needs.energy + 3);
+    return done("Eight glasses! You feel fresher.");
+  }
+  return done(`${w.glasses} of ${WATER_GOAL} glasses.`);
+}
+
+/** A finished five-minute focus session: a little knowledge. */
+export function finishFocus(state: GameState): PhoneResult {
+  state.skills.knowledge = (state.skills.knowledge ?? 0) + FOCUS_XP;
+  return done(`Well done. +${FOCUS_XP} knowledge xp.`);
+}
+
+// --- FitLife and QuickGigs
+
+export function nextWorkoutIn(state: GameState): number {
+  return Math.max(0, Math.ceil(state.phone.lastWorkoutAt + WORKOUT_GAP_MINUTES - state.minute));
+}
+
+export function doWorkout(state: GameState, id: string): PhoneResult {
+  const w = WORKOUTS.find((x) => x.id === id);
+  if (!w) return fail("Unknown workout.");
+  const wait = nextWorkoutIn(state);
+  if (wait > 0) return fail(`Rest first. The next workout is ready in ${wait} min.`);
+  if (state.needs.energy < w.energy + 10) return fail("You're too tired for that.");
+  if (state.needs.hunger < 20) return fail("You're too hungry to exercise. Eat first.");
+  const n = state.needs;
+  n.energy -= w.energy;
+  n.hunger = Math.max(0, n.hunger - w.hunger);
+  n.hygiene = Math.max(0, n.hygiene - w.hygiene);
+  addFun(state, w.fun);
+  state.phone.lastWorkoutAt = state.minute;
+  return done(`${w.name} done. You feel good.`);
+}
+
+export function nextGigIn(state: GameState): number {
+  return Math.max(0, Math.ceil(state.phone.lastGigAt + GIG_GAP_MINUTES - state.minute));
+}
+
+export function doGig(state: GameState, id: string): PhoneResult {
+  const g = GIGS.find((x) => x.id === id);
+  if (!g) return fail("Unknown gig.");
+  const wait = nextGigIn(state);
+  if (wait > 0) return fail(`You need a break. The next gig opens in ${wait} min.`);
+  if (state.needs.energy < g.energy + 15) return fail("You're too tired for this gig.");
+  state.needs.energy -= g.energy;
+  state.needs.fun = Math.max(0, state.needs.fun - 3);
+  state.phone.lastGigAt = state.minute;
+  transfer(state.ledger, MINT, PLAYER, g.pay, `Gig: ${g.title}`, state.minute);
+  state.stats.totalEarned += g.pay;
+  return done(`Done! ₦${g.pay.toLocaleString()} received.`);
 }

@@ -1,7 +1,7 @@
 .net-chip {
   position: absolute;
   right: 12px;
-  top: 262px;
+  top: 192px;
   z-index: 6;
   display: inline-flex;
   align-items: center;
@@ -23,10 +23,10 @@
 .net-panel {
   position: absolute;
   right: 12px;
-  top: 304px;
+  top: 234px;
   z-index: 6;
   width: min(330px, calc(100% - 24px));
-  max-height: max(280px, calc(100% - 420px));
+  max-height: max(280px, calc(100% - 300px));
   overflow: auto;
   padding: 12px;
   border-radius: 14px;

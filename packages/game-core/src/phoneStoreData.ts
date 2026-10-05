@@ -17,7 +17,11 @@ export type StoreAppId =
   | "notes" | "calendar" | "weather" | "torch" | "calc" | "clock" | "translate" | "currency" | "netcheck"
   | "gram" | "chirp" | "match" | "tube" | "tunes" | "radio" | "cinema" | "events"
   | "eats" | "invest" | "ajo" | "learn" | "health" | "faith" | "sleep" | "diary"
-  | "snake" | "g2048" | "xo" | "memory" | "trivia";
+  | "snake" | "g2048" | "xo" | "memory" | "trivia"
+  | "convert" | "split" | "todo" | "budget" | "dice" | "focus" | "water"
+  | "books" | "podcasts" | "nolly"
+  | "recipes" | "fit" | "bills" | "fuel" | "gigs"
+  | "hangman" | "connect4" | "wordguess" | "minesweeper" | "reaction";
 
 export interface StoreApp {
   id: StoreAppId;
@@ -84,7 +88,36 @@ export const STORE_APPS: StoreApp[] = [
   app("xo", "Tic Tac", "Beat the phone", "games", 6, 0, "basic", 0, 0, "xo", "#ff8787", "#e03131"),
   app("memory", "Match Pairs", "Remember where they are", "games", 18, 500, "basic", 0, 0, "cards", "#faa2c1", "#d6336c"),
   app("trivia", "Naija Quiz", "How well do you know home", "games", 30, 800, "basic", 1, 0, "quiz", "#66d9e8", "#1098ad"),
+  // more tools
+  app("convert", "UnitConvert", "Distance, weight, temperature", "tools", 5, 0, "basic", 0, 0, "ruler", "#91a7ff", "#3b5bdb"),
+  app("split", "Split It", "Share a bill fairly", "tools", 4, 0, "basic", 0, 0, "split", "#63e6be", "#0ca678"),
+  app("todo", "Reminders", "A to-do list that nags", "tools", 5, 0, "basic", 0, 0, "todo", "#ffa8a8", "#fa5252"),
+  app("budget", "Budget", "Where your money went", "tools", 12, 0, "basic", 0, 0, "wallet", "#8ce99a", "#2f9e44"),
+  app("dice", "Dice", "Roll one to six dice", "tools", 3, 0, "basic", 0, 0, "dice", "#ced4da", "#495057"),
+  app("focus", "Focus", "Five minutes of no distractions", "tools", 5, 0, "basic", 0, 0, "target", "#ff8787", "#c92a2a"),
+  app("water", "Hydrate", "Drink eight glasses a day", "tools", 4, 0, "basic", 0, 0, "drop", "#74c0fc", "#1971c2"),
+  // more media
+  app("books", "LifeReads", "Short stories to read offline", "media", 60, 0, "basic", 0, 0.2, "bookopen", "#ffc078", "#e67700"),
+  app("podcasts", "Podcasts", "Talk shows on demand", "media", 90, 0, "basic", 8, 0.3, "mic", "#d0bfff", "#7048e8"),
+  app("nolly", "NollyPlay", "Rent a film, watch anywhere", "media", 150, 0, "mid", 3, 0, "play", "#ffa94d", "#d9480f"),
+  // more life
+  app("recipes", "Naija Kitchen", "Recipes and cooking tips", "life", 35, 0, "basic", 0, 0.1, "pot", "#ffd43b", "#e8590c"),
+  app("fit", "FitLife", "Short workouts at home", "life", 28, 0, "basic", 0, 0, "dumbbell", "#69db7c", "#2b8a3e"),
+  app("bills", "LifeBills", "Pay rent, power and water", "life", 20, 0, "basic", 1, 0, "receipt", "#74c0fc", "#1864ab"),
+  app("fuel", "FuelWatch", "Petrol, diesel and gas prices", "life", 8, 0, "basic", 1, 0, "fuel", "#ffa8a8", "#c92a2a"),
+  app("gigs", "QuickGigs", "Small jobs for quick cash", "life", 40, 0, "basic", 2, 0, "briefcase", "#4dabf7", "#1971c2"),
+  // more games
+  app("hangman", "Hangman", "Guess the word", "games", 8, 0, "basic", 0, 0, "hang", "#e599f7", "#ae3ec9"),
+  app("connect4", "Four in a Row", "Beat the phone", "games", 14, 0, "basic", 0, 0, "dots", "#ffd43b", "#f08c00"),
+  app("wordguess", "Word Guess", "A new five-letter word each day", "games", 20, 0, "basic", 0, 0, "word", "#8ce99a", "#2f9e44"),
+  app("minesweeper", "Minesweeper", "Don't step on one", "games", 16, 0, "mid", 0, 0, "mine", "#ced4da", "#495057"),
+  app("reaction", "Tap Speed", "How fast are your thumbs", "games", 6, 0, "basic", 0, 0, "bolt", "#ffe066", "#e67700"),
 ];
+
+/** Which phone models can run an app. */
+export function compatibleTiers(app: StoreApp): PhoneTier[] {
+  return TIER_ORDER.filter((t) => tierAtLeast(t, app.minTier));
+}
 
 export const STORE_IDS = new Set<string>(STORE_APPS.map((a) => a.id));
 

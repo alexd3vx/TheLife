@@ -439,3 +439,42 @@ button.phone-btn-side { border: 0; padding: 0; cursor: pointer; }
 .torch-on { position: absolute; inset: 0; z-index: 3; background: #fffbe6; display: grid; place-items: center; color: #5c4b00; }
 .phone-pages { flex: none; touch-action: pan-y; }
 .phone-go .pa-dots i, .pa-dots i { box-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+
+/* ---- download animation, compatibility, store detail */
+.phone-go .phone-grid, .phone-grid { grid-template-columns: repeat(4, 1fr); gap: 14px 4px; }
+.phone-go .phone-icon-tile { width: clamp(40px, 15cqw, 52px); height: clamp(40px, 15cqw, 52px); }
+.phone-icon-tile { width: clamp(40px, 15cqw, 56px); height: clamp(40px, 15cqw, 56px); }
+.phone-icon.is-new .phone-icon-tile { animation: icon-pop .7s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes icon-pop { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.18) rotate(3deg); opacity: 1; } 100% { transform: none; } }
+.phone-icon.is-ghost { cursor: default; }
+.phone-icon.is-ghost .phone-icon-tile { filter: saturate(.35) brightness(.8); }
+.phone-icon.is-ghost .pa-ring { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); }
+.phone-icon.is-ghost .pa-ring i { display: none; }
+.phone-icon.is-ghost .phone-icon-name { opacity: .8; animation: ghost-blink 1.4s ease-in-out infinite; }
+@keyframes ghost-blink { 50% { opacity: .45; } }
+.pa-ring { position: relative; flex: none; display: inline-grid; place-items: center; }
+.pa-ring svg { display: block; }
+.pa-ring-track { fill: none; stroke: rgba(127, 127, 127, .3); stroke-width: 3; }
+.pa-ring-fill { fill: none; stroke: var(--accent, #4d8bff); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset .35s ease; }
+.phone-icon.is-ghost .pa-ring-fill { stroke: #fff; }
+.pa-ring.is-paused .pa-ring-fill { stroke: #f0b429; }
+.pa-ring i { position: absolute; font-style: normal; font-size: .62rem; font-weight: 800; }
+.pa-ring:not(.is-paused) svg { animation: ring-breathe 1.6s ease-in-out infinite; }
+@keyframes ring-breathe { 50% { opacity: .75; } }
+.pa-row.is-tappable { cursor: pointer; }
+.pa-bad { color: #d9534f !important; }
+.ps-sheet-wrap { position: absolute; inset: 0; z-index: 6; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; animation: phone-fade .2s both; }
+.ps-sheet { width: 100%; max-height: 80%; overflow: auto; padding: 18px 16px calc(var(--chin, 0px) + 16px); border-radius: 22px 22px 0 0; background: var(--bg); display: grid; gap: 12px; animation: sheet-up .28s cubic-bezier(.2, .9, .3, 1) both; }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.ps-sheet-head { display: flex; gap: 14px; align-items: center; }
+.ps-sheet-head span { display: grid; gap: 2px; }
+.ps-sheet-head small { color: var(--muted); }
+.ps-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; font-size: .72rem; color: var(--muted); }
+.ps-facts span { display: grid; gap: 2px; padding: 8px 4px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.ps-facts b { color: var(--text); font-size: .85rem; }
+.ps-compat { display: flex; gap: 8px; flex-wrap: wrap; }
+.ps-compat span { padding: 6px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; border: 1px solid var(--line); background: var(--card); }
+.ps-compat .is-yes { color: #1f9d5c; }
+.ps-compat .is-no { color: #d9534f; opacity: .8; }
+.ps-compat .is-you { outline: 2px solid var(--accent); }
+.ps-sheet-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }

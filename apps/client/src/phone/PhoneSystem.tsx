@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  HOME_PLANS, STORAGE_MB, STORE_APPS, STORE_CATEGORIES, buyHomePlan, cancelDownload, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, setMobileData, setWifi,
+  HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, buyHomePlan, cancelDownload, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, setMobileData, setWifi,
   startDownload, storageTotalMB, storageUsedMB, storeAppById, tierAtLeast, uninstallApp,
   type GameState, type StoreAppId, type StoreCategory,
 } from "@thelife/game-core";
@@ -16,6 +16,23 @@ export function AppTile({ id, size = 44 }: { id: StoreAppId | string; size?: num
     </span>
   );
 }
+
+/** A circular progress ring: the download animation. */
+export function Ring({ value, size = 36, paused = false }: { value: number; size?: number; paused?: boolean }) {
+  const r = size / 2 - 3;
+  const c = 2 * Math.PI * r;
+  return (
+    <span className={`pa-ring${paused ? " is-paused" : ""}`} style={{ width: size, height: size }} role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} className="pa-ring-track" />
+        <circle cx={size / 2} cy={size / 2} r={r} className="pa-ring-fill" strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0.02, Math.min(1, value)))} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <i>{paused ? "⏸" : `${Math.round(value * 100)}`}</i>
+    </span>
+  );
+}
+
+const TIER_SHORT = { basic: "Go", mid: "Plus", flagship: "Max" } as const;
 
 const daysLeft = (state: GameState) => Math.max(0, Math.ceil(((state.phone.homeNet?.until ?? 0) - state.minute) / 1440));
 
@@ -91,6 +108,7 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
   const [tab, setTab] = useState<StoreTab>("browse");
   const [cat, setCat] = useState<StoreCategory | "all">("all");
   const [query, setQuery] = useState("");
+  const [detail, setDetail] = useState<StoreAppId | null>(null);
   const p = state.phone;
   const link = connection(state);
   const list = STORE_APPS.filter((a) => (cat === "all" || a.category === cat) && (!query || `${a.name} ${a.blurb}`.toLowerCase().includes(query.toLowerCase())));
@@ -100,8 +118,8 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
     const a = storeAppById(id)!;
     const d = queue.find((x) => x.appId === id);
     if (p.installed.includes(id)) return <Btn kind="soft" onClick={() => (hasApp(p, id) ? onOpen(id) : act(() => ({ ok: false, reason: `${a.name} needs a better phone.` })))}>Open</Btn>;
-    if (d) return <span className="pa-fine">{d.paused ? "Paused" : `${Math.round((d.doneMB / a.sizeMB) * 100)}%`}</span>;
-    if (!tierAtLeast(p.model, a.minTier)) return <span className="pa-fine">Needs Plus</span>;
+    if (d) return <Ring value={d.doneMB / a.sizeMB} paused={d.paused} />;
+    if (!tierAtLeast(p.model, a.minTier)) return <span className="pa-fine pa-bad">Not compatible</span>;
     return <Btn onClick={() => act((s) => startDownload(s, id))}>{a.price ? naira(a.price) : "Get"}</Btn>;
   };
 
@@ -128,14 +146,14 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
             <div className="pa-group">
               {list.length === 0 && <p className="pa-empty">Nothing found.</p>}
               {list.map((a) => (
-                <div key={a.id} className="pa-row">
+                <div key={a.id} className="pa-row is-tappable" onClick={() => setDetail(a.id)}>
                   <AppTile id={a.id} />
                   <span className="pa-row-main">
                     <strong>{a.name}</strong>
                     <small>{a.blurb}</small>
-                    <small>{MB(a.sizeMB)}{a.dataMB === 0 ? " · works offline" : ""}</small>
+                    <small className={tierAtLeast(p.model, a.minTier) ? "" : "pa-bad"}>{MB(a.sizeMB)}{a.dataMB === 0 ? " · works offline" : ""} · {tierAtLeast(p.model, a.minTier) ? "✓ Compatible" : `Needs ${TIER_SHORT[a.minTier]} or newer`}</small>
                   </span>
-                  {button(a.id)}
+                  <span onClick={(e) => e.stopPropagation()}>{button(a.id)}</span>
                 </div>
               ))}
             </div>
@@ -155,6 +173,7 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
                     <small>{i === 0 ? (d.paused ? "Paused: waiting for a connection" : `${MB(d.doneMB)} of ${MB(a.sizeMB)}`) : "Waiting in the queue"}</small>
                     <div className="pa-bar"><i style={{ width: `${Math.min(100, (d.doneMB / a.sizeMB) * 100)}%` }} /></div>
                   </span>
+                  <Ring value={d.doneMB / a.sizeMB} paused={d.paused} size={32} />
                   <button className="pa-icon-btn" aria-label={`Cancel ${a.name}`} onClick={() => act((s) => cancelDownload(s, d.appId))}>
                     <Icon name="trash" size={18} />
                   </button>
@@ -184,6 +203,35 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
           </>
         )}
       </div>
+      {detail && (() => {
+        const a = storeAppById(detail)!;
+        const ok = tierAtLeast(p.model, a.minTier);
+        return (
+          <div className="ps-sheet-wrap" onClick={() => setDetail(null)}>
+            <div className="ps-sheet" role="dialog" aria-label={a.name} onClick={(e) => e.stopPropagation()}>
+              <div className="ps-sheet-head">
+                <AppTile id={a.id} size={64} />
+                <span><strong>{a.name}</strong><small>{a.blurb}</small></span>
+              </div>
+              <div className="ps-facts">
+                <span><b>{MB(a.sizeMB)}</b>size</span>
+                <span><b>{a.price ? naira(a.price) : "Free"}</b>price</span>
+                <span><b>{a.dataMB ? `${a.dataMB} MB` : "None"}</b>data per open</span>
+              </div>
+              <p className="pa-section">Works on</p>
+              <div className="ps-compat">
+                {(["basic", "mid", "flagship"] as const).map((t) => (
+                  <span key={t} className={`${compatibleTiers(a).includes(t) ? "is-yes" : "is-no"}${p.model === t ? " is-you" : ""}`}>
+                    {compatibleTiers(a).includes(t) ? "✓" : "✕"} {PHONE_MODELS[t].name.replace("LifePhone ", "")}{p.model === t ? " (yours)" : ""}
+                  </span>
+                ))}
+              </div>
+              {!ok && <p className="pa-note pa-bad">Your {PHONE_MODELS[p.model].name} can't run this app. Buy a newer phone in LifeShop.</p>}
+              <div className="ps-sheet-actions">{button(a.id)}<Btn kind="soft" onClick={() => setDetail(null)}>Close</Btn></div>
+            </div>
+          </div>
+        );
+      })()}
       <Tabs<StoreTab>
         tabs={[
           { id: "browse", label: "Browse", icon: "store" as IconName },

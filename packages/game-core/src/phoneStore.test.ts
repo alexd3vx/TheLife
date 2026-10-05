@@ -3,7 +3,7 @@ import {
   AJO_AMOUNT, BACKGROUNDS, MINT, PLAYER, SINK, STORE_APPS, Sim, addNote, balance, buyHomePlan, buyShares, cancelDownload, connection, createGameState, diaryCheckIn,
   hasApp, isPowerCut, joinAjo, ledgerTotal, nextLessonIn, openApp, orderEats, parseGameState, payAjo, portfolioValue, profileFrom, recordScore, sellShares,
   setMobileData, setWifi, startDownload, stockPrice, storageUsedMB, takeLesson, transfer, uninstallApp, weatherFor, quizRound, ratesFor, feedPosts, seeded,
-  STORAGE_MB, MOBILE_SPEED, streamData, buyTicket,
+  STORAGE_MB, MOBILE_SPEED, streamData, buyTicket, addTodo, toggleTodo, deleteTodo, drinkWater, glassesToday, doWorkout, doGig, finishFocus, compatibleTiers, wordOfDay, fuelPrices,
 } from "./index.js";
 
 const background = (tier: string) => BACKGROUNDS.find((b) => b.tier === tier)!;
@@ -21,9 +21,9 @@ const quietMinute = () => {
 };
 
 describe("the store catalogue", () => {
-  it("has thirty apps with unique ids and sane sizes", () => {
-    expect(STORE_APPS).toHaveLength(30);
-    expect(new Set(STORE_APPS.map((a) => a.id)).size).toBe(30);
+  it("has fifty apps with unique ids and sane sizes", () => {
+    expect(STORE_APPS).toHaveLength(50);
+    expect(new Set(STORE_APPS.map((a) => a.id)).size).toBe(50);
     for (const a of STORE_APPS) expect(a.sizeMB).toBeGreaterThan(0);
     for (const tier of ["basic", "mid", "flagship"] as const) {
       expect(STORE_APPS.filter((a) => a.minTier === "basic").every((a) => a.sizeMB < STORAGE_MB[tier])).toBe(true);
@@ -271,5 +271,39 @@ describe("what the apps do", () => {
     expect(s.state.needs.fun).toBe(45);
     transfer(s.state.ledger, PLAYER, SINK, balance(s.state.ledger), "spend", 0);
     expect(buyTicket(s.state, "x", 3_500, 25).ok).toBe(false);
+  });
+
+  it("every app says which phones it runs on", () => {
+    for (const a of STORE_APPS) expect(compatibleTiers(a).length).toBeGreaterThan(0);
+    expect(compatibleTiers(STORE_APPS.find((a) => a.id === "invest")!)).toEqual(["mid", "flagship"]);
+    expect(compatibleTiers(STORE_APPS.find((a) => a.id === "notes")!)).toEqual(["basic", "mid", "flagship"]);
+  });
+
+  it("reminders, water, workouts, gigs and focus work and keep the ledger balanced", () => {
+    const s = sim("nepo");
+    expect(addTodo(s.state, " ").ok).toBe(false);
+    addTodo(s.state, "buy rice");
+    toggleTodo(s.state, 0);
+    expect(s.state.phone.todos[0]).toEqual({ text: "buy rice", done: true });
+    deleteTodo(s.state, 0);
+    expect(s.state.phone.todos).toHaveLength(0);
+    for (let i = 0; i < 8; i++) drinkWater(s.state);
+    expect(glassesToday(s.state)).toBe(8);
+    s.state.minute += 1440;
+    expect(glassesToday(s.state)).toBe(0);
+    s.state.needs.energy = 100; s.state.needs.hunger = 100;
+    expect(doWorkout(s.state, "w2").ok).toBe(true);
+    expect(doWorkout(s.state, "w2").ok).toBe(false);
+    const before = balance(s.state.ledger);
+    expect(doGig(s.state, "g3").ok).toBe(true);
+    expect(balance(s.state.ledger)).toBe(before + 2_500);
+    expect(doGig(s.state, "g1").ok).toBe(false);
+    expect(ledgerTotal(s.state.ledger)).toBe(0);
+    const xp = s.state.skills.knowledge ?? 0;
+    finishFocus(s.state);
+    expect(s.state.skills.knowledge).toBeGreaterThan(xp);
+    expect(wordOfDay(4)).toBe(wordOfDay(4));
+    expect(wordOfDay(4)).toHaveLength(5);
+    expect(fuelPrices(3)).toEqual(fuelPrices(3));
   });
 });

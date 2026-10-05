@@ -2,6 +2,7 @@ import type { GameState, StoreAppId } from "@thelife/game-core";
 import type { Act } from "./PhoneApps";
 import * as T from "./PhoneTools";
 import * as G from "./PhoneGames";
+import * as M from "./PhoneMore";
 
 /** The screen for a downloaded app. */
 export function ExtraApp({ id, state, act }: { id: StoreAppId; state: GameState; act: Act }) {
@@ -37,5 +38,25 @@ export function ExtraApp({ id, state, act }: { id: StoreAppId; state: GameState;
     case "xo": return <G.TicTac {...p} />;
     case "memory": return <G.MatchPairs {...p} />;
     case "trivia": return <G.Trivia {...p} />;
+    case "convert": return <M.Convert />;
+    case "split": return <M.Split />;
+    case "todo": return <M.Todo {...p} />;
+    case "budget": return <M.Budget {...p} />;
+    case "dice": return <M.Dice />;
+    case "focus": return <M.Focus {...p} />;
+    case "water": return <M.Water {...p} />;
+    case "books": return <M.Books {...p} />;
+    case "podcasts": return <M.Podcasts {...p} />;
+    case "nolly": return <M.Nolly {...p} />;
+    case "recipes": return <M.Recipes />;
+    case "fit": return <M.Fit {...p} />;
+    case "bills": return <M.Bills {...p} />;
+    case "fuel": return <M.Fuel {...p} />;
+    case "gigs": return <M.Gigs {...p} />;
+    case "hangman": return <M.Hangman {...p} />;
+    case "connect4": return <M.Connect4 {...p} />;
+    case "wordguess": return <M.WordGuess {...p} />;
+    case "minesweeper": return <M.Minesweeper {...p} />;
+    case "reaction": return <M.Reaction {...p} />;
   }
 }
