@@ -46,6 +46,8 @@ export type ClientMessage =
   /** Asks the server to run one game action (a whitelisted function) on this player's life. */
   | { t: "do"; id: number; fn: string; args: RpcArg[] }
   | { t: "move"; x: number; y: number; z: number; yaw: number; clip: string; level: number }
+  /** Arrives somewhere by a paid ride (taxi, keke, danfo): the server moves the player there if they just paid for a trip. */
+  | { t: "arrive"; x: number; z: number }
   | { t: "chat"; text: string }
   | { t: "pay"; to: string; amount: number }
   | { t: "ping"; ts: number }
@@ -128,6 +130,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     case "move":
       if (!finite(m.x) || !finite(m.y, 500) || !finite(m.z) || !finite(m.yaw, 100) || !finite(m.level, 20)) return null;
       return { t: "move", x: m.x, y: m.y, z: m.z, yaw: m.yaw, clip: typeof m.clip === "string" ? m.clip.slice(0, 40) : "Idle_Loop", level: Math.max(0, Math.round(m.level)) };
+    case "arrive":
+      if (!finite(m.x) || !finite(m.z)) return null;
+      return { t: "arrive", x: m.x, z: m.z };
     case "chat": {
       if (typeof m.text !== "string") return null;
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { GROUP_LABEL, lagosMinuteNow, openStatus, placeGroup, type District, type Landmark, type PlaceGroup } from "@thelife/game-core";
 import { PIN_STYLE } from "./pins";
 import { GameIcon, iconPath } from "../ui/icons";
@@ -10,15 +10,19 @@ import "./citymap.css";
  */
 
 const COLOURS = {
-  water: [141, 178, 208],
-  street: [196, 202, 208],
-  block: [214, 208, 190],
-  park: [160, 196, 130],
-  market: [222, 178, 130],
+  water: [96, 150, 214],
+  street: [214, 222, 236],
+  block: [226, 231, 242],
+  park: [176, 200, 238],
+  market: [208, 212, 244],
 } as const;
 
-const WALLS = ["#d9cfc1", "#cbbfae", "#e0d6c8", "#c2b8aa", "#d6c5b0", "#bfc4c9"];
-const ROOFS = ["#9a8f86", "#8a7d74", "#a39689", "#7c8590", "#a58a78", "#8f8a80"];
+const WALLS = ["#dfe6f2", "#d0d9ea", "#e6ebf5", "#c8d2e6", "#d8dff0", "#c3ccdf"];
+const ROOFS = ["#8e9bb8", "#7f8cab", "#9aa6c2", "#7384a8", "#8a96b6", "#7a88a6"];
+
+/** The map keeps to blues: places that are green on the 3D street are blue-teal here. */
+const BLUE_PIN: Record<string, string> = { school: "#3a6fd8", stadium: "#2f86d4", park: "#4a8fe0" };
+const pinColour = (kind: string, fallback: string) => BLUE_PIN[kind] ?? fallback;
 
 interface Props {
   district: District;
@@ -35,15 +39,21 @@ interface Props {
 }
 
 interface Building {
-  poly: [number, number][];
+  /** x, z pairs */
+  pts: Float32Array;
   h: number;
-  wall: string;
+  lit: string;
+  dark: string;
   roof: string;
   key: number;
   minX: number;
   maxX: number;
   minZ: number;
   maxZ: number;
+  /** +1 / -1: which way round the corners go */
+  wind: number;
+  /** longest side, for skipping what is too small to see */
+  size: number;
 }
 
 let groundPicture: HTMLCanvasElement | null = null;
@@ -80,7 +90,12 @@ function buildings(district: District): Building[] {
     const named = !!l.landmark;
     const h = Math.max(3.2, l.floors * l.storey) * (named ? 1.15 : 1);
     const c = l.colour % WALLS.length;
-    out.push({ poly, h, wall: WALLS[c]!, roof: ROOFS[c]!, key: (f.minX + f.maxX + f.minZ + f.maxZ) / 2, minX: f.minX, maxX: f.maxX, minZ: f.minZ, maxZ: f.maxZ });
+    const pts = new Float32Array(poly.length * 2);
+    poly.forEach(([x, z], i) => {
+      pts[i * 2] = x;
+      pts[i * 2 + 1] = z;
+    });
+    out.push({ pts, h, lit: shade(WALLS[c]!, 0.94), dark: shade(WALLS[c]!, 0.8), roof: ROOFS[c]!, key: (f.minX + f.maxX + f.minZ + f.maxZ) / 2, minX: f.minX, maxX: f.maxX, minZ: f.minZ, maxZ: f.maxZ, wind: area(poly) > 0 ? 1 : -1, size: Math.max(f.maxX - f.minX, f.maxZ - f.minZ) });
   }
   out.sort((a, b) => a.key - b.key);
   buildingsCache = out;
@@ -132,13 +147,14 @@ export default function CityMap({ district, player, home, others = [], hour, wee
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
 
+  const hereX = Math.round((player?.x ?? district.spawn.x) / 25) * 25, hereZ = Math.round((player?.z ?? district.spawn.z) / 25) * 25;
   const places = useMemo(() => {
-    const here = player ?? district.spawn;
+    const here = { x: hereX, z: hereZ };
     return district.landmarks
       .map((l) => ({ l, st: openStatus(l.kind, hour, weekday), d: Math.hypot(l.entrance.x - here.x, l.entrance.z - here.z) }))
       .sort((a, b) => a.d - b.d);
-  }, [district, hour, weekday, player]);
-  const shown = places.filter((p) => (filter === "all" ? true : filter === "open" ? p.st.open : placeGroup(p.l.kind) === filter));
+  }, [district, Math.floor(hour * 2), weekday, hereX, hereZ]);
+  const shown = useMemo(() => places.filter((p) => (filter === "all" ? true : filter === "open" ? p.st.open : placeGroup(p.l.kind) === filter)), [places, filter]);
   const nearest = places[0]?.d !== undefined && places[0].d < 60 ? places[0].l.id : null;
   const shownRef = useRef(shown);
   shownRef.current = shown;
@@ -190,7 +206,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
     const el = wrap.current!;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
       size.current = { w: r.width, h: r.height, dpr };
       const c = canvas.current!;
       c.width = Math.round(r.width * dpr);
@@ -207,81 +223,110 @@ export default function CityMap({ district, player, home, others = [], hour, wee
   }, []);
   const initialised = useRef(false);
 
+  // where the pills, the home mark and the player's dot sit on the screen; moved directly, not through React
+  const layer = useRef<HTMLDivElement>(null);
+  const placeLabels = useRef<() => void>(() => {});
+  const playerRef = useRef(player);
+  playerRef.current = player;
   // drawing, only when something changed
+  const moving = useRef(0);
   useEffect(() => {
     let raf = 0;
-    const g = canvas.current!.getContext("2d")!;
+    const g = canvas.current!.getContext("2d", { alpha: false })!;
     const blds = buildings(district);
     const ground0 = ground(district);
     const t = district.terrain!;
     const cell = t.cell;
     const frame = () => {
       raf = requestAnimationFrame(frame);
-      if (!dirty.current) return;
+      const now = performance.now();
+      const busy = now < moving.current;
+      if (!dirty.current) {
+        // the gesture just ended: one full-detail picture
+        if (!busy && lastBusy) dirty.current = true;
+        else return;
+      }
+      lastBusy = busy;
       dirty.current = false;
       const { w, h, dpr } = size.current;
       const v = view.current;
+      const s = v.s;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.fillStyle = "#9ab9d6";
+      g.fillStyle = "#6096d6";
       g.fillRect(0, 0, w, h);
       // the ground: the island's picture, laid down slanted
-      g.save();
-      const ox = w / 2 - (v.cx - v.cz) * v.s, oy = h / 2 - (v.cx + v.cz) * 0.5 * v.s;
-      g.setTransform(dpr * v.s, dpr * v.s * 0.5, -dpr * v.s, dpr * v.s * 0.5, dpr * ox, dpr * oy);
-      g.imageSmoothingEnabled = v.s < 1.4;
+      const ox = w / 2 - (v.cx - v.cz) * s, oy = h / 2 - (v.cx + v.cz) * 0.5 * s;
+      g.setTransform(dpr * s, dpr * s * 0.5, -dpr * s, dpr * s * 0.5, dpr * ox, dpr * oy);
+      g.imageSmoothingEnabled = s < 1.4;
       g.drawImage(ground0, 0, 0, t.width * cell, t.height * cell);
-      g.restore();
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // the buildings, far to near, only those on screen (and only those big enough to see when zoomed far out)
-      const minH = v.s < 0.3 ? 6 : 0;
+      // the buildings, far to near, only those on screen and big enough to see; while the map is being moved the little ones wait
       const corner = toWorld(0, 0), c2 = toWorld(w, 0), c3 = toWorld(0, h), c4 = toWorld(w, h);
       const x0 = Math.min(corner.x, c2.x, c3.x, c4.x) - 40, x1 = Math.max(corner.x, c2.x, c3.x, c4.x) + 40;
       const z0 = Math.min(corner.z, c2.z, c3.z, c4.z) - 40, z1 = Math.max(corner.z, c2.z, c3.z, c4.z) + 40;
-      let drawn = 0;
+      const minPx = busy ? 3.2 : 1.6;
+      const sy = s * 0.5, lift = 0.8 * s;
+      let drawn = 0, fill = "";
       for (const b of blds) {
         if (b.maxX < x0 || b.minX > x1 || b.maxZ < z0 || b.minZ > z1) continue;
-        if (b.h < minH) continue;
-        if (++drawn > 9000) break;
-        const base = b.poly.map(([x, z]) => toScreen(x, z, 0));
-        const top = b.poly.map(([x, z]) => toScreen(x, z, b.h));
-        const wind = area(b.poly) > 0 ? 1 : -1;
-        if (v.s > 0.22) {
-          for (let i = 0; i < b.poly.length; i++) {
-            const j = (i + 1) % b.poly.length;
-            const ex = b.poly[j]![0] - b.poly[i]![0], ez = b.poly[j]![1] - b.poly[i]![1];
+        if (b.size * s < minPx) continue;
+        if (++drawn > (busy ? 2500 : 5000)) break;
+        const p = b.pts, n = p.length / 2;
+        const top = b.h * lift;
+        // screen position of corner i at height 0
+        const walls = !busy && s > 0.22 && top > 3;
+        if (walls) {
+          for (let i = 0; i < n; i++) {
+            const j = i + 1 === n ? 0 : i + 1;
+            const xi = p[i * 2]!, zi = p[i * 2 + 1]!, xj = p[j * 2]!, zj = p[j * 2 + 1]!;
             // outward normal for this winding; visible when it faces the camera (towards +x +z)
-            const nx = ez * wind, nz = -ex * wind;
+            const nx = (zj - zi) * b.wind, nz = -(xj - xi) * b.wind;
             if (nx + nz <= 0) continue;
-            g.fillStyle = shade(b.wall, nx > nz ? 0.92 : 0.78);
+            const c = nx > nz ? b.lit : b.dark;
+            if (c !== fill) {
+              g.fillStyle = c;
+              fill = c;
+            }
+            const ax = ox + (xi - zi) * s, ay = oy + (xi + zi) * sy, bx = ox + (xj - zj) * s, by = oy + (xj + zj) * sy;
             g.beginPath();
-            g.moveTo(base[i]![0], base[i]![1]);
-            g.lineTo(base[j]![0], base[j]![1]);
-            g.lineTo(top[j]![0], top[j]![1]);
-            g.lineTo(top[i]![0], top[i]![1]);
+            g.moveTo(ax, ay);
+            g.lineTo(bx, by);
+            g.lineTo(bx, by - top);
+            g.lineTo(ax, ay - top);
             g.closePath();
             g.fill();
           }
         }
-        g.fillStyle = b.roof;
+        if (b.roof !== fill) {
+          g.fillStyle = b.roof;
+          fill = b.roof;
+        }
         g.beginPath();
-        top.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
+        for (let i = 0; i < n; i++) {
+          const x = p[i * 2]!, z = p[i * 2 + 1]!;
+          const px = ox + (x - z) * s, py = oy + (x + z) * sy - (walls ? top : b.h * lift);
+          if (i) g.lineTo(px, py);
+          else g.moveTo(px, py);
+        }
         g.closePath();
         g.fill();
       }
       // trees
-      if (v.s > 0.7) {
-        g.fillStyle = "rgba(60,110,70,.9)";
+      if (s > 0.7 && !busy) {
+        g.fillStyle = "rgba(70,110,190,.85)";
         let n = 0;
         for (const tr of district.trees) {
           if (tr.x < x0 || tr.x > x1 || tr.z < z0 || tr.z > z1) continue;
-          if (++n > 2500) break;
+          if (++n > 2000) break;
           const [px, py] = toScreen(tr.x, tr.z, 3);
           g.beginPath();
-          g.arc(px, py, Math.max(1.5, 2.4 * v.s), 0, Math.PI * 2);
+          g.arc(px, py, Math.max(1.5, 2.4 * s), 0, Math.PI * 2);
           g.fill();
         }
       }
+      placeLabels.current();
     };
+    let lastBusy = false;
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, [district]);
@@ -316,6 +361,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
           v.cx += (a + b) / 2;
           v.cz += (b - a) / 2;
           dirty.current = true;
+          moving.current = performance.now() + 140;
         }
       } else if (pts.size === 2) {
         const [a, b] = [...pts.values()];
@@ -324,19 +370,20 @@ export default function CityMap({ district, player, home, others = [], hour, wee
         pinch = d;
         moved = true;
         dirty.current = true;
+        moving.current = performance.now() + 140;
       }
     };
     const up = (e: PointerEvent) => {
       const had = pts.delete(e.pointerId);
       pinch = 0;
       if (had && pts.size === 0 && !moved && performance.now() - downAt < 600) onSelect(null);
-      bump((n) => n + 1);
+      dirty.current = true;
     };
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       view.current.s = Math.max(0.12, Math.min(6, view.current.s * Math.exp(-e.deltaY * 0.0015)));
       dirty.current = true;
-      bump((n) => n + 1);
+      moving.current = performance.now() + 160;
     };
     c.addEventListener("pointerdown", down);
     c.addEventListener("pointermove", move);
@@ -352,57 +399,74 @@ export default function CityMap({ district, player, home, others = [], hour, wee
     };
   }, [onSelect]);
 
-  // labels follow the map while it is moved: re-render them on a light timer
-  useEffect(() => {
-    const t = setInterval(() => bump((n) => n + 1), 120);
-    return () => clearInterval(t);
-  }, []);
-
-  const v = view.current;
-  const labelled = v.s >= 0.7;
   const pill = (l: Landmark, st: { open: boolean; text: string }) => {
-    const [px, py] = toScreen(l.x, l.z, 18);
-    if (px < -80 || py < -40 || px > size.current.w + 80 || py > size.current.h + 40) return null;
     const style = PIN_STYLE[l.kind];
     const on = selected === l.id;
     const glyph = iconPath(style.icon);
     return (
-      <button key={l.id} className={`cm-pin${st.open ? "" : " is-closed"}${on ? " is-on" : ""}${labelled || on ? "" : " is-dot"}`} style={{ left: px, top: py }} onClick={() => onSelect(on ? null : l.id)} aria-label={`${l.name}, ${st.text}`}>
-        <span className="cm-pin-icon" style={{ background: style.colour }}>
+      <button key={l.id} data-wx={l.x} data-wz={l.z} data-wy={18} className={`cm-pin${st.open ? "" : " is-closed"}${on ? " is-on" : ""}`} onClick={() => onSelect(on ? null : l.id)} aria-label={`${l.name}, ${st.text}`}>
+        <span className="cm-pin-icon" style={{ background: pinColour(l.kind, style.colour) }}>
           {glyph && (
             <svg viewBox={`0 0 ${glyph.box[0]} ${glyph.box[1]}`} width="12" height="12" aria-hidden="true">
               <path d={glyph.d} fill="#fff" />
             </svg>
           )}
         </span>
-        {(labelled || on) && (
-          <span className="cm-pin-text">
-            <b>{l.name}</b>
-            {(!st.open || on) && <small>{nearest === l.id ? "You are here" : st.text}</small>}
-            {st.open && !on && nearest === l.id && <small className="here">You are here</small>}
-          </span>
-        )}
+        <span className="cm-pin-text">
+          <b>{l.name}</b>
+          {(!st.open || on) && <small>{nearest === l.id ? "You are here" : st.text}</small>}
+          {st.open && !on && nearest === l.id && <small className="here">You are here</small>}
+        </span>
         <i className="cm-pin-stem" />
       </button>
     );
   };
 
-  const me = player ? toScreen(player.x, player.z, 0) : null;
-  const homeAt = home ? toScreen(home.x, home.z, 6) : null;
+  // after every render: find the things to place, then place them (and again each time the map moves)
+  useLayoutEffect(() => {
+    const el = layer.current;
+    if (!el) return;
+    const items: { el: HTMLElement; x: number; z: number; y: number; dyn?: "me" }[] = [];
+    el.querySelectorAll<HTMLElement>("[data-wx]").forEach((n) => items.push({ el: n, x: +n.dataset.wx!, z: +n.dataset.wz!, y: +n.dataset.wy! }));
+    const me = el.querySelector<HTMLElement>(".cm-me");
+    if (me) items.push({ el: me, x: 0, z: 0, y: 0, dyn: "me" });
+    placeLabels.current = () => {
+      const { w, h } = size.current;
+      el.classList.toggle("is-dots", view.current.s < 0.7);
+      for (const it of items) {
+        let x = it.x, z = it.z;
+        if (it.dyn) {
+          const p = playerRef.current;
+          if (!p) continue;
+          x = p.x;
+          z = p.z;
+        }
+        const [px, py] = toScreen(x, z, it.y);
+        const off = px < -90 || py < -50 || px > w + 90 || py > h + 50;
+        if (off) {
+          if (it.el.style.display !== "none") it.el.style.display = "none";
+          continue;
+        }
+        if (it.el.style.display) it.el.style.display = "";
+        it.el.style.transform = it.dyn ? `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0)` : `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0) translate(-50%,-100%)`;
+      }
+    };
+    placeLabels.current();
+  });
+
   const openCount = places.filter((p) => p.st.open).length;
   const chips: { id: "all" | "open" | PlaceGroup; label: string }[] = [{ id: "all", label: "All" }, { id: "open", label: "Open now" }, ...(Object.keys(GROUP_LABEL) as PlaceGroup[]).map((g) => ({ id: g, label: GROUP_LABEL[g] }))];
 
   return (
     <div className="citymap" ref={wrap}>
       <canvas ref={canvas} className="cm-canvas" />
-      <div className="cm-layer">
+      <div className="cm-layer" ref={layer}>
         {shown.map((p) => pill(p.l, p.st))}
-        {homeAt && <span className="cm-home" style={{ left: homeAt[0], top: homeAt[1] }}><GameIcon name="home" size={14} /></span>}
-        {others.map((o) => {
-          const [px, py] = toScreen(o.x, o.z, 2);
-          return <span key={o.id} className="cm-other" style={{ left: px, top: py }}>{o.name}</span>;
-        })}
-        {me && <span className="cm-me" style={{ left: me[0], top: me[1] }} />}
+        {home && <span className="cm-home" data-wx={home.x} data-wz={home.z} data-wy={6}><GameIcon name="home" size={14} /></span>}
+        {others.map((o) => (
+          <span key={o.id} className="cm-other" data-wx={o.x} data-wz={o.z} data-wy={2}>{o.name}</span>
+        ))}
+        {player && <span className="cm-me" />}
       </div>
 
       <div className={`cm-panel${listOpen ? "" : " is-hidden"}`}>
@@ -424,7 +488,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
             return (
               <li key={l.id}>
                 <button className={selected === l.id ? "is-on" : ""} onClick={() => { onSelect(l.id); const vv = view.current; vv.cx = l.x; vv.cz = l.z; vv.s = Math.max(vv.s, 1.1); dirty.current = true; bump((n) => n + 1); }}>
-                  <span className="cm-row-icon" style={{ background: style.colour }}><GameIcon name={style.icon} size={16} /></span>
+                  <span className="cm-row-icon" style={{ background: pinColour(l.kind, style.colour) }}><GameIcon name={style.icon} size={16} /></span>
                   <span className="cm-row-text">
                     <b>{l.name}</b>
                     <small>{style.label}</small>

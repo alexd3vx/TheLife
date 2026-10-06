@@ -98,6 +98,23 @@ describe("game server", () => {
     expect(server.room.players.get(w.id)!.x).toBeCloseTo(x, 3);
   });
 
+  it("only lets a player arrive far away after paying for a ride", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    const w = await a.next("welcome");
+    const p = server.room.players.get(w.id)!;
+    const stop = server.room.district.landmarks[1]!.entrance;
+    a.send({ t: "arrive", x: stop.x, z: stop.z });
+    await a.next("correct"); // no ride paid: sent back
+    expect(p.x).not.toBeCloseTo(stop.x, 1);
+    p.rideUntil = Date.now() + 60_000;
+    a.send({ t: "arrive", x: stop.x, z: stop.z });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(p.x).toBeCloseTo(stop.x, 3);
+    expect(p.z).toBeCloseTo(stop.z, 3);
+    expect(p.rideUntil).toBe(0);
+  });
+
   it("limits chat to a few messages in a burst", async () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Ada");

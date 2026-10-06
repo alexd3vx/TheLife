@@ -178,6 +178,12 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           if (!result.ok) send(ws, { t: "correct", ...result.correct });
           return;
         }
+        case "arrive": {
+          if (me.where !== "world") return;
+          const result = room.arrive(me, message, now);
+          if (!result.ok) send(ws, { t: "correct", ...result.correct });
+          return;
+        }
         case "chat": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
           broadcast({ t: "chat", from: me.id, name: me.name, text: message.text, at: now });

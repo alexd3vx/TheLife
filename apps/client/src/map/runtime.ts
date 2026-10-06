@@ -57,6 +57,8 @@ export interface MapRuntime {
   skipIntro(): void;
   /** While a menu, the phone or a panel is open the character ignores the keyboard and the stick. */
   setInputBlocked(on: boolean): void;
+  /** The 2D city map is covering the street: stop drawing the 3D world until it is gone. */
+  setCovered(on: boolean): void;
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
@@ -708,6 +710,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       controller.drive(0, 0, 0, false);
     }
   }
+  let covered = false, coveredAcc = 0;
   let lastX = controller.position.x, lastZ = controller.position.z, localSpeed = 0;
   function loop() {
     if (stopped) return;
@@ -717,6 +720,14 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const rawDt = clock.getDelta();
     const dt = Math.min(rawDt, 0.1);
     if (document.hidden) return;
+    if (covered) {
+      coveredAcc += dt;
+      if (coveredAcc > 0.5) {
+        coveredAcc = 0;
+        events.onStats(currentStats());
+      }
+      return;
+    }
     refreshNav();
     advanceFar();
     driveFromInput();
@@ -845,6 +856,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     skipIntro,
     setInputBlocked(on: boolean) {
       inputBlocked = on;
+    },
+    setCovered(on: boolean) {
+      covered = on;
     },
     goTo,
     placeAt(x, z) {

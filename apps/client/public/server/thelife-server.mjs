@@ -62,6 +62,9 @@ function parseClientMessage(raw) {
     case "move":
       if (!finite(m.x) || !finite(m.y, 500) || !finite(m.z) || !finite(m.yaw, 100) || !finite(m.level, 20)) return null;
       return { t: "move", x: m.x, y: m.y, z: m.z, yaw: m.yaw, clip: typeof m.clip === "string" ? m.clip.slice(0, 40) : "Idle_Loop", level: Math.max(0, Math.round(m.level)) };
+    case "arrive":
+      if (!finite(m.x) || !finite(m.z)) return null;
+      return { t: "arrive", x: m.x, z: m.z };
     case "chat": {
       if (typeof m.text !== "string") return null;
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
@@ -3973,6 +3976,7 @@ var Room = class {
       lastCreateAt: 0,
       lastRpcAt: {},
       lastMoveAt: now,
+      rideUntil: 0,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now }, rpc: { tokens: LIMITS.rpc.burst, at: now } }
     };
     if (!walkableAt(this.district, player.x, player.z)) {
@@ -4089,7 +4093,23 @@ var Room = class {
     }
     const result = runRpc(player.life, fn, args);
     player.events.push(...player.life.drainEvents());
+    if (fn === "payRide" && result.ok) player.rideUntil = now + 18e4;
     return result;
+  }
+  /** The player got off a ride they paid for: put them at the stop. One arrival per payment. */
+  arrive(player, to, now) {
+    const b = this.district.bounds;
+    const inside = to.x > b.minX && to.x < b.maxX && to.z > b.minZ && to.z < b.maxZ;
+    if (player.rideUntil < now || !inside || !walkableAt(this.district, to.x, to.z, 0.1)) {
+      return { ok: false, correct: { x: player.x, y: player.y, z: player.z, level: player.level } };
+    }
+    player.rideUntil = 0;
+    player.x = to.x;
+    player.y = 0;
+    player.z = to.z;
+    player.level = 0;
+    player.lastMoveAt = now;
+    return { ok: true };
   }
   /** The state sent to a player's own page: their life, with only the latest few ledger lines. */
   snapshot(player) {
@@ -4310,6 +4330,12 @@ async function startGameServer(options = {}) {
         case "move": {
           if (me.where !== "world" || !room.allow(me, "move", now)) return;
           const result = room.move(me, message, now);
+          if (!result.ok) send(ws, { t: "correct", ...result.correct });
+          return;
+        }
+        case "arrive": {
+          if (me.where !== "world") return;
+          const result = room.arrive(me, message, now);
           if (!result.ok) send(ws, { t: "correct", ...result.correct });
           return;
         }

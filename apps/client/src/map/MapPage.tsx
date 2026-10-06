@@ -124,6 +124,10 @@ export default function MapPage() {
   useEffect(() => {
     runtimeRef.current?.setInputBlocked(blocked);
   }, [blocked, loading]);
+  // under the big map nobody sees the street: don't draw it
+  useEffect(() => {
+    runtimeRef.current?.setCovered(bigMap && !trip);
+  }, [bigMap, trip, loading]);
   useEffect(() => {
     const detach = input.attach();
     const off = input.onPress((a) => {
@@ -214,6 +218,8 @@ export default function MapPage() {
           seconds={trip.seconds}
           onDone={() => {
             runtimeRef.current?.placeAt(trip.x, trip.z);
+            // the server only believes a jump this far because a ride was just paid for
+            world.send({ t: "arrive", x: trip.x, z: trip.z });
             setMode("street");
             setPlaceShown(trip.name);
             window.setTimeout(() => setPlaceShown(null), 3200);

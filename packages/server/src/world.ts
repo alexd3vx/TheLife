@@ -24,6 +24,8 @@ export interface Player extends PlayerView {
   lastCreateAt: number;
   lastRpcAt: Record<string, number>;
   lastMoveAt: number;
+  /** Until when a paid ride lets the player arrive somewhere far away. */
+  rideUntil: number;
   /** Token buckets for rate limits. */
   buckets: Record<"chat" | "pay" | "move" | "rtc" | "rpc", { tokens: number; at: number }>;
 }
@@ -77,6 +79,7 @@ export class Room {
       lastCreateAt: 0,
       lastRpcAt: {},
       lastMoveAt: now,
+      rideUntil: 0,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now }, rpc: { tokens: LIMITS.rpc.burst, at: now } },
     };
     if (!walkableAt(this.district, player.x, player.z)) {
@@ -207,7 +210,24 @@ export class Room {
     }
     const result = runRpc(player.life, fn, args);
     player.events.push(...player.life.drainEvents());
+    if (fn === "payRide" && result.ok) player.rideUntil = now + 180_000;
     return result;
+  }
+
+  /** The player got off a ride they paid for: put them at the stop. One arrival per payment. */
+  arrive(player: Player, to: { x: number; z: number }, now: number): MoveResult {
+    const b = this.district.bounds;
+    const inside = to.x > b.minX && to.x < b.maxX && to.z > b.minZ && to.z < b.maxZ;
+    if (player.rideUntil < now || !inside || !walkableAt(this.district, to.x, to.z, 0.1)) {
+      return { ok: false, correct: { x: player.x, y: player.y, z: player.z, level: player.level } };
+    }
+    player.rideUntil = 0;
+    player.x = to.x;
+    player.y = 0;
+    player.z = to.z;
+    player.level = 0;
+    player.lastMoveAt = now;
+    return { ok: true };
   }
 
   /** The state sent to a player's own page: their life, with only the latest few ledger lines. */
