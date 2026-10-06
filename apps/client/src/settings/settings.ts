@@ -33,6 +33,8 @@ export interface Settings {
   showFps: boolean;
   showStats: boolean;
   nameTags: boolean;
+  /** How the home is shown: walking about inside it in 3D, or looking down on it (isometric). */
+  homeView: "3d" | "iso";
   // controls
   cameraSpeed: number;
   /** Tap the ground to walk there (as well as the stick and keys). */
@@ -75,7 +77,7 @@ const KEY = "thelife.settings.v1";
 
 export function defaultSettings(): Settings {
   const base = GRAPHICS[recommendedPreset()];
-  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, cameraSpeed: 1, tapToWalk: true, keys: structuredClone(DEFAULT_KEYS), touchControls: "auto", touchOpacity: 0.7, touch: structuredClone(DEFAULT_TOUCH), haptics: true, invertLook: false, serverUrl: "" };
+  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, homeView: "3d", cameraSpeed: 1, tapToWalk: true, keys: structuredClone(DEFAULT_KEYS), touchControls: "auto", touchOpacity: 0.7, touch: structuredClone(DEFAULT_TOUCH), haptics: true, invertLook: false, serverUrl: "" };
 }
 
 function clamp(v: unknown, lo: number, hi: number, d: number): number {
@@ -126,6 +128,7 @@ function parse(raw: unknown): Settings {
     showFps: typeof r.showFps === "boolean" ? r.showFps : d.showFps,
     showStats: typeof r.showStats === "boolean" ? r.showStats : d.showStats,
     nameTags: typeof r.nameTags === "boolean" ? r.nameTags : d.nameTags,
+    homeView: pick(r.homeView, ["3d", "iso"] as const, d.homeView),
     cameraSpeed: clamp(r.cameraSpeed, 0.4, 2, d.cameraSpeed),
     tapToWalk: typeof r.tapToWalk === "boolean" ? r.tapToWalk : d.tapToWalk,
     keys: parseKeys(r.keys, d.keys),

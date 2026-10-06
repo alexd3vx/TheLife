@@ -179,6 +179,9 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
 
         {tab === "display" && (
           <>
+            <Row title="Home view" hint="Walk about inside your home in 3D, or look down on it from above (isometric). It applies the next time you open your home.">
+              <Segments label="Home view" value={s.homeView} onChange={(v) => set({ homeView: v })} options={[{ id: "3d", label: "3D" }, { id: "iso", label: "Isometric" }]} />
+            </Row>
             <Row title="Install the game" hint={install.state === "installed" ? "TheLife is installed on this device." : install.state === "ios" ? "In Safari, tap Share, then Add to Home Screen." : install.state === "unavailable" ? "Use your browser menu: Install app or Add to Home Screen." : "Opens full screen from its own icon. You still need internet to play."}>
               {install.state === "ready" ? <button className="st-btn" onClick={() => void install.install()}>Install</button> : <span>{install.state === "installed" ? "Installed" : ""}</span>}
             </Row>

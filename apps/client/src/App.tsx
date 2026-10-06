@@ -1,6 +1,7 @@
 import { isAdmin } from "./ui/admin";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "./auth/AuthProvider";
+import { useSettings } from "./settings/settings";
 import { AuthPage } from "./ui/AuthPage";
 import { HomePlaceholder } from "./ui/HomePlaceholder";
 
@@ -32,6 +33,7 @@ function useHashRoute(): string {
 export function App() {
   const { status } = useAuth();
   const hash = useHashRoute();
+  const { homeView } = useSettings();
 
   const admin = isAdmin();
   if (admin && hash.startsWith("#/lab")) {
@@ -124,15 +126,15 @@ export function App() {
       </Suspense>
     );
   }
-  // Home is the painted 2.5D room. (The old 3D house stays reachable for developers at #/play3d.)
-  if (hash.startsWith("#/play3d") && admin) {
+  // Home is the 3D house by default; the painted isometric room is an option (Settings, Display, Home view) and always at #/iso.
+  if (hash.startsWith("#/play3d") || (hash.startsWith("#/play") && homeView === "3d")) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <PlayPage />
       </Suspense>
     );
   }
-  if (hash.startsWith("#/play")) {
+  if (hash.startsWith("#/play") || hash.startsWith("#/iso")) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <IsoPage />
