@@ -82,7 +82,9 @@ describe.each([["flat", HOUSE_LAYOUT], ["lapo room", LAPO_ROOM], ["nepo duplex",
 
   it("every action the game offers can be done somewhere in the house", () => {
     const used = new Set(layout.items.flatMap((i) => (i.decor ? [] : [i.action ?? furnitureById(i.furniture)?.action])).filter(Boolean));
-    const missing = ["snack", "cook", "eatMeal", "tv", "work", "sleep", "toilet", "shower", "brush", "radio", "read"].filter((a) => !used.has(a));
+    // A one-room lapo start has no TV, desk, radio, fridge or books yet: those are bought later.
+    const needed = _name === "lapo room" ? ["cook", "eatMeal", "sleep", "toilet", "shower", "brush"] : ["snack", "cook", "eatMeal", "tv", "work", "sleep", "toilet", "shower", "brush", "radio", "read"];
+    const missing = needed.filter((a) => !used.has(a));
     expect(missing).toEqual([]);
   });
 

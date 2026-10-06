@@ -15,6 +15,7 @@ painted_wooden_cabinet vintage_cabinet_01 chinese_cabinet
 television_02 Television_01 boombox portable_cassette_player classic_laptop gaming_console desk_lamp_arm_01 vintage_radio_transceiver
 electric_stove vintage_microwave vintage_electric_kettle ceiling_fan wall_clock mantel_clock_01
 potted_plant_01 potted_plant_02 potted_plant_04 ornate_mirror_01 vintage_oil_lamp
+old_bed_frame lightbulb_01 metal_jerrycan metal_stool_01 cardboard_box_01 metal_trash_can brass_pot_01 oil_tin Lantern_01 barrel_03 cement_bag old_tyre bleach_bottle ceramic_pot caged_hanging_light
 """.split()
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets-src", "polyhaven")

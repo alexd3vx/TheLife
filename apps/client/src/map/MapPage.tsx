@@ -119,6 +119,7 @@ export default function MapPage() {
     const detach = input.attach();
     const off = input.onPress((a) => {
       if (a === "phone") return window.dispatchEvent(new CustomEvent("thelife-toggle-phone"));
+      if (a === "inventory") return window.dispatchEvent(new CustomEvent("thelife-toggle-bag"));
       if (blockedRef.current) return;
       if (a === "interact") {
         const n = nearRef.current;

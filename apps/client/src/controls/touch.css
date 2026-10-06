@@ -40,3 +40,4 @@
   .has-touch .play-needs { top: 58px; gap: 5px; padding: 6px 7px; max-width: calc(100% - 130px); }
   .has-touch .play-need-bar { width: 22px; }
 }
+.touch.is-editing .touch-btn, .touch.is-editing .touch-stick { backdrop-filter: none; transition: none; }

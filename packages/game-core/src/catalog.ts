@@ -48,6 +48,7 @@ export const FURNITURE: FurnitureDef[] = [
   item("WoodenChair_01", "Carved chair", "seating", 45_000, "sit"),
   item("plastic_monobloc_chair_01", "Plastic chair", "seating", 6_500, "sit"),
   item("wooden_stool_01", "Wooden stool", "seating", 9_500, "sit"),
+  item("metal_stool_01", "Metal stool", "seating", 5_000, "sit"),
   item("folding_wooden_stool", "Folding stool", "seating", 7_000, "sit"),
   item("painted_wooden_bench", "Wooden bench", "seating", 32_000, "sit"),
   item("Ottoman_01", "Ottoman", "seating", 40_000, "sit"),
@@ -67,6 +68,7 @@ export const FURNITURE: FurnitureDef[] = [
   item("metal_office_desk", "Office desk", "tables", 80_000, "work"),
   item("SchoolDesk_01", "Study desk", "tables", 35_000, "work"),
   // ---- Bedroom
+  item("old_bed_frame", "Old iron bed with thin mattress", "bedroom", 28_000, "sleep"),
   item("p_bed", "Double bed with mattress", "bedroom", 210_000, "sleep"),
   item("GothicBed_01", "Carved wooden bed", "bedroom", 320_000, "sleep"),
   item("vintage_day_bed", "Day bed", "bedroom", 130_000, "sleep"),
@@ -109,6 +111,9 @@ export const FURNITURE: FurnitureDef[] = [
   // ---- Lighting
   item("desk_lamp_arm_01", "Desk lamp", "lighting", 15_000, undefined, "light"),
   item("vintage_oil_lamp", "Oil lamp", "lighting", 8_000, undefined, "light"),
+  item("lightbulb_01", "Bare bulb", "lighting", 1_500, undefined, "light"),
+  item("Lantern_01", "Lantern", "lighting", 7_500, undefined, "light"),
+  item("caged_hanging_light", "Caged hanging light", "lighting", 14_000, undefined, "light"),
   item("p_floor_lamp", "Floor lamp", "lighting", 22_000, undefined, "light"),
   // ---- Decor
   item("wall_clock", "Wall clock", "decor", 8_000),
@@ -117,6 +122,16 @@ export const FURNITURE: FurnitureDef[] = [
   item("potted_plant_02", "Potted plant", "decor", 18_000),
   item("potted_plant_04", "Small plant", "decor", 6_000),
   item("ornate_mirror_01", "Ornate mirror", "decor", 45_000),
+  item("metal_jerrycan", "Water jerrycan", "decor", 4_500),
+  item("barrel_03", "Water barrel", "decor", 14_000),
+  item("cardboard_box_01", "Cardboard box", "decor", 1_500),
+  item("metal_trash_can", "Metal bin", "decor", 7_500),
+  item("brass_pot_01", "Cooking pot", "kitchen", 9_000),
+  item("oil_tin", "Oil tin", "decor", 2_500),
+  item("ceramic_pot", "Ceramic pot", "decor", 6_000),
+  item("cement_bag", "Cement bag", "decor", 6_500),
+  item("old_tyre", "Old tyre", "decor", 3_000),
+  item("bleach_bottle", "Bleach bottle", "decor", 1_200),
   item("p_rug", "Patterned rug", "decor", 25_000),
   item("p_doormat", "Doormat", "decor", 3_500),
 ];

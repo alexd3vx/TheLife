@@ -215,6 +215,21 @@ export const OUTFIT_PARTS = [
 const r = (id, label, group) => ({ id, label, group });
 
 export const REALISTIC = [
+  r("old_bed_frame", "Old metal bed frame", "bedroom"),
+  r("lightbulb_01", "Light bulb", "lighting"),
+  r("metal_jerrycan", "Jerrycan", "containers"),
+  r("metal_stool_01", "Metal stool", "seating"),
+  r("cardboard_box_01", "Cardboard box", "containers"),
+  r("metal_trash_can", "Metal bin", "containers"),
+  r("brass_pot_01", "Brass pot", "kitchen"),
+  r("oil_tin", "Oil tin", "containers"),
+  r("Lantern_01", "Lantern", "lighting"),
+  r("barrel_03", "Water barrel", "containers"),
+  r("cement_bag", "Cement bag", "containers"),
+  r("old_tyre", "Old tyre", "containers"),
+  r("bleach_bottle", "Bleach bottle", "containers"),
+  r("ceramic_pot", "Ceramic pot", "kitchen"),
+  r("caged_hanging_light", "Caged light", "lighting"),
   r("sofa_02", "Sofa (two-seat)", "seating"),
   r("sofa_03", "Sofa (large)", "seating"),
   r("modern_arm_chair_01", "Modern armchair", "seating"),

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import ArrivalFilm from "../arrival/ArrivalFilm";
+import DoorCutscene from "./DoorCutscene";
+import InventoryPanel from "../inventory/InventoryPanel";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
@@ -62,6 +64,8 @@ export default function PlayPage() {
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
+  const recentNotes = useRef(new Map<string, number>());
+  const [bagOpen, setBagOpen] = useState(false);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
 
   const pushToasts = useCallback((events: SimEvent[]) => {
@@ -115,8 +119,13 @@ export default function PlayPage() {
       lastNote.current = latest.id;
       return;
     }
-    if (latest.id === lastNote.current) return;
+    // Only genuinely newer notifications count (your copy of the life runs ahead of the server's and can step back and forth).
+    if (latest.id <= lastNote.current) return;
     lastNote.current = latest.id;
+    const sig = `${latest.title}|${latest.text}`;
+    const nowMs = Date.now();
+    if ((recentNotes.current.get(sig) ?? 0) > nowMs - 90_000) return;
+    recentNotes.current.set(sig, nowMs);
     if (phoneOpen) return;
     setBuzz(true);
     pushToasts([{ kind: "info", text: `${latest.title}: ${latest.text}`, minute: 0 }]);
@@ -267,6 +276,14 @@ export default function PlayPage() {
         </button>
       )}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {hud && !phoneOpen && !bagOpen && (
+        <button className="play-bag" onClick={() => setBagOpen(true)} aria-label="Open your bag">
+          <GameIcon name="bag" size={22} />
+        </button>
+      )}
+      {bagOpen && runtimeRef.current?.session && (
+        <InventoryPanel session={runtimeRef.current.session} onClose={() => setBagOpen(false)} onPhone={() => { setPhoneApp(null); setPhoneOpen(true); }} />
+      )}
       {phoneOpen && runtimeRef.current?.session && (
         <PhoneUI session={runtimeRef.current.session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />
       )}
@@ -290,21 +307,14 @@ export default function PlayPage() {
       {life.justArrived && life.session && !filmDone && (
         <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} onDone={() => setFilmDone(true)} />
       )}
-      {(loading || !life.session) && !error && !(life.justArrived && !filmDone) && (
-        <div className="play-loading">
-          {life.phase === "offline" ? (
-            <>
-              <span>{life.detail || "Can't reach the world right now."}</span>
-              <button className="btn btn-primary" onClick={() => world.reconnect()}>Try again</button>
-            </>
-          ) : life.session ? (
-            "Building the house…"
-          ) : life.phase === "creating" ? (
-            "Starting your life…"
-          ) : (
-            "Connecting…"
-          )}
-        </div>
+      {!error && !(life.justArrived && !filmDone) && (
+        <DoorCutscene
+          ready={!loading && !!life.session}
+          tier={(life.session?.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"}
+          offline={life.phase === "offline"}
+          detail={life.detail}
+          onRetry={() => world.reconnect()}
+        />
       )}
       {error && <div className="play-error">{error}</div>}
     </div>

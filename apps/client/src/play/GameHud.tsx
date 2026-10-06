@@ -1,3 +1,4 @@
+import InventoryPanel from "../inventory/InventoryPanel";
 import { useEffect, useRef, useState } from "react";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import PhoneUI from "../phone/PhoneUI";
@@ -33,17 +34,21 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
   const [hud, setHud] = useState<HudSnapshot>(() => session.snapshot());
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
+  const [bagOpen, setBagOpen] = useState(false);
   useEffect(() => {
     const open = (e: Event) => {
       setPhoneApp((e as CustomEvent<string>).detail ?? null);
       setPhoneOpen(true);
     };
     const toggle = () => setPhoneOpen((o) => !o);
+    const bag = () => setBagOpen((o) => !o);
+    window.addEventListener("thelife-toggle-bag", bag);
     window.addEventListener("thelife-open-phone", open);
     window.addEventListener("thelife-toggle-phone", toggle);
     return () => {
       window.removeEventListener("thelife-open-phone", open);
       window.removeEventListener("thelife-toggle-phone", toggle);
+      window.removeEventListener("thelife-toggle-bag", bag);
     };
   }, []);
   useEffect(() => {
@@ -167,6 +172,12 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
           </span>
         </button>
       )}
+      {!phoneOpen && !bagOpen && (
+        <button className="play-bag" onClick={() => setBagOpen(true)} aria-label="Open your bag">
+          <GameIcon name="bag" size={22} />
+        </button>
+      )}
+      {bagOpen && <InventoryPanel session={session} onClose={() => setBagOpen(false)} onPhone={() => { setPhoneApp(null); setPhoneOpen(true); }} />}
       {phoneOpen && <PhoneUI session={session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />}
 
       {away && (

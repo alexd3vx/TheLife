@@ -28,7 +28,11 @@ function buzz(ms = 12) {
  * dragging anywhere else on the screen turns the camera. With `editing`, each piece can be dragged and resized instead of used.
  */
 export default function TouchControls({ editing = false, nearLabel, onPhone }: { editing?: boolean; nearLabel?: string | null; onPhone?(): void }) {
-  const s = useSettings();
+  const stored = useSettings();
+  // While a control is being dragged only this component redraws; the setting is saved when the finger lifts (saving on every move
+  // would rebuild the graphics settings of the whole game dozens of times a second).
+  const [draft, setDraft] = useState<Record<TouchId, TouchSpot> | null>(null);
+  const s = draft ? { ...stored, touch: draft } : stored;
   const [selected, setSelected] = useState<TouchId | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -42,15 +46,22 @@ export default function TouchControls({ editing = false, nearLabel, onPhone }: {
       e.stopPropagation();
       setSelected(id);
       const box = root.current!.getBoundingClientRect();
+      let latest: Record<TouchId, TouchSpot> = getSettings().touch;
+      setDraft(latest);
       const move = (ev: PointerEvent) => {
         const x = Math.max(0.04, Math.min(0.96, (ev.clientX - box.left) / box.width));
         const y = Math.max(0.06, Math.min(0.94, 1 - (ev.clientY - box.top) / box.height));
-        updateSettings({ touch: { ...getSettings().touch, [id]: { ...getSettings().touch[id], x, y } } });
+        latest = { ...latest, [id]: { ...latest[id], x, y } };
+        setDraft(latest);
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        updateSettings({ touch: latest });
+        setDraft(null);
       };
+      window.addEventListener("pointercancel", up);
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     },

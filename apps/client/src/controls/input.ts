@@ -31,7 +31,7 @@ class Input {
       this.last = "keys";
       if (!this.down.has(e.code)) {
         this.down.add(e.code);
-        if (!e.repeat && (action === "interact" || action === "phone" || action === "resetCamera" || action === "map")) this.press(action);
+        if (!e.repeat && (action === "interact" || action === "phone" || action === "resetCamera" || action === "map" || action === "inventory")) this.press(action);
       }
     };
     const onUp = (e: KeyboardEvent) => {

@@ -1,6 +1,6 @@
 // What the player can do with the keyboard or the touch buttons, and the default keys. Each key can be changed in Settings.
 
-export type GameAction = "forward" | "back" | "left" | "right" | "run" | "interact" | "phone" | "resetCamera" | "map";
+export type GameAction = "forward" | "back" | "left" | "right" | "run" | "interact" | "phone" | "resetCamera" | "map" | "inventory";
 
 export const ACTIONS: { id: GameAction; label: string; hint: string }[] = [
   { id: "forward", label: "Move forward", hint: "Towards where the camera looks" },
@@ -12,6 +12,7 @@ export const ACTIONS: { id: GameAction; label: string; hint: string }[] = [
   { id: "phone", label: "Phone", hint: "Take out or put away your phone" },
   { id: "resetCamera", label: "Camera behind me", hint: "Swing the camera back behind the character" },
   { id: "map", label: "Map", hint: "Open the phone's map" },
+  { id: "inventory", label: "Bag", hint: "Open or close your bag" },
 ];
 
 export type KeyMap = Record<GameAction, string[]>;
@@ -27,6 +28,7 @@ export const DEFAULT_KEYS: KeyMap = {
   phone: ["KeyP", "Tab"],
   resetCamera: ["KeyC"],
   map: ["KeyM"],
+  inventory: ["KeyI", "KeyB"],
 };
 
 /** The buttons on a touch screen. */

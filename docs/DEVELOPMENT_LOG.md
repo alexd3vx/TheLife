@@ -217,3 +217,10 @@ Chronological record of decisions and changes. Newest first.
 - Traffic: cars, SUVs, danfo buses, keke and okada on the real streets (right-hand traffic), some parked, lamps at night and in rain, they stop for you. Instanced meshes (a few draw calls).
 - Arrival film rebuilt on one canvas (runs at 60 fps on software rendering): flight, a real landing (glide, flare, touchdown, tyre smoke, roll-out), taxi to the terminal, ride in a vehicle that matches the background (SUV + escort, yellow taxi, keke + danfo), arrival at the door. Dev preview: `#/filmtest?tier=nepo|middle|lapo`.
 - Controls: stick/buttons clamp to the screen on portrait phones, run button hidden by default (push the stick all the way to run), tidier HUD on phones.
+
+## Lapo room, door cutscene, bag, real assets (round 2)
+- Lapo start room is bigger (9 x 6 m) and nearly empty: old iron bed, kitchen spot, small table and one chair, a bare bulb, a jerrycan, a box, and the landlord's cubicle (toilet, basin, shower). TV, fridge, desk, laptop, radio etc. have to be bought.
+- 15 new CC0 Poly Haven props (iron bed frame, bulb, jerrycan, stools, bin, pots, lantern, barrel, tyre...) added through tools/assets (fetch_polyhaven.py + sources.mjs + build-assets.mjs) and the catalog.
+- The house no longer shows "Building the house": a door cutscene (door swings open on a warm room, camera pushes in) covers the build and fades when ready.
+- Bag: grid by item size (5x4 lapo tote, 6x5 backpack, 7x5 satchel), worked out from the life (phone, wallet, key, ID, chargers, power bank, groceries, meals); open with I/B or the bag button. Pure logic in game-core/bag.ts.
+- Fixes: duplicate phone toasts (house and map HUD), smoother on-screen control editing, real dates in the phone.

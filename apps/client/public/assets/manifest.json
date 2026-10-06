@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-05T12:46:32.633Z",
+ "generatedAt": "2026-10-06T13:24:04.699Z",
  "credits": {
   "quaternius-ubc": {
    "name": "Universal Base Characters (Standard)",
@@ -2347,6 +2347,321 @@
    "label": "Garbage truck",
    "group": "vehicle",
    "credit": "kenney-cars"
+  },
+  {
+   "id": "old_bed_frame",
+   "category": "realistic",
+   "file": "props/real/old_bed_frame.glb",
+   "bytes": 295852,
+   "textureMB": 8.4,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Old metal bed frame",
+   "group": "bedroom",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.9,
+    1.2,
+    2
+   ]
+  },
+  {
+   "id": "lightbulb_01",
+   "category": "realistic",
+   "file": "props/real/lightbulb_01.glb",
+   "bytes": 62876,
+   "textureMB": 1.4,
+   "triangles": 4372,
+   "materials": 2,
+   "textures": 4,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Light bulb",
+   "group": "lighting",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.06,
+    0.1,
+    0.06
+   ]
+  },
+  {
+   "id": "metal_jerrycan",
+   "category": "realistic",
+   "file": "props/real/metal_jerrycan.glb",
+   "bytes": 129284,
+   "textureMB": 1,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Jerrycan",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.35,
+    0.46,
+    0.17
+   ]
+  },
+  {
+   "id": "metal_stool_01",
+   "category": "realistic",
+   "file": "props/real/metal_stool_01.glb",
+   "bytes": 162124,
+   "textureMB": 4.2,
+   "triangles": 8334,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Metal stool",
+   "group": "seating",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.35,
+    0.88,
+    0.35
+   ]
+  },
+  {
+   "id": "cardboard_box_01",
+   "category": "realistic",
+   "file": "props/real/cardboard_box_01.glb",
+   "bytes": 106584,
+   "textureMB": 1,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Cardboard box",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.39,
+    0.34,
+    0.52
+   ]
+  },
+  {
+   "id": "metal_trash_can",
+   "category": "realistic",
+   "file": "props/real/metal_trash_can.glb",
+   "bytes": 239640,
+   "textureMB": 4.2,
+   "triangles": 9794,
+   "materials": 2,
+   "textures": 6,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Metal bin",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.78,
+    0.91,
+    0.56
+   ]
+  },
+  {
+   "id": "brass_pot_01",
+   "category": "realistic",
+   "file": "props/real/brass_pot_01.glb",
+   "bytes": 51676,
+   "textureMB": 1,
+   "triangles": 3760,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Brass pot",
+   "group": "kitchen",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.3,
+    0.29,
+    0.3
+   ]
+  },
+  {
+   "id": "oil_tin",
+   "category": "realistic",
+   "file": "props/real/oil_tin.glb",
+   "bytes": 57036,
+   "textureMB": 1,
+   "triangles": 2834,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Oil tin",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.11,
+    0.21,
+    0.15
+   ]
+  },
+  {
+   "id": "Lantern_01",
+   "category": "realistic",
+   "file": "props/real/Lantern_01.glb",
+   "bytes": 142828,
+   "textureMB": 1,
+   "triangles": 9799,
+   "materials": 2,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Lantern",
+   "group": "lighting",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.12,
+    0.29,
+    0.1
+   ]
+  },
+  {
+   "id": "barrel_03",
+   "category": "realistic",
+   "file": "props/real/barrel_03.glb",
+   "bytes": 96556,
+   "textureMB": 4.2,
+   "triangles": 1473,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Water barrel",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.63,
+    0.93,
+    0.64
+   ]
+  },
+  {
+   "id": "cement_bag",
+   "category": "realistic",
+   "file": "props/real/cement_bag.glb",
+   "bytes": 51388,
+   "textureMB": 4.2,
+   "triangles": 844,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Cement bag",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.46,
+    0.18,
+    0.7
+   ]
+  },
+  {
+   "id": "old_tyre",
+   "category": "realistic",
+   "file": "props/real/old_tyre.glb",
+   "bytes": 127860,
+   "textureMB": 4.2,
+   "triangles": 2880,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Old tyre",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.6,
+    0.6,
+    0.16
+   ]
+  },
+  {
+   "id": "bleach_bottle",
+   "category": "realistic",
+   "file": "props/real/bleach_bottle.glb",
+   "bytes": 52668,
+   "textureMB": 1,
+   "triangles": 4052,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Bleach bottle",
+   "group": "containers",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.09,
+    0.29,
+    0.06
+   ]
+  },
+  {
+   "id": "ceramic_pot",
+   "category": "realistic",
+   "file": "props/real/ceramic_pot.glb",
+   "bytes": 102688,
+   "textureMB": 4.2,
+   "triangles": 3592,
+   "materials": 1,
+   "textures": 3,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Ceramic pot",
+   "group": "kitchen",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    0.66,
+    0.37,
+    0.5
+   ]
+  },
+  {
+   "id": "caged_hanging_light",
+   "category": "realistic",
+   "file": "props/real/caged_hanging_light.glb",
+   "bytes": 245772,
+   "textureMB": 5.6,
+   "triangles": 9800,
+   "materials": 1,
+   "textures": 4,
+   "joints": 0,
+   "animations": 0,
+   "clipNames": [],
+   "label": "Caged light",
+   "group": "lighting",
+   "credit": "polyhaven",
+   "sizeMetres": [
+    1.16,
+    0.75,
+    0.31
+   ]
   },
   {
    "id": "sofa_02",

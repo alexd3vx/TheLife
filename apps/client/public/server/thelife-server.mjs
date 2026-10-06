@@ -2185,6 +2185,7 @@ var FURNITURE = [
   item("WoodenChair_01", "Carved chair", "seating", 45e3, "sit"),
   item("plastic_monobloc_chair_01", "Plastic chair", "seating", 6500, "sit"),
   item("wooden_stool_01", "Wooden stool", "seating", 9500, "sit"),
+  item("metal_stool_01", "Metal stool", "seating", 5e3, "sit"),
   item("folding_wooden_stool", "Folding stool", "seating", 7e3, "sit"),
   item("painted_wooden_bench", "Wooden bench", "seating", 32e3, "sit"),
   item("Ottoman_01", "Ottoman", "seating", 4e4, "sit"),
@@ -2204,6 +2205,7 @@ var FURNITURE = [
   item("metal_office_desk", "Office desk", "tables", 8e4, "work"),
   item("SchoolDesk_01", "Study desk", "tables", 35e3, "work"),
   // ---- Bedroom
+  item("old_bed_frame", "Old iron bed with thin mattress", "bedroom", 28e3, "sleep"),
   item("p_bed", "Double bed with mattress", "bedroom", 21e4, "sleep"),
   item("GothicBed_01", "Carved wooden bed", "bedroom", 32e4, "sleep"),
   item("vintage_day_bed", "Day bed", "bedroom", 13e4, "sleep"),
@@ -2246,6 +2248,9 @@ var FURNITURE = [
   // ---- Lighting
   item("desk_lamp_arm_01", "Desk lamp", "lighting", 15e3, void 0, "light"),
   item("vintage_oil_lamp", "Oil lamp", "lighting", 8e3, void 0, "light"),
+  item("lightbulb_01", "Bare bulb", "lighting", 1500, void 0, "light"),
+  item("Lantern_01", "Lantern", "lighting", 7500, void 0, "light"),
+  item("caged_hanging_light", "Caged hanging light", "lighting", 14e3, void 0, "light"),
   item("p_floor_lamp", "Floor lamp", "lighting", 22e3, void 0, "light"),
   // ---- Decor
   item("wall_clock", "Wall clock", "decor", 8e3),
@@ -2254,6 +2259,16 @@ var FURNITURE = [
   item("potted_plant_02", "Potted plant", "decor", 18e3),
   item("potted_plant_04", "Small plant", "decor", 6e3),
   item("ornate_mirror_01", "Ornate mirror", "decor", 45e3),
+  item("metal_jerrycan", "Water jerrycan", "decor", 4500),
+  item("barrel_03", "Water barrel", "decor", 14e3),
+  item("cardboard_box_01", "Cardboard box", "decor", 1500),
+  item("metal_trash_can", "Metal bin", "decor", 7500),
+  item("brass_pot_01", "Cooking pot", "kitchen", 9e3),
+  item("oil_tin", "Oil tin", "decor", 2500),
+  item("ceramic_pot", "Ceramic pot", "decor", 6e3),
+  item("cement_bag", "Cement bag", "decor", 6500),
+  item("old_tyre", "Old tyre", "decor", 3e3),
+  item("bleach_bottle", "Bleach bottle", "decor", 1200),
   item("p_rug", "Patterned rug", "decor", 25e3),
   item("p_doormat", "Doormat", "decor", 3500)
 ];

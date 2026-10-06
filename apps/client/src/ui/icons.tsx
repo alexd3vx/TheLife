@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import {
-  FaBatteryEmpty, FaBatteryFull, FaCamera, FaBolt, FaBomb, FaBowlFood, FaBuildingColumns, FaCaretDown, FaCaretLeft, FaCaretRight, FaCaretUp, FaCartShopping, FaCheck, FaChurch, FaCloud,
+  FaBatteryEmpty, FaBatteryFull, FaCamera, FaKey, FaIdCard, FaPlug, FaBagShopping, FaBolt, FaBomb, FaBowlFood, FaBuildingColumns, FaCaretDown, FaCaretLeft, FaCaretRight, FaCaretUp, FaCartShopping, FaCheck, FaChurch, FaCloud,
   FaCloudBolt, FaCloudRain, FaCrown, FaDiceOne, FaDiceTwo, FaDiceThree, FaDiceFour, FaDiceFive, FaDiceSix, FaFaceFrown, FaFaceGrinBeam, FaFaceMeh, FaFaceSmile, FaFaceTired, FaFire, FaFlag,
   FaGasPump, FaGraduationCap, FaHand, FaHospital, FaHouse, FaMobileScreen, FaMoon, FaMosque, FaMoneyBillWave, FaMusic, FaPalette, FaPause, FaPencil, FaPersonRunning, FaPersonWalking,
   FaPlane, FaShieldHalved, FaShower, FaSun, FaToilet, FaUtensils, FaXmark, FaMapLocationDot, FaStar, FaCross, FaStarAndCrescent, FaPlay, FaDice, FaAppleWhole, FaLemon, FaCarrot,
@@ -12,7 +12,7 @@ import type { IconType } from "react-icons";
 export const FA = {
   hunger: FaUtensils, energy: FaBolt, hygiene: FaShower, bladder: FaToilet, fun: FaMusic,
   phone: FaMobileScreen, map: FaMapLocationDot, palette: FaPalette, moon: FaMoon, sun: FaSun, cart: FaCartShopping, meal: FaBowlFood, home: FaHouse, money: FaMoneyBillWave,
-  skill: FaGraduationCap, batteryFull: FaBatteryFull, batteryEmpty: FaBatteryEmpty, charging: FaBolt, walk: FaPersonWalking, run: FaPersonRunning, hand: FaHand, camera: FaCamera, spot: FaCircleDot,
+  skill: FaGraduationCap, batteryFull: FaBatteryFull, batteryEmpty: FaBatteryEmpty, charging: FaBolt, walk: FaPersonWalking, run: FaPersonRunning, hand: FaHand, camera: FaCamera, key: FaKey, idcard: FaIdCard, plug: FaPlug, bag: FaBagShopping, spot: FaCircleDot,
   airport: FaPlane, police: FaShieldHalved, hospital: FaHospital, school: FaPencil, church: FaChurch, mosque: FaStarAndCrescent, fire: FaFire, fuel: FaGasPump, hotel: FaCrown,
   market: FaCartShopping, bank: FaBuildingColumns, star: FaStar, cross: FaCross, play: FaPlay, pause: FaPause, check: FaCheck, close: FaXmark, up: FaCaretUp, down: FaCaretDown,
   left: FaCaretLeft, right: FaCaretRight, bomb: FaBomb, flag: FaFlag, dice: FaDice,
