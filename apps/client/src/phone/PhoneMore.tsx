@@ -205,7 +205,7 @@ export function Nolly({ state, act }: P) {
           <Row key={f.id} icon="play" tone="#d9480f" title={f.title} sub={`${f.genre} · ${f.mins} min · streams about 60 MB`} right={<Btn onClick={() => act((s) => bookTicket(s, "rent", f.title))}>{naira(Math.round(f.price / 5 / 100) * 100 + 300)}</Btn>} />
         ))}
       </div>
-      <p className="pa-fine center">Day {day}. Rentals lift your mood like a night in.</p>
+      <p className="pa-fine center">Rentals lift your mood like a night in.</p>
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { useBackHandler } from "./active";
 import { useEffect, useRef, useState } from "react";
 import {
-  BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS, balance, beatById, bestCharger, billPerWeek, clockOf, contactsFor, deliveryFee, isPowerCut, itemPrice, loanLimit, modelOf, newsFor, powerCutOn, shopItemById, skillLevel, wallPower, type GameState, type PhoneResult,
-} from "@thelife/game-core";
+  BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS, balance, beatById, bestCharger, billPerWeek, clockOf, contactsFor, deliveryFee, isPowerCut, itemPrice, loanLimit, modelOf, newsFor, powerCutOn, shopItemById, skillLevel, wallPower, type GameState, type PhoneResult, lagosDateLabel } from "@thelife/game-core";
 import { isOnline, applyForJob, borrow, deposit, markThreadRead, payBill, payRent, placeOrder, plug, quitJob, repay, replyToThread, sendMoney, setAutoPay, setBankCharging, topUp, withdraw } from "./remote";
 import type { GameSession } from "../play/gameSession";
 import { Icon, type IconName } from "./icons";
@@ -315,7 +314,7 @@ export function Pay({ state, act }: { state: GameState; act: Act }) {
                     icon={internal ? "swap" : incoming ? "arrowIn" : "arrowOut"}
                     tone={internal ? "#7a8cff" : incoming ? "#1f9d5c" : "#d9534f"}
                     title={e.reason}
-                    sub={`Day ${c.day} · ${c.label}`}
+                    sub={`${lagosDateLabel(c.day)} · ${c.label}`}
                     right={<strong className={internal ? "" : incoming ? "pa-in" : "pa-out"}>{internal ? "" : incoming ? "+" : "−"}{naira(e.amount)}</strong>}
                   />
                 );

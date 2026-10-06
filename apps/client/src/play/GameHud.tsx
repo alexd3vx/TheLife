@@ -50,6 +50,7 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
     window.dispatchEvent(new CustomEvent("thelife-phone-state", { detail: phoneOpen }));
   }, [phoneOpen]);
   const [buzz, setBuzz] = useState(false);
+  const recentNotes = useRef(new Map<string, number>());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(session.awaySummary.length ? session.awaySummary : null);
   const onHourRef = useRef(onHour);
@@ -96,8 +97,14 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
       lastNote.current = latest.id;
       return;
     }
-    if (latest.id === lastNote.current) return;
+    // Only genuinely newer notifications count. (Your copy of the life runs ahead of the server's; when the server's copy arrives, the
+    // "latest" can step back and forward again, and must not toast the same message over and over.)
+    if (latest.id <= lastNote.current) return;
     lastNote.current = latest.id;
+    const sig = `${latest.title}|${latest.text}`;
+    const nowMs = Date.now();
+    if ((recentNotes.current.get(sig) ?? 0) > nowMs - 90_000) return;
+    recentNotes.current.set(sig, nowMs);
     if (phoneOpen) return;
     setBuzz(true);
     pushToasts([{ kind: "info", text: `${latest.title}: ${latest.text}` }]);

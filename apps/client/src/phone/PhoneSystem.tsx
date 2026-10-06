@@ -2,8 +2,7 @@ import { useBackHandler } from "./active";
 import { GameIcon } from "../ui/icons";
 import { useState } from "react";
 import {
-  HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, storageTotalMB, storageUsedMB, storeAppById, tierAtLeast, type GameState, type StoreAppId, type StoreCategory,
-} from "@thelife/game-core";
+  HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, storageTotalMB, storageUsedMB, storeAppById, tierAtLeast, type GameState, type StoreAppId, type StoreCategory, lagosDateLabel } from "@thelife/game-core";
 import { buyHomePlan, cancelDownload, setMobileData, setWifi, startDownload, uninstallApp } from "./remote";
 import { Btn, MB, Row, Tabs, naira, type Act } from "./PhoneApps";
 import { Icon, type IconName } from "./icons";
@@ -95,7 +94,7 @@ export function Settings({ state, act }: { state: GameState; act: Act }) {
       <p className="pa-section">About</p>
       <div className="pa-group">
         <Row icon="power" tone="#6b7a90" title={model.name} sub={`${model.screen} · ${MB(STORAGE_MB[p.model])} for apps`} />
-        <Row icon="clock" tone="#9aa6ff" title="Phone time" sub={`${clockOf(state.minute).label}, day ${clockOf(state.minute).day}`} />
+        <Row icon="clock" tone="#9aa6ff" title="Phone time" sub={`${clockOf(state.minute).label}, ${lagosDateLabel(clockOf(state.minute).day)}`} />
       </div>
     </div>
   );

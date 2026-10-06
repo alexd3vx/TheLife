@@ -1,8 +1,7 @@
 import { GameIcon, type FaName } from "../ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AJO_AMOUNT, AJO_MEMBERS, COURSES, DIARY_MOODS, EATS_MENU, HEALTH_TIPS, LANGS, LESSON_XP, PHRASES, PRAYER_TIMES, STATIONS, STOCKS, VERSES, balance, clockOf, connection, diaryDone, eventsFor, feedPosts, filmsFor, moodLabel, nextLessonIn, portfolioValue, powerCutOn, ratesFor, skillLevel, sparkProfiles, stockPrice, weatherFor, type GameState, type Lang,
-} from "@thelife/game-core";
+  AJO_AMOUNT, AJO_MEMBERS, COURSES, DIARY_MOODS, EATS_MENU, HEALTH_TIPS, LANGS, LESSON_XP, PHRASES, PRAYER_TIMES, STATIONS, STOCKS, VERSES, balance, clockOf, connection, diaryDone, eventsFor, feedPosts, filmsFor, moodLabel, nextLessonIn, portfolioValue, powerCutOn, ratesFor, skillLevel, sparkProfiles, stockPrice, weatherFor, type GameState, type Lang, lagosDateLabel } from "@thelife/game-core";
 import { bookTicket, addNote, buyShares, deleteNote, diaryCheckIn, joinAjo, orderEats, payAjo, sellShares, streamData, takeLesson } from "./remote";
 import { Btn, MB, Row, naira, type Act } from "./PhoneApps";
 import { Icon } from "./icons";
@@ -39,7 +38,7 @@ export function Calendar({ state }: P) {
   return (
     <div className="pa-page">
       <div className="pa-card-soft">
-        <span>{WEEKDAYS[(day - 1) % 7]} · Day {day}</span>
+        <span>{lagosDateLabel(day)}</span>
         <strong>{clockOf(state.minute).label}</strong>
         <small>{state.profile && state.profile.rentPerWeek > 0 ? `Rent of ${naira(state.profile.rentPerWeek)} due in ${rentIn} day${rentIn === 1 ? "" : "s"}.` : "You live in the family house: no rent."}</small>
       </div>
@@ -141,7 +140,7 @@ export function Clock({ state }: P) {
   const c = clockOf(state.minute);
   return (
     <div className="pa-page">
-      <div className="pa-card-soft"><span>Game time</span><strong>{c.label}</strong><small>Day {c.day}</small></div>
+      <div className="pa-card-soft"><span>Lagos time</span><strong>{c.label}</strong><small>{lagosDateLabel(c.day)}</small></div>
       <p className="pa-section">Stopwatch</p>
       <div className="pa-big">{fmtMs(elapsed)}</div>
       <div className="pa-split">
@@ -525,7 +524,7 @@ export function Diary({ state, act }: P) {
       ) : <div className="pa-note">You've written today. See you tomorrow.</div>}
       <div className="pa-group">
         {state.phone.diary.length === 0 && <p className="pa-empty">Your entries will show here.</p>}
-        {[...state.phone.diary].reverse().map((d, i) => <Row key={i} title={`Day ${d.day} · ${DIARY_MOODS.find((m) => m.id === d.mood)?.label ?? ""}`} sub={d.text || "—"} />)}
+        {[...state.phone.diary].reverse().map((d, i) => <Row key={i} title={`${lagosDateLabel(d.day)} · ${DIARY_MOODS.find((m) => m.id === d.mood)?.label ?? ""}`} sub={d.text || "—"} />)}
       </div>
     </div>
   );

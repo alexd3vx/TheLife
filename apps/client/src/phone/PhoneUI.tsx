@@ -1,7 +1,6 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  appInfo, bestCharger, clockOf, connection, contactsFor, hasApp, isDead, isPowerCut, modelOf, powerCutOn, storeAppById, unreadCount, wallPower, balance, type AnyAppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier, type StoreAppId,
-} from "@thelife/game-core";
+  appInfo, bestCharger, clockOf, connection, contactsFor, hasApp, isDead, isPowerCut, modelOf, powerCutOn, storeAppById, unreadCount, wallPower, balance, type AnyAppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier, type StoreAppId, lagosDateLabel } from "@thelife/game-core";
 import { isOnline, rpc, call, clearNotifications, dismissNotification, markNotificationsRead, openApp, plug, useApp } from "./remote";
 import type { GameSession } from "../play/gameSession";
 import { Battery, Chat, Jobs, Maps, News, Pay, Shop, naira, type Act } from "./PhoneApps";
@@ -442,7 +441,7 @@ function LockScreen({ state, onUnlock, onOpen }: { state: GameState; onUnlock():
       <div className="phone-wall" />
       <div className="phone-lock-time">
         <strong>{clock.label}</strong>
-        <span>Day {clock.day}</span>
+        <span>{lagosDateLabel(clock.day)}</span>
       </div>
       <div className="phone-lock-notes">
         {list.map((n) => (
@@ -505,12 +504,12 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
         {tier === "basic" ? (
           <>
             <strong>{clock.label}</strong>
-            <span>Day {clock.day} · LifePhone Go</span>
+            <span>{lagosDateLabel(clock.day)} · LifePhone Go</span>
           </>
         ) : (
           <div className="phone-widget">
             <strong>{clock.label}</strong>
-            <span>Day {clock.day}</span>
+            <span>{lagosDateLabel(clock.day)}</span>
             <div className="phone-widget-row">
               <span>
                 <Icon name="bolt" size={14} /> {isPowerCut(state.minute) ? "Power cut now" : upcoming?.announced ? `Cut at ${String(Math.floor((upcoming.startMinute % 1440) / 60)).padStart(2, "0")}:00` : "Power on"}
@@ -566,7 +565,7 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
     if (app === "pay") return naira(balance(state.ledger));
     if (app === "shop") return p.orders.length ? `${p.orders.length} on the way` : "Order food, chargers, phones";
     if (app === "jobs") return p.job ? "You have a job" : "Find a job";
-    if (app === "news") return `Day ${clockOf(state.minute).day} headlines`;
+    if (app === "news") return `${lagosDateLabel(clockOf(state.minute).day)} headlines`;
     if (app === "maps") return "Around you";
     if (app === "battery") return `${Math.round(p.battery)}% battery`;
     return appInfo(app).blurb;
@@ -651,7 +650,7 @@ function Drawer({ state, onOpen, onDismiss, onClear, onClose, onPlug, onOpenApp 
       <div className="phone-drawer-head">
         <div>
           <strong>{clock.label}</strong>
-          <span>Day {clock.day}</span>
+          <span>{lagosDateLabel(clock.day)}</span>
         </div>
         <button onClick={onClose} aria-label="Close notifications">
           <Icon name="back" size={20} />

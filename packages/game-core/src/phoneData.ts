@@ -14,7 +14,7 @@ export interface PhoneModel {
   price: number;
   /** Charging ports it has. A charger only works if it fits one of them. */
   ports: PortId[];
-  /** Fastest it can take charge, in battery % per game hour. */
+  /** Fastest it can take charge, in battery % per hour. */
   maxCharge: number;
   /** Hours of use per full battery, screen on / screen off. */
   screenHours: number;

@@ -145,7 +145,7 @@ export default function PlayPage() {
         {hud && (
           <div className="play-clock" aria-label="Time and money">
             <span><GameIcon name={isNight(hud.hourFloat) ? "moon" : "sun"} /></span>
-            <strong>Day {hud.day}</strong>
+            <strong>{hud.date}</strong>
             <span>{hud.time}</span>
             <span className="play-money">{naira(hud.money)}</span>
           </div>
