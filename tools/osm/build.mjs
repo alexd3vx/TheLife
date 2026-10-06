@@ -178,6 +178,18 @@ function simplify(pts, eps) {
   return pts.filter((_, i) => keep[i]);
 }
 
+// What the land is used for, and where the busy roads are: untagged buildings take their character from these.
+const lu = new Grid(W, H, CELL);
+for (const w of o.ways.values()) {
+  if (!closed(w)) continue;
+  const t = w.tags;
+  const v = t.landuse === "commercial" || t.landuse === "retail" || t.amenity === "marketplace" ? 1 : t.landuse === "residential" ? 2 : t.landuse === "industrial" ? 3 : 0;
+  if (v) lu.fillRings([ptsOf(w.nodes)], v);
+}
+const mainG = new Grid(W, H, CELL);
+for (const w of o.ways.values()) if (["primary", "secondary", "tertiary", "trunk", "primary_link", "secondary_link"].includes(w.tags.highway) && !w.tags.tunnel) mainG.line(ptsOf(w.nodes), 6, 1);
+const mainDist = distanceTo(mainG, 1);
+
 const KIND = { house: 0, flats: 1, shop: 2, hangar: 3, terminal: 4 };
 const buildings = [];
 const addBuilding = (id, ring, tags) => {
@@ -196,6 +208,15 @@ const addBuilding = (id, ring, tags) => {
   const hTag = Number.parseFloat(tags.height);
   const m2 = Math.abs(a);
   let kind = "house";
+  const ci0 = Math.floor(cz / CELL) * W + Math.floor(cx / CELL);
+  if (b === "yes" || b === "house" || b === "residential" || b === "apartments" || b === "commercial") {
+    const use = lu.a[ci0], onMain = mainDist[ci0] <= 10;
+    const r0 = hash(id + "k");
+    if (use === 1 && m2 > 45) kind = r0 < 0.8 ? "shop" : "flats";
+    else if (use === 3 && m2 > 200) kind = "hangar";
+    else if (onMain && m2 > 70 && r0 < 0.6) kind = "shop";
+    else if (m2 > 220 && r0 < 0.35) kind = "flats";
+  }
   if (/^(retail|commercial|office|hotel|supermarket|kiosk|shop)$/.test(b) || tags.shop || tags.office) kind = "shop";
   else if (/^(apartments|residential|dormitory)$/.test(b)) kind = "flats";
   else if (/^(industrial|warehouse|garage|garages|hangar|shed|storage_tank|factory)$/.test(b)) kind = "hangar";
@@ -206,7 +227,8 @@ const addBuilding = (id, ring, tags) => {
   else if (kind === "hangar") floors = 1;
   else {
     const r = hash(id);
-    floors = kind === "flats" ? 3 + Math.floor(r * 4) : kind === "shop" ? 2 + Math.floor(r * 4) : m2 > 600 ? 3 + Math.floor(r * 4) : m2 > 200 ? 2 + Math.floor(r * 3) : 1 + Math.floor(r * 2);
+    const core = lu.a[ci0] === 1 || mainDist[ci0] <= 10;
+    floors = core && kind !== "house" ? 3 + Math.floor(r * 5) : kind === "flats" ? 3 + Math.floor(r * 4) : kind === "shop" ? 2 + Math.floor(r * 4) : m2 > 600 ? 3 + Math.floor(r * 4) : m2 > 200 ? 2 + Math.floor(r * 3) : 1 + Math.floor(r * 2);
   }
   floors = Math.max(1, Math.min(40, floors));
   // The turn of the building: along its longest wall.
