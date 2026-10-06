@@ -30,6 +30,10 @@ function parseClientMessage(raw) {
     }
     case "place":
       return { t: "place", where: m.where === "home" ? "home" : "world" };
+    case "look": {
+      const look = typeof m.look === "string" ? cleanLook(m.look) : void 0;
+      return look ? { t: "look", look } : null;
+    }
     case "create": {
       const p = m.profile;
       if (!p || typeof p !== "object") return null;
@@ -40,6 +44,7 @@ function parseClientMessage(raw) {
       return {
         t: "create",
         replace: m.replace === true,
+        look: typeof m.look === "string" ? cleanLook(m.look) : void 0,
         profile: { backgroundId: text(p.backgroundId, 40), sex: p.sex === "female" ? "female" : "male", firstName: firstName.slice(0, 14), surname: cleanName(text(p.surname, 40)).slice(0, 14), hometown: text(p.hometown, 40), startingMoney: Math.round(p.startingMoney), traits }
       };
     }
@@ -75,9 +80,10 @@ function parseClientMessage(raw) {
       return null;
   }
 }
-var LOOK_KEYS = ["body", "skinTone", "hair", "hairColor", "beard", "brows", "eyeColor", "top", "bottom", "shoes", "hood", "pauldrons", "outfitVariant", "topColor", "bottomColor", "shoesColor", "topFabric", "bottomFabric"];
+var LOOK_KEYS = ["body", "skinTone", "hair", "hairColor", "beard", "brows", "eyeColor", "top", "bottom", "shoes", "hood", "pauldrons", "outfitVariant", "topColor", "bottomColor", "shoesColor", "topFabric", "bottomFabric", "accessory", "accessoryColor"];
+var LOOK_NUMBERS = ["height", "build"];
 function cleanLook(raw) {
-  if (raw.length > 1200) return void 0;
+  if (raw.length > 1500) return void 0;
   let value;
   try {
     value = JSON.parse(raw);
@@ -90,6 +96,10 @@ function cleanLook(raw) {
     const v = value[key];
     if (typeof v === "boolean" || v === null) out[key] = v;
     else if (typeof v === "string" && /^[\w-]{1,30}$/.test(v)) out[key] = v;
+  }
+  for (const key of LOOK_NUMBERS) {
+    const v = value[key];
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.round(Math.max(0.8, Math.min(1.25, v)) * 100) / 100;
   }
   return Object.keys(out).length ? JSON.stringify(out) : void 0;
 }
@@ -2391,6 +2401,7 @@ function parseGameState(raw) {
     ledger: { accounts: { ...accounts }, entries, nextId: r.ledger.nextId ?? entries.length + 1 },
     inventory,
     kitchen: parseKitchen(r.kitchen, profile?.tier),
+    ...typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {},
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
     rentOwed: Math.max(0, r.rentOwed ?? 0),
@@ -3870,24 +3881,35 @@ var Room = class {
     const away = simulateAbsence(state, (now - saved.savedAt) / 6e4);
     player.away = away.lines.length ? away.lines : null;
     player.life = new Sim(state, { realClock: true });
+    if (state.look) player.look = state.look;
     player.lastStepAt = now;
     this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
   }
   /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
-  createLife(player, choice, now, replace = false) {
+  createLife(player, choice, now, replace = false, look) {
     if (player.life && !replace) return { ok: false, reason: "You already have a life." };
     if (player.life && now - player.lastCreateAt < 6e4) return { ok: false, reason: "Wait a minute before starting over again." };
     player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile), { realClock: true });
+    if (look) {
+      player.life.state.look = look;
+      player.look = look;
+    }
     player.lastStepAt = now;
     this.assignHome(player);
     player.away = null;
     this.rename(player, `${profile.firstName} ${profile.surname}`.trim());
     this.saveLife(player, now);
     return { ok: true };
+  }
+  /** Saves a new look with the life (the wardrobe and the hairdresser use this). */
+  setLook(player, look) {
+    if (!player.life) return;
+    player.life.state.look = look;
+    player.look = look;
   }
   /** A player's home is a building of their background, the same one every time (their account decides). */
   assignHome(player) {
@@ -4122,12 +4144,19 @@ async function startGameServer(options = {}) {
       }
       switch (message.t) {
         case "create": {
-          const made = room.createLife(me, message.profile, now, message.replace === true);
+          const made = room.createLife(me, message.profile, now, message.replace === true, message.look);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
           sendHome(me, me.where === "world");
+          return;
+        }
+        case "look": {
+          if (!room.allow(me, "rpc", now)) return;
+          room.setLook(me, message.look);
+          sendLife(me);
+          if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
           return;
         }
         case "place": {
