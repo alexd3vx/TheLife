@@ -551,6 +551,11 @@ export class Avatar {
     return true;
   }
 
+  /** Length of a clip in seconds (0 if there is none). */
+  clipDuration(name: string): number {
+    return this.clips.get(name)?.duration ?? 0;
+  }
+
   /** Plays a clip once and holds its last pose. Returns its length in seconds (0 if the clip doesn't exist). */
   playOnce(name: string, fade = 0.12): number {
     const clip = this.clips.get(name);

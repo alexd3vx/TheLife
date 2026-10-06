@@ -152,3 +152,17 @@ Decided: real Lagos clock; slow real-time needs; social apps are separate apps t
 - Roleplay: police, courts and jail as real roles; crimes and consequences; safe zones and fair-play rules (rules screen at login). Not peaceful-only.
 - Voice (server to plan for): phone calls between two players, proximity voice, push-to-talk radio channels.
 - Launch: free test with friends (accounts, 100 players max); money decided later.
+
+## Round 6: the pivot to 2.5D (decided with the owner)
+- The full-3D city was costing more than it gave (about 10 fps in software rendering, mixed art styles, heavy on phones). Decision: **isometric 2.5D, painted / illustrated, warm Lagos colours.** The 3D renderer, OSM map and building generator are parked in the repo; the server, sim, kitchen, bag, phone, accounts and PWA all stay.
+- Pipeline: the existing 3D models are baked into painted isometric sprites (`tools/sprites`), the game draws images on a 2D canvas (`apps/client/src/iso`). Preview at `#/iso`.
+- Phases, one at a time, each signed off by the owner before the next:
+  1. Art direction proof: the player's room (done as a proof; awaiting sign-off).
+  2. Home life done properly (needs, kitchen, bag, sleep, bathroom, buying things, house edit mode).
+  3. Moving between places: painted scenes, fast travel with a short cutscene, a stylised map picture.
+  4. Visiting friends: invite someone to your house, chat; replaces the shared full map.
+  5. Work and money: laptop job mini-game, shops and markets.
+  6. Social apps (LifeGram, LifeChat, Chirp, LifeTok).
+  7. Customisation and wardrobe.
+  8. Roleplay and voice.
+- Scripted texts from made-up people are switched off until real player chat exists.
