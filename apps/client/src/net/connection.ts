@@ -74,6 +74,9 @@ export class Connection {
       return;
     }
     this.ws = ws;
+    // A line that neither opens nor fails would leave the game "connecting" forever: give up on it and try again.
+    const stall = setTimeout(() => ws.readyState === WebSocket.CONNECTING && ws.close(), 8000);
+    ws.addEventListener("close", () => clearTimeout(stall));
     ws.onopen = () => {
       this.tries = 0;
       ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(DEFAULT_LOOK), key: playerKey(), where: this.where(), ...(token ? { token } : {}) } satisfies ClientMessage));
