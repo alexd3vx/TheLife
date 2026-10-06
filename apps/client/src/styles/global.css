@@ -71,3 +71,6 @@ button, input { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Installed / phone play: no pull-to-refresh or bounce while dragging the camera, and room for notches. */
+html, body { overscroll-behavior: none; }

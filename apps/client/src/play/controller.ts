@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ACTIONS } from "@thelife/game-core";
-import { findPath, pathLength, type NavGrid, type Point } from "@thelife/shared";
+import { findPath, isFree, pathLength, type NavGrid, type Point } from "@thelife/shared";
 import type { Avatar } from "../lab/avatar";
 import type { Interaction } from "./interactions";
 
@@ -24,7 +24,7 @@ export interface Status {
   hint: string | null;
 }
 
-type Mode = "idle" | "walking" | "settling" | "doing" | "leaving";
+type Mode = "idle" | "walking" | "driving" | "settling" | "doing" | "leaving";
 
 /** How the player asked to get there: "auto" runs when it is far. */
 export type Pace = "auto" | "walk" | "run";
@@ -59,6 +59,9 @@ export class CharacterController {
   mode: Mode = "idle";
 
   private path: Point[] = [];
+  /** What the player is pushing right now (a stick or the keys): a world direction, how hard, and whether to run. */
+  private driveInput: { x: number; z: number; m: number; run: boolean } | null = null;
+  private heading = { x: 0, z: 1 };
   private pending: Interaction | null = null;
   private interaction: Interaction | null = null;
   private actionId: string | null = null;
@@ -115,6 +118,68 @@ export class CharacterController {
   tapInteraction(interaction: Interaction, pace: Pace = "auto"): boolean {
     if (this.mode === "doing" && this.interaction?.id === interaction.id && !this.resting) return true; // already doing it
     return this.go({ x: interaction.approach[0], z: interaction.approach[1] }, interaction, pace);
+  }
+
+  /**
+   * Direct control, GTA-style: call it every frame with the way the player is pushing (a unit direction in the world, how hard 0 to 1,
+   * and whether to run). It takes over from walking to a tapped spot, gets the character up from a seat first, and slides along walls.
+   */
+  drive(dirX: number, dirZ: number, magnitude: number, run: boolean): void {
+    this.driveInput = magnitude > 0.08 ? { x: dirX, z: dirZ, m: Math.min(1, magnitude), run } : null;
+    if (!this.driveInput) return;
+    if (this.mode === "idle" || this.mode === "walking") {
+      this.path = [];
+      this.pending = null;
+      this.queued = null;
+      this.mode = "driving";
+      this.setStatus(null, null);
+    } else if (this.mode === "doing") {
+      this.game.cancel();
+      this.actionId = null;
+      if (this.interaction?.pose || this.onFloor) {
+        this.getUp(() => {
+          this.mode = "idle";
+        });
+      } else {
+        this.finishActivity();
+        this.mode = "driving";
+        this.setStatus(null, null);
+      }
+    }
+  }
+
+  private driveStep(dt: number) {
+    const inp = this.driveInput;
+    const cruise = inp ? (inp.run ? RUN_SPEED : WALK_SPEED) * inp.m * this.game.speedFactor() : 0;
+    this.speed += THREE.MathUtils.clamp(cruise - this.speed, -DECEL * 1.4 * dt, ACCEL * 1.6 * dt);
+    if (inp) {
+      this.heading = { x: inp.x, z: inp.z };
+      this.yaw = turnToward(this.yaw, Math.atan2(inp.x, inp.z), TURN_RATE * 1.6 * dt);
+    }
+    const step = this.speed * dt;
+    if (step > 0) {
+      const px = this.position.x, pz = this.position.z;
+      const nx = px + this.heading.x * step, nz = pz + this.heading.z * step;
+      if (isFree(this.nav, nx, nz)) {
+        this.position.x = nx;
+        this.position.z = nz;
+      } else if (isFree(this.nav, nx, pz)) {
+        this.position.x = nx; // slide along a wall
+      } else if (isFree(this.nav, px, nz)) {
+        this.position.z = nz;
+      } else {
+        this.speed = 0;
+      }
+    }
+    this.running = !!inp?.run;
+    this.updateLocomotion();
+    if (!inp && this.speed < 0.05) {
+      this.speed = 0;
+      this.mode = "idle";
+      this.running = false;
+      this.avatar.setSpeed(1);
+      this.setClip("Idle_Loop");
+    }
   }
 
   /** Can the character get from here to that spot? (No side effects.) */
@@ -346,6 +411,8 @@ export class CharacterController {
       }
     } else if (this.mode === "walking") {
       this.walk(dt);
+    } else if (this.mode === "driving") {
+      this.driveStep(dt);
     }
     this.followGame();
     this.updateLook(dt);
@@ -533,7 +600,9 @@ export class CharacterController {
   private updateLook(dt: number) {
     this.clock += dt;
     let target: THREE.Vector3 | null = null;
-    if (this.mode === "walking") {
+    if (this.mode === "driving") {
+      target = new THREE.Vector3(this.position.x + this.heading.x * 4, 1.55, this.position.z + this.heading.z * 4);
+    } else if (this.mode === "walking") {
       const ahead = this.path[1] ?? this.path[0];
       if (ahead) target = new THREE.Vector3(ahead.x, 1.55, ahead.z);
     } else if ((this.mode === "doing" || this.mode === "settling") && this.interaction?.look) {

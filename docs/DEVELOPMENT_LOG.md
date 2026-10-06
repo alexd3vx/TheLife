@@ -204,3 +204,9 @@ Chronological record of decisions and changes. Newest first.
 - `game-core/homes.ts`: every player has a home door on a real building that fits their background (nepo: detached houses in the east, middle: flats in the middle, lapo: small houses in the old west), reachable on foot from the spawn. The server picks it from the account/key (same every time), sends a `home` message, and puts you at your door (`correct`) when you step out (`place world`).
 - The house scene is now your private interior; the layouts are `play/layouts.ts` (lapo room with a bathroom cubicle, the middle flat, a nepo duplex). "Go outside" / "Enter home" connect the two. Your door is drawn in the street (a door, a lamp, a glowing mat) and a button appears when you stand at it.
 - `arrival/ArrivalFilm.tsx`: the opening film after a character is made (title, flight, approach, landing, ride, home), tinted per background; vector + CSS only; tap to skip.
+
+## GTA controls + PWA
+- Direct movement: WASD/arrows (rebindable in Settings → Controls) and an on-screen stick, camera-relative; Shift/Run button; E / hand button to interact (enter home, pay a player nearby); C camera behind me; P phone; M map. Right mouse also turns the camera. Tap-to-walk is a setting.
+- Touch layout editor (Settings → Controls → Edit layout): drag, resize, hide or reset each control; opacity and vibration settings. On phones the HUD tucks away to keep the screen clear.
+- PWA: manifest, icons (any + maskable + Apple), service worker (app files cached; play still needs internet), install button + Add-to-Home-Screen hint and Full screen toggle in Settings → Display.
+- Creator: Start/Back buttons on the traits page now pinned to the bottom of the screen.

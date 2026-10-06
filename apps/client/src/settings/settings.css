@@ -28,3 +28,15 @@
 .st-slider output { min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; font-size: .85rem; }
 .st-text { width: min(260px, 60vw); padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .06); color: inherit; font: inherit; }
 .st-gear { position: absolute; z-index: 5; }
+
+.st-sub { margin: 18px 0 6px; font-size: .95rem; }
+.st-keys { display: grid; gap: 6px; }
+.st-key-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.st-key-caps { display: flex; gap: 4px; }
+.st-key-caps kbd { background: var(--surface-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 2px 8px; font: inherit; font-weight: 700; min-width: 26px; text-align: center; }
+.st-key-row button, .st-key-reset, .st-btn { background: var(--surface-2); color: inherit; border: 1px solid var(--border); border-radius: 10px; padding: 6px 12px; cursor: pointer; min-height: 36px; }
+.st-key-reset { justify-self: start; margin-top: 6px; }
+.st-layout { position: fixed; inset: 0; z-index: 60; background: #0b0a09; }
+.st-layout-bar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: rgba(20, 17, 15, .92); border: 1px solid var(--border); border-radius: 14px; padding: 8px 14px; color: #fff; font-size: .85rem; z-index: 6; max-width: calc(100% - 20px); flex-wrap: wrap; justify-content: center; }
+.st-layout-bar button { background: var(--surface-2); color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 6px 14px; cursor: pointer; }
+.st-layout-bar .is-primary { background: var(--accent); color: var(--accent-ink); }

@@ -1,3 +1,4 @@
+import { DEFAULT_KEYS, DEFAULT_TOUCH, type GameAction, type KeyMap, type TouchId, type TouchSpot } from "../controls/bindings";
 import { useSyncExternalStore } from "react";
 
 // Player settings: graphics, display, controls, online. Saved on this device; the game reads them live.
@@ -34,6 +35,15 @@ export interface Settings {
   nameTags: boolean;
   // controls
   cameraSpeed: number;
+  /** Tap the ground to walk there (as well as the stick and keys). */
+  tapToWalk: boolean;
+  keys: KeyMap;
+  /** Touch controls: shown on touch screens ("auto"), always, or never. */
+  touchControls: "auto" | "on" | "off";
+  touchOpacity: number;
+  touch: Record<TouchId, TouchSpot>;
+  haptics: boolean;
+  invertLook: boolean;
   // online
   serverUrl: string;
 }
@@ -64,11 +74,33 @@ const KEY = "thelife.settings.v1";
 
 export function defaultSettings(): Settings {
   const base = GRAPHICS[recommendedPreset()];
-  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, cameraSpeed: 1, serverUrl: "" };
+  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, cameraSpeed: 1, tapToWalk: true, keys: structuredClone(DEFAULT_KEYS), touchControls: "auto", touchOpacity: 0.7, touch: structuredClone(DEFAULT_TOUCH), haptics: true, invertLook: false, serverUrl: "" };
 }
 
 function clamp(v: unknown, lo: number, hi: number, d: number): number {
   return typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
+}
+
+function parseKeys(raw: unknown, d: KeyMap): KeyMap {
+  const out = structuredClone(d);
+  if (!raw || typeof raw !== "object") return out;
+  for (const id of Object.keys(d) as GameAction[]) {
+    const v = (raw as Record<string, unknown>)[id];
+    if (Array.isArray(v) && v.length > 0) out[id] = v.filter((k): k is string => typeof k === "string" && /^[A-Za-z0-9]{1,20}$/.test(k)).slice(0, 3);
+    if (out[id].length === 0) out[id] = d[id];
+  }
+  return out;
+}
+
+function parseTouch(raw: unknown, d: Record<TouchId, TouchSpot>): Record<TouchId, TouchSpot> {
+  const out = structuredClone(d);
+  if (!raw || typeof raw !== "object") return out;
+  for (const id of Object.keys(d) as TouchId[]) {
+    const v = (raw as Record<string, Partial<TouchSpot>>)[id];
+    if (!v || typeof v !== "object") continue;
+    out[id] = { x: clamp(v.x, 0.04, 0.96, d[id].x), y: clamp(v.y, 0.06, 0.94, d[id].y), s: clamp(v.s, 0.6, 1.8, d[id].s), ...(v.hidden === true ? { hidden: true } : d[id].hidden && v.hidden !== false ? { hidden: true } : {}) };
+  }
+  return out;
 }
 
 function parse(raw: unknown): Settings {
@@ -94,6 +126,13 @@ function parse(raw: unknown): Settings {
     showStats: typeof r.showStats === "boolean" ? r.showStats : d.showStats,
     nameTags: typeof r.nameTags === "boolean" ? r.nameTags : d.nameTags,
     cameraSpeed: clamp(r.cameraSpeed, 0.4, 2, d.cameraSpeed),
+    tapToWalk: typeof r.tapToWalk === "boolean" ? r.tapToWalk : d.tapToWalk,
+    keys: parseKeys(r.keys, d.keys),
+    touchControls: pick(r.touchControls, ["auto", "on", "off"] as const, d.touchControls),
+    touchOpacity: clamp(r.touchOpacity, 0.25, 1, d.touchOpacity),
+    touch: parseTouch(r.touch, d.touch),
+    haptics: typeof r.haptics === "boolean" ? r.haptics : d.haptics,
+    invertLook: typeof r.invertLook === "boolean" ? r.invertLook : d.invertLook,
     serverUrl: typeof r.serverUrl === "string" ? r.serverUrl.slice(0, 200) : d.serverUrl,
   };
 }

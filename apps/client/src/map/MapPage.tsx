@@ -14,6 +14,8 @@ import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { setChargeChecker } from "../phone/remote";
 import { chargingSpotNear } from "@thelife/game-core";
+import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
+import { input } from "../controls/input";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -85,6 +87,54 @@ export default function MapPage() {
   }, [home, loading]);
   const atHome = !!(home && stats && Math.hypot(stats.position.x - home.spawn.x, stats.position.z - home.spawn.z) < 7);
 
+  // Keyboard and on-screen controls: what the interact button does depends on what is close.
+  const touchOn = useTouchControlsVisible();
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setPhoneOpen(!!(e as CustomEvent<boolean>).detail);
+    window.addEventListener("thelife-phone-state", on);
+    return () => window.removeEventListener("thelife-phone-state", on);
+  }, []);
+  const nearPlayer = (() => {
+    if (!stats || intro !== "off") return null;
+    let best: { id: string; name: string } | null = null;
+    let bestD = 3.2;
+    for (const p of runtimeRef.current?.online.remotes.list() ?? []) {
+      const d = Math.hypot(p.x - stats.position.x, p.z - stats.position.z);
+      if (d < bestD) {
+        bestD = d;
+        best = { id: p.id, name: p.name };
+      }
+    }
+    return best;
+  })();
+  const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlayer ? nearPlayer.name : null;
+  const nearRef = useRef({ atHome, nearPlayer });
+  nearRef.current = { atHome, nearPlayer };
+  const blocked = phoneOpen || showSettings || bigMap || intro !== "off";
+  useEffect(() => {
+    runtimeRef.current?.setInputBlocked(blocked);
+  }, [blocked, loading]);
+  useEffect(() => {
+    const detach = input.attach();
+    const off = input.onPress((a) => {
+      if (a === "phone") return window.dispatchEvent(new CustomEvent("thelife-toggle-phone"));
+      if (blockedRef.current) return;
+      if (a === "interact") {
+        const n = nearRef.current;
+        if (n.atHome) window.location.hash = "#/play";
+        else if (n.nearPlayer) window.dispatchEvent(new CustomEvent("thelife-open-online", { detail: n.nearPlayer.id }));
+      } else if (a === "resetCamera") runtimeRef.current?.resetView();
+      else if (a === "map") window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "maps" }));
+    });
+    return () => {
+      off();
+      detach();
+    };
+  }, []);
+  const blockedRef = useRef(blocked);
+  blockedRef.current = blocked;
+
   // Out in the city a phone only charges beside a place with power.
   useEffect(() => {
     setChargeChecker(() => {
@@ -132,7 +182,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="play">
+    <div className={`play${touchOn ? " has-touch" : ""}`}>
       <div className="play-stage" ref={containerRef} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">
@@ -253,6 +303,7 @@ export default function MapPage() {
         </div>
       )}
 
+      {touchOn && !loading && !error && life.session && intro === "off" && !showSettings && !bigMap && !phoneOpen && <TouchControls nearLabel={nearLabel} />}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {!loading && !error && !life.session && (
         <div className="play-loading" role="status">

@@ -87,5 +87,5 @@
 .creator.is-full .creator-panel { border: 0; background: radial-gradient(90% 60% at 50% 0%, #2a1c10 0%, var(--bg) 70%); align-items: center; }
 .creator.is-full .creator-head, .creator.is-full .creator-body { width: min(720px, 100%); }
 .creator.is-full .creator-body { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
-.creator.is-full .creator-actions { position: sticky; bottom: 0; margin: 0 -18px; padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, var(--bg) 28%); }
+.creator.is-full .creator-actions { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(720px, 100%); box-sizing: border-box; margin: 0; z-index: 5; padding: 26px 18px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, var(--bg) 40%); }
 .creator.is-full .creator-traitlist { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }

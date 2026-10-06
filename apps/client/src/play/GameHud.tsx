@@ -38,9 +38,17 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
       setPhoneApp((e as CustomEvent<string>).detail ?? null);
       setPhoneOpen(true);
     };
+    const toggle = () => setPhoneOpen((o) => !o);
     window.addEventListener("thelife-open-phone", open);
-    return () => window.removeEventListener("thelife-open-phone", open);
+    window.addEventListener("thelife-toggle-phone", toggle);
+    return () => {
+      window.removeEventListener("thelife-open-phone", open);
+      window.removeEventListener("thelife-toggle-phone", toggle);
+    };
   }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("thelife-phone-state", { detail: phoneOpen }));
+  }, [phoneOpen]);
   const [buzz, setBuzz] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(session.awaySummary.length ? session.awaySummary : null);

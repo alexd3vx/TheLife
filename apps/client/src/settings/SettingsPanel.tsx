@@ -1,6 +1,9 @@
-import { useState } from "react";
-import { PRESET_LABEL, applyPreset, recommendedPreset, updateSettings, useSettings, type Preset, type Settings, type ShadowQuality } from "./settings";
+import { useEffect, useState } from "react";
+import { PRESET_LABEL, applyPreset, getSettings, recommendedPreset, updateSettings, useSettings, type Preset, type Settings, type ShadowQuality } from "./settings";
 import { GameIcon } from "../ui/icons";
+import { canFullscreen, toggleFullscreen, useInstall } from "../pwa/pwa";
+import { ACTIONS, DEFAULT_KEYS, DEFAULT_TOUCH, keyName, type GameAction } from "../controls/bindings";
+import TouchControls, { isTouchDevice } from "../controls/TouchControls";
 import "./settings.css";
 
 type Tab = "graphics" | "display" | "controls" | "online";
@@ -46,11 +49,48 @@ function Slider({ value, min, max, step, onChange, format, label }: { value: num
   );
 }
 
+/** One row per action; press "Change" then the key you want. */
+function KeyBinder() {
+  const s = useSettings();
+  const [waiting, setWaiting] = useState<GameAction | null>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    const on = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== "Escape") {
+        const keys = { ...getKeys() };
+        for (const a of Object.keys(keys) as GameAction[]) keys[a] = keys[a].filter((k) => k !== e.code);
+        keys[waiting] = [e.code];
+        updateSettings({ keys });
+      }
+      setWaiting(null);
+    };
+    window.addEventListener("keydown", on, true);
+    return () => window.removeEventListener("keydown", on, true);
+  }, [waiting]);
+  return (
+    <div className="st-keys">
+      {ACTIONS.map((a) => (
+        <div className="st-key-row" key={a.id}>
+          <span>{a.label}</span>
+          <span className="st-key-caps">{s.keys[a.id].length ? s.keys[a.id].map((k) => <kbd key={k}>{keyName(k)}</kbd>) : <em>none</em>}</span>
+          <button onClick={() => setWaiting(waiting === a.id ? null : a.id)}>{waiting === a.id ? "Press a key…" : "Change"}</button>
+        </div>
+      ))}
+      <button className="st-key-reset" onClick={() => updateSettings({ keys: structuredClone(DEFAULT_KEYS) })}>Reset keys</button>
+    </div>
+  );
+}
+const getKeys = () => getSettings().keys;
+
 /** The settings screen: a preset on top, then every option. Changes apply to the running game straight away. */
 export default function SettingsPanel({ onClose }: { onClose?(): void }) {
   const s = useSettings();
   const [tab, setTab] = useState<Tab>("graphics");
   const set = (patch: Partial<Settings>) => updateSettings(patch);
+  const [editLayout, setEditLayout] = useState(false);
+  const install = useInstall();
   const rec = recommendedPreset();
   const presets: Preset[] = ["recommended", "low", "medium", "high", "ultra"];
   return (
@@ -137,6 +177,14 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
 
         {tab === "display" && (
           <>
+            <Row title="Install the game" hint={install.state === "installed" ? "TheLife is installed on this device." : install.state === "ios" ? "In Safari, tap Share, then Add to Home Screen." : install.state === "unavailable" ? "Use your browser menu: Install app or Add to Home Screen." : "Opens full screen from its own icon. You still need internet to play."}>
+              {install.state === "ready" ? <button className="st-btn" onClick={() => void install.install()}>Install</button> : <span>{install.state === "installed" ? "Installed" : ""}</span>}
+            </Row>
+            {canFullscreen() && (
+              <Row title="Full screen" hint="Hides the browser bars.">
+                <button className="st-btn" onClick={toggleFullscreen}>Toggle</button>
+              </Row>
+            )}
             <Row title="Show frame rate">
               <Toggle label="Show frame rate" on={s.showFps} onChange={(v) => set({ showFps: v })} />
             </Row>
@@ -154,10 +202,40 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
             <Row title="Camera speed" hint="How fast the view turns and zooms when you drag.">
               <Slider label="Camera speed" value={s.cameraSpeed} min={0.4} max={2} step={0.1} onChange={(v) => set({ cameraSpeed: v })} format={(v) => `${v.toFixed(1)}x`} />
             </Row>
-            <p className="st-note">Tap the ground to walk there (you run if it is far). Tap something you can use to see what you can do with it. Drag to turn the camera, pinch or scroll to zoom.</p>
+            <Row title="Tap the ground to walk" hint="Turn off if you only want to walk with the keys or the stick.">
+              <Toggle on={s.tapToWalk} onChange={(v) => set({ tapToWalk: v })} label="Tap the ground to walk" />
+            </Row>
+            <Row title="Flip camera drag" hint="Swap the direction the camera turns when you drag.">
+              <Toggle on={s.invertLook} onChange={(v) => set({ invertLook: v })} label="Flip camera drag" />
+            </Row>
+            <Row title="On-screen controls" hint="The stick and buttons. Auto shows them on phones and tablets.">
+              <Segments label="On-screen controls" value={s.touchControls} options={[{ id: "auto", label: "Auto" }, { id: "on", label: "On" }, { id: "off", label: "Off" }]} onChange={(v) => set({ touchControls: v })} />
+            </Row>
+            <Row title="Button see-through" hint="How faint the on-screen controls are.">
+              <Slider label="Button see-through" value={s.touchOpacity} min={0.25} max={1} step={0.05} onChange={(v) => set({ touchOpacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            </Row>
+            <Row title="Vibration" hint="A small buzz when you press a button.">
+              <Toggle on={s.haptics} onChange={(v) => set({ haptics: v })} label="Vibration" />
+            </Row>
+            <Row title="Move the buttons" hint="Drag each control where your thumbs like it, make it bigger or smaller, or hide it.">
+              <button className="st-btn" onClick={() => setEditLayout(true)}>Edit layout</button>
+            </Row>
+            <h3 className="st-sub">Keyboard</h3>
+            <KeyBinder />
+            <p className="st-note">{isTouchDevice() ? "Drag the screen to turn the camera, pinch to zoom." : "Hold the left or right mouse button and drag to turn the camera. Scroll to zoom."} Tap the ground to walk there when that is on.</p>
           </>
         )}
 
+        {editLayout && (
+          <div className="st-layout" role="dialog" aria-label="Edit on-screen controls">
+            <TouchControls editing />
+            <div className="st-layout-bar">
+              <span>Drag a control to move it. Tap one to resize or hide it.</span>
+              <button onClick={() => updateSettings({ touch: structuredClone(DEFAULT_TOUCH) })}>Reset all</button>
+              <button className="is-primary" onClick={() => setEditLayout(false)}>Done</button>
+            </div>
+          </div>
+        )}
         {tab === "online" && (
           <>
             <Row title="Server address" hint="Where the online world runs, for example wss://46-105-53-216.sslip.io">

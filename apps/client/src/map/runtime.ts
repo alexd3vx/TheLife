@@ -21,6 +21,7 @@ import { bodyFor, sexOf } from "../lab/looks";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 import { RemotePlayers } from "./remotePlayers";
 import { DoorManager } from "./doors";
+import { input } from "../controls/input";
 
 export interface MapStats {
   fps: number;
@@ -51,6 +52,8 @@ export interface MapRuntime {
   setHome(h: { door: { x: number; z: number }; spawn: { x: number; z: number }; tier: string } | null): void;
   playIntro(): Promise<void>;
   skipIntro(): void;
+  /** While a menu, the phone or a panel is open the character ignores the keyboard and the stick. */
+  setInputBlocked(on: boolean): void;
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
@@ -352,7 +355,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   controls.minPolarAngle = 0.15;
   controls.maxPolarAngle = 1.42;
   controls.screenSpacePanning = false;
-  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
   /** The side of the player with the most open ground, so the camera never starts inside a building. */
   function openAzimuth(): number {
     const base = Math.atan2(8, 14);
@@ -554,6 +557,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       goTo(lm.id, "auto");
       return;
     }
+    if (!getSettings().tapToWalk) return events.onMenu(null);
     plane.constant = -controller.position.y - 0.02; // taps land on the floor the player is on
     const point = groundAt(clientX, clientY);
     const bnds = district.bounds;
@@ -623,7 +627,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     renderer.shadowMap.needsUpdate = true;
     void fx?.set(st.bloom, st.bloomStrength);
     frameGap = st.fpsCap ? 1000 / st.fpsCap - 2 : 0;
-    controls.rotateSpeed = st.cameraSpeed;
+    controls.rotateSpeed = st.cameraSpeed * (st.invertLook ? -1 : 1);
     controls.zoomSpeed = st.cameraSpeed;
     streamer.setDrawDistance(st.drawDistance);
     const fogNear = 140 * st.drawDistance, fogFar = 330 * st.drawDistance;
@@ -669,6 +673,23 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     };
   }
 
+  // ---- walking with the keys or the on-screen stick, relative to where the camera looks
+  let inputBlocked = false;
+  const camFwd = new THREE.Vector3();
+  function driveFromInput() {
+    const mv = !intro && !inputBlocked ? input.move() : { x: 0, y: 0, m: 0 };
+    if (mv.m > 0.08) {
+      camFwd.set(controls.target.x - camera.position.x, 0, controls.target.z - camera.position.z);
+      if (camFwd.lengthSq() < 1e-6) camFwd.set(0, 0, -1);
+      camFwd.normalize();
+      // forward = away from the camera; screen-right = forward x up = (-fz, fx)
+      const rx = -camFwd.z, rz = camFwd.x;
+      farRoute = null;
+      controller.drive(camFwd.x * mv.y + rx * mv.x, camFwd.z * mv.y + rz * mv.x, mv.m, input.running());
+    } else if (controller.mode === "driving") {
+      controller.drive(0, 0, 0, false);
+    }
+  }
   let lastX = controller.position.x, lastZ = controller.position.z, localSpeed = 0;
   function loop() {
     if (stopped) return;
@@ -680,6 +701,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (document.hidden) return;
     refreshNav();
     advanceFar();
+    driveFromInput();
     controller.update(dt);
     terrain.update(controller.position.x, controller.position.z);
     remotes.focus.copy(controller.position);
@@ -798,6 +820,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     setHome,
     playIntro,
     skipIntro,
+    setInputBlocked(on: boolean) {
+      inputBlocked = on;
+    },
     goTo,
     setNight(on) {
       night = on;

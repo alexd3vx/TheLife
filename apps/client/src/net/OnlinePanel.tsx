@@ -133,6 +133,16 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
     setPaying(null);
   };
 
+  // The interact button next to another player opens this panel with the pay box ready.
+  useEffect(() => {
+    const on = (e: Event) => {
+      setOpen(true);
+      setPaying((e as CustomEvent<string>).detail ?? null);
+    };
+    window.addEventListener("thelife-open-online", on);
+    return () => window.removeEventListener("thelife-open-online", on);
+  }, []);
+
   const online = status === "online";
   return (
     <>
