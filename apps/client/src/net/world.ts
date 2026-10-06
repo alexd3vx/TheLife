@@ -13,6 +13,8 @@ class World {
   detail = "";
   /** The newest welcome, so panels that open later still know who is here. */
   lastWelcome: Extract<ServerMessage, { t: "welcome" }> | null = null;
+  /** At home, or out in the city. Others only see you in the city. */
+  private where: "home" | "world" = "world";
   private conn: Connection | null = null;
   private seq = 0;
   private readonly listeners = new Set<Listener>();
@@ -32,7 +34,13 @@ class World {
         if (m.t === "welcome") this.lastWelcome = m;
         this.listeners.forEach((l) => l(m));
       },
-    });
+    }, () => this.where);
+  }
+
+  /** Say where you are now (the next connection will say it too). */
+  setPlace(where: "home" | "world"): void {
+    this.where = where;
+    this.conn?.send({ t: "place", where });
   }
 
   disconnect(): void {

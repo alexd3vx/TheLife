@@ -114,7 +114,7 @@ export default function CreatorPage() {
     if (!profile) return;
     saveLook(look);
     beginLife({ ...profile, traits: sanitizeTraits(traits), firstName: firstName.trim() || profile.firstName, surname: surname.trim() || profile.surname });
-    window.location.hash = "#/map";
+    window.location.hash = "#/play";
   }, [profile, look, firstName, surname, traits]);
 
   const weaknessCount = traits.filter((id) => TRAITS.find((t) => t.id === id)?.kind === "weakness").length;

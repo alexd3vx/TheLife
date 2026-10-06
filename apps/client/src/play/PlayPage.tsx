@@ -1,6 +1,8 @@
 import { isAdmin } from "../ui/admin";
 import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useOnlineLife } from "../net/useOnlineLife";
+import { world } from "../net/world";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
@@ -54,6 +56,7 @@ export default function PlayPage() {
   const [menu, setMenu] = useState<TapMenu | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSettings();
+  const life = useOnlineLife("home");
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
@@ -67,11 +70,11 @@ export default function PlayPage() {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || !life.session) return;
     let disposed = false;
     loadManifest()
       .then((manifest) =>
-        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu }),
+        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu }, { session: life.session! }),
       )
       .then((runtime) => {
         if (disposed) {
@@ -97,7 +100,7 @@ export default function PlayPage() {
       runtimeRef.current?.dispose();
       runtimeRef.current = null;
     };
-  }, [pushToasts]);
+  }, [pushToasts, life.session]);
 
   useEffect(() => runtimeRef.current?.setFollow(follow), [follow]);
   useEffect(() => runtimeRef.current?.setPhoneOpen(phoneOpen), [phoneOpen]);
@@ -129,8 +132,8 @@ export default function PlayPage() {
         <a className="play-chip" href="#/" aria-label="Back">
           ←<span className="play-chip-label"> Back</span>
         </a>
-        <a className="play-chip" href="#/map" aria-label="Lagos Island">
-          <GameIcon name="map" /><span className="play-chip-label"> Lagos</span>
+        <a className="play-chip" href="#/map" aria-label="Go outside into Lagos">
+          <GameIcon name="map" /><span className="play-chip-label"> Go outside</span>
         </a>
         {isAdmin() && (
           <a className="play-chip" href="#/lab" aria-label="Asset lab (test)">
@@ -282,7 +285,22 @@ export default function PlayPage() {
         </div>
       )}
 
-      {loading && <div className="play-loading">Building the house…</div>}
+      {(loading || !life.session) && !error && (
+        <div className="play-loading">
+          {life.phase === "offline" ? (
+            <>
+              <span>{life.detail || "Can't reach the world right now."}</span>
+              <button className="btn btn-primary" onClick={() => world.reconnect()}>Try again</button>
+            </>
+          ) : life.session ? (
+            "Building the house…"
+          ) : life.phase === "creating" ? (
+            "Starting your life…"
+          ) : (
+            "Connecting…"
+          )}
+        </div>
+      )}
       {error && <div className="play-error">{error}</div>}
     </div>
   );

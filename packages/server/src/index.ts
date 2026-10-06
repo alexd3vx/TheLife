@@ -106,7 +106,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           other.life = null;
           sockets.get(other.id)?.close(4004, "signed in elsewhere");
         }
-        const joined = room.join(message.name, now, message.look, key);
+        const joined = room.join(message.name, now, message.look, key, message.where ?? "world");
         if (!joined.ok) {
           send(ws, { t: "error", reason: joined.reason });
           return ws.close(4003, "full");
@@ -114,8 +114,8 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         clearTimeout(helloTimer);
         me = joined.player;
         sockets.set(me.id, ws);
-        send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: [...room.players.values()].filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
-        broadcast({ t: "join", player: room.view(me) }, me.id);
+        send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
+        if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
         if (me.life) sendLife(me);
         else send(ws, { t: "needsLife" });
         return;
@@ -124,9 +124,18 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         case "create": {
           const made = room.createLife(me, message.profile, now);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
-          broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
+          if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
+          return;
+        }
+        case "place": {
+          if (me.where === message.where) return;
+          me.where = message.where;
+          if (me.where === "world") {
+            broadcast({ t: "join", player: room.view(me) }, me.id);
+            for (const other of room.inWorld()) if (other.id !== me.id) send(ws, { t: "join", player: room.view(other) });
+          } else broadcast({ t: "leave", id: me.id }, me.id);
           return;
         }
         case "do": {
@@ -141,7 +150,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           return;
         }
         case "move": {
-          if (!room.allow(me, "move", now)) return;
+          if (me.where !== "world" || !room.allow(me, "move", now)) return;
           const result = room.move(me, message, now);
           if (!result.ok) send(ws, { t: "correct", ...result.correct });
           return;
@@ -182,7 +191,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       if (me) {
         room.leave(me.id);
         if (sockets.get(me.id) === ws) sockets.delete(me.id);
-        broadcast({ t: "leave", id: me.id });
+        if (me.where === "world") broadcast({ t: "leave", id: me.id });
       }
     });
     ws.on("error", () => ws.close());
@@ -202,9 +211,10 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
 
   let tick = 0;
   const interval = setInterval(() => {
-    if (room.size < 2) return; // nobody to tell
+    const here = room.inWorld();
+    if (here.length < 2) return; // nobody to tell
     tick++;
-    broadcast({ t: "state", tick, serverTime: Date.now(), players: [...room.players.values()].map((p) => ({ id: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level })) });
+    broadcast({ t: "state", tick, serverTime: Date.now(), players: here.map((p) => ({ id: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level })) });
   }, 1000 / (options.tickRate ?? 10));
 
   await new Promise<void>((resolve) => http.listen(options.port ?? 0, resolve));

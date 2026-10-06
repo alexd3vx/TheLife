@@ -114,12 +114,10 @@ export default function MapPage() {
         <a className="play-chip" href="#/" aria-label="Back to the menu">
           ←<span className="play-chip-label"> Menu</span>
         </a>
+        <a className="play-chip" href="#/play" aria-label="Go home">
+          <GameIcon name="home" /><span className="play-chip-label"> Home</span>
+        </a>
         <span className="play-chip">Lagos Island</span>
-        {admin && (
-          <a className="play-chip" href="#/play" aria-label="The old house page">
-            House (test)
-          </a>
-        )}
         {stats && settings.showFps && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 

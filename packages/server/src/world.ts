@@ -1,5 +1,5 @@
 import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
-import { MAX_ROOM_PLAYERS, type PlayerView } from "@thelife/shared";
+import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
 /** Fastest a character may move (running is about 3.3 m/s); the rest is tolerance for network jitter. */
@@ -7,6 +7,8 @@ export const MAX_SPEED = 7;
 const MAX_STEP_SLACK = 1.2;
 
 export interface Player extends PlayerView {
+  /** At home (invisible to others, not in the city) or out in the city. */
+  where: Where;
   /** The secret that unlocks this player's life (kept on the server only). */
   key: string;
   /** The player's life, run here. Null until they have made a character. */
@@ -46,7 +48,7 @@ export class Room {
     return this.players.size;
   }
 
-  join(rawName: string, now: number, look: string | undefined, key: string): JoinResult {
+  join(rawName: string, now: number, look: string | undefined, key: string, where: Where = "world"): JoinResult {
     if (this.players.size >= MAX_ROOM_PLAYERS) return { ok: false, reason: "This world is full. Try again in a moment." };
     const id = `p${this.nextId++}`;
     const spawn = this.district.spawn;
@@ -62,6 +64,7 @@ export class Room {
       clip: "Idle_Loop",
       level: 0,
       look,
+      where,
       key,
       life: null,
       ack: 0,
@@ -228,6 +231,11 @@ export class Room {
 
   money(player: Player): number {
     return player.life?.money ?? 0;
+  }
+
+  /** Everyone who is out in the city. */
+  inWorld(): Player[] {
+    return [...this.players.values()].filter((p) => p.where === "world");
   }
 
   view(p: Player): PlayerView {

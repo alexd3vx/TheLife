@@ -29,17 +29,14 @@ export function HomePlaceholder() {
           </p>
         )}
         {save && <p className="muted">Save started {new Date(save.createdAt).toLocaleDateString()}</p>}
-        <a className="btn btn-primary" href="#/map" style={linkStyle}>
-          Play: Lagos Island
+        <a className="btn btn-primary" href="#/play" style={linkStyle}>
+          Play
         </a>
         <a className="btn btn-ghost" href="#/settings" style={linkStyle}>
           Settings
         </a>
         {isAdmin() && (
           <>
-            <a className="btn btn-ghost" href="#/play" style={linkStyle}>
-              House (test)
-            </a>
             <a className="btn btn-ghost" href="#/showroom" style={linkStyle}>
               Furniture showroom (test)
             </a>

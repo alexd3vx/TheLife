@@ -16,7 +16,7 @@ export interface OnlineLife {
  * Connects to the game server and returns your life once the server has sent it. If the server has no life for this browser yet,
  * the character you made in the creator is sent to it (the server rebuilds the profile itself and only takes your choices).
  */
-export function useOnlineLife(): OnlineLife {
+export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
   const [state, setState] = useState<OnlineLife>({ phase: "connecting", session: null, detail: "" });
 
   useEffect(() => {
@@ -50,6 +50,7 @@ export function useOnlineLife(): OnlineLife {
       else if (st === "connecting" && !session) set({ phase: "connecting", detail: world.detail });
       else if (session && st !== "online") session.notice(st === "offline" ? world.detail || "You lost the connection." : "Reconnecting…");
     });
+    world.setPlace(where);
     world.connect();
     return () => {
       offMessage();
@@ -57,7 +58,7 @@ export function useOnlineLife(): OnlineLife {
       setTransport(null);
       world.disconnect();
     };
-  }, []);
+  }, [where]);
 
   return state;
 }

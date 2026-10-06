@@ -280,6 +280,25 @@ describe("game server", () => {
     expect((await c.next("error")).reason).toMatch(/log in/i);
   });
 
+  it("keeps players at home out of the city until they step out", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    await a.next("welcome");
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws);
+    await new Promise((r) => ws.once("open", r));
+    const b = new Client(ws);
+    ws.send(JSON.stringify({ t: "hello", name: "Bayo", protocol: PROTOCOL_VERSION, key: newKey(), where: "home" }));
+    const wb = await b.next("welcome");
+    expect(wb.players.map((p) => p.name)).toEqual(["Ada"]);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(a.inbox.some((m) => m.t === "join")).toBe(false); // Bayo is at home: Ada sees nothing
+    b.send({ t: "place", where: "world" });
+    expect((await a.next("join")).player.name).toBe("Bayo");
+    b.send({ t: "place", where: "home" });
+    expect((await a.next("leave")).id).toBe(wb.id);
+  });
+
   it("answers the health check", async () => {
     server = await startGameServer({ port: 0 });
     const body = (await (await fetch(`http://127.0.0.1:${server.port}/health`)).json()) as { ok: boolean };

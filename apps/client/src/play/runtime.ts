@@ -81,7 +81,7 @@ const TAP_MAX_TIME = 450; // milliseconds
 
 export type PlayMode = "house" | "showroom";
 
-export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode } = {}): Promise<PlayRuntime | null> {
+export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode; session?: GameSession } = {}): Promise<PlayRuntime | null> {
   const showroom = options.mode === "showroom";
   const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : HOUSE_LAYOUT;
   let renderer: THREE.WebGLRenderer;
@@ -112,7 +112,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   await avatar.load();
   world.scene.add(avatar.root);
 
-  const session = showroom ? null : new GameSession(options.fresh);
+  const session = showroom ? null : (options.session ?? new GameSession(options.fresh));
   if (session?.awaySummary.length) events.onAway(session.awaySummary);
   // The showroom has no needs or money: every activity can always start, and runs until you walk away.
   let fakeActive: { id: string; forced: boolean } | null = null;
