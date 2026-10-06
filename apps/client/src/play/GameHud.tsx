@@ -26,8 +26,8 @@ interface Toast {
  * The life on top of the world: the clock, money, needs and the phone. It runs the game rules (`GameSession`) at real time while
  * the player walks around, and shows what the character needs.
  */
-export default function GameHud({ onHour, children }: { onHour?(hour: number): void; children?: React.ReactNode }) {
-  const sessionRef = useRef<GameSession | null>(null);
+export default function GameHud({ onHour, session: given, children }: { onHour?(hour: number): void; session?: GameSession; children?: React.ReactNode }) {
+  const sessionRef = useRef<GameSession | null>(given ?? null);
   if (!sessionRef.current) sessionRef.current = new GameSession(false);
   const session = sessionRef.current;
   const [hud, setHud] = useState<HudSnapshot>(() => session.snapshot());

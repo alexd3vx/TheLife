@@ -1,12 +1,9 @@
 import { useBackHandler } from "./active";
 import { useEffect, useRef, useState } from "react";
 import {
-  BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS,
-  applyForJob, balance, beatById, bestCharger, billPerWeek, borrow, clockOf, contactsFor, deliveryFee, deposit, isPowerCut, itemPrice, loanLimit,
-  markThreadRead, modelOf, newsFor, payBill, payRent, placeOrder, plug, powerCutOn, quitJob, repay, replyToThread, sendMoney, setAutoPay,
-  setBankCharging, shopItemById, skillLevel, topUp, wallPower, withdraw,
-  type GameState, type PhoneResult,
+  BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS, balance, beatById, bestCharger, billPerWeek, clockOf, contactsFor, deliveryFee, isPowerCut, itemPrice, loanLimit, modelOf, newsFor, powerCutOn, shopItemById, skillLevel, wallPower, type GameState, type PhoneResult,
 } from "@thelife/game-core";
+import { isOnline, applyForJob, borrow, deposit, markThreadRead, payBill, payRent, placeOrder, plug, quitJob, repay, replyToThread, sendMoney, setAutoPay, setBankCharging, topUp, withdraw } from "./remote";
 import type { GameSession } from "../play/gameSession";
 import { Icon, type IconName } from "./icons";
 import DistrictMap from "../map/DistrictMap";
@@ -555,15 +552,19 @@ export function Battery({ state, act, onModel }: { state: GameState; act: Act; o
           </>
         )}
       </div>
-      <p className="pa-section">Playtest: try another phone</p>
-      <div className="pa-seg">
-        {(["basic", "mid", "flagship"] as const).map((t) => (
-          <button key={t} aria-pressed={phone.model === t} onClick={() => onModel(t)}>
-            {{ basic: "Go", mid: "Plus", flagship: "Max" }[t]}
-          </button>
-        ))}
-      </div>
-      <p className="pa-fine center">Swaps the phone you hold so you can see each one. In the real game you buy phones in LifeShop.</p>
+      {!isOnline() && (
+        <>
+          <p className="pa-section">Playtest: try another phone</p>
+          <div className="pa-seg">
+            {(["basic", "mid", "flagship"] as const).map((t) => (
+              <button key={t} aria-pressed={phone.model === t} onClick={() => onModel(t)}>
+                {{ basic: "Go", mid: "Plus", flagship: "Max" }[t]}
+              </button>
+            ))}
+          </div>
+          <p className="pa-fine center">Swaps the phone you hold so you can see each one. In the real game you buy phones in LifeShop.</p>
+        </>
+      )}
     </div>
   );
 }

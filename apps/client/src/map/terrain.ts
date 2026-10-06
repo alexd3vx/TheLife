@@ -166,7 +166,7 @@ diffuseColor.rgb = col;
 `,
       );
   };
-  const landGeo = new THREE.PlaneGeometry(t.size.x, t.size.z, 1, 1);
+  const landGeo = new THREE.PlaneGeometry(t.size.x, t.size.z, 40, 56); // many small triangles: huge ones lose precision close to the camera
   const land = new THREE.Mesh(landGeo, landMat);
   land.rotation.x = -Math.PI / 2;
   land.position.set(t.size.x / 2, -0.02, t.size.z / 2);
@@ -201,7 +201,11 @@ diffuseColor.rgb = wcol;
 `,
       );
   };
-  const waterGeo = new THREE.PlaneGeometry(60_000, 60_000);
+  // Many small triangles and a nudge backwards: two huge triangles lose depth precision and could be drawn over the land.
+  const waterGeo = new THREE.PlaneGeometry(24_000, 24_000, 64, 64);
+  waterMat.polygonOffset = true;
+  waterMat.polygonOffsetFactor = 4;
+  waterMat.polygonOffsetUnits = 4;
   const water = new THREE.Mesh(waterGeo, waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.set(t.size.x / 2, -0.35, t.size.z / 2);

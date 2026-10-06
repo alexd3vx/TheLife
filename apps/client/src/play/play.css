@@ -35,6 +35,7 @@
 }
 .play-controls button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .play-loading, .play-error {
+  gap: 14px;
   position: absolute; z-index: 3; inset: 0; display: grid; place-content: center; font-family: var(--font-display); font-size: 1.4rem;
   background: rgba(20, 17, 15, .85); text-align: center; padding: 24px;
 }

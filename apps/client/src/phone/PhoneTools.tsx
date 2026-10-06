@@ -1,11 +1,9 @@
 import { GameIcon, type FaName } from "../ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AJO_AMOUNT, AJO_MEMBERS, COURSES, DIARY_MOODS, EATS_MENU, HEALTH_TIPS, LANGS, LESSON_XP, PHRASES, PRAYER_TIMES, STATIONS, STOCKS, VERSES,
-  addNote, balance, buyShares, buyTicket, clockOf, connection, deleteNote, diaryCheckIn, diaryDone, eventsFor, feedPosts, filmsFor, joinAjo, moodLabel,
-  nextLessonIn, orderEats, payAjo, portfolioValue, powerCutOn, ratesFor, sellShares, skillLevel, sparkProfiles, stockPrice, streamData, takeLesson, weatherFor,
-  type GameState, type Lang,
+  AJO_AMOUNT, AJO_MEMBERS, COURSES, DIARY_MOODS, EATS_MENU, HEALTH_TIPS, LANGS, LESSON_XP, PHRASES, PRAYER_TIMES, STATIONS, STOCKS, VERSES, balance, clockOf, connection, diaryDone, eventsFor, feedPosts, filmsFor, moodLabel, nextLessonIn, portfolioValue, powerCutOn, ratesFor, skillLevel, sparkProfiles, stockPrice, weatherFor, type GameState, type Lang,
 } from "@thelife/game-core";
+import { bookTicket, addNote, buyShares, deleteNote, diaryCheckIn, joinAjo, orderEats, payAjo, sellShares, streamData, takeLesson } from "./remote";
 import { Btn, MB, Row, naira, type Act } from "./PhoneApps";
 import { Icon } from "./icons";
 
@@ -377,7 +375,7 @@ export function Cinema({ state, act }: P) {
     <div className="pa-page">
       <p className="pa-section">Showing today</p>
       <div className="pa-group">
-        {films.map((f) => <Row key={f.id} icon="film" tone="#6741d9" title={f.title} sub={`${f.genre} · ${f.mins} min`} right={<Btn onClick={() => act((s) => buyTicket(s, f.title, f.price, 25))}>{naira(f.price)}</Btn>} />)}
+        {films.map((f) => <Row key={f.id} icon="film" tone="#6741d9" title={f.title} sub={`${f.genre} · ${f.mins} min`} right={<Btn onClick={() => act((s) => bookTicket(s, "film", f.title))}>{naira(f.price)}</Btn>} />)}
       </div>
       <p className="pa-fine center">A night out lifts your mood.</p>
     </div>
@@ -390,7 +388,7 @@ export function Events({ state, act }: P) {
     <div className="pa-page">
       <div className="pa-group">
         {events.length === 0 && <p className="pa-empty">Nothing on this week.</p>}
-        {events.map((e) => <Row key={e.id} icon="ticket" tone="#d9480f" title={e.title} sub={`${e.place} · ${e.inDays === 0 ? "today" : `in ${e.inDays} day${e.inDays > 1 ? "s" : ""}`}`} right={<Btn onClick={() => act((s) => buyTicket(s, e.title, e.price, 12))}>{e.price ? naira(e.price) : "Join"}</Btn>} />)}
+        {events.map((e) => <Row key={e.id} icon="ticket" tone="#d9480f" title={e.title} sub={`${e.place} · ${e.inDays === 0 ? "today" : `in ${e.inDays} day${e.inDays > 1 ? "s" : ""}`}`} right={<Btn onClick={() => act((s) => bookTicket(s, "event", e.title))}>{e.price ? naira(e.price) : "Join"}</Btn>} />)}
       </div>
     </div>
   );

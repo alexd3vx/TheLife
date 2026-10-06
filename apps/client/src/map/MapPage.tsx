@@ -10,6 +10,8 @@ import { PIN_STYLE } from "./pins";
 import SettingsPanel from "../settings/SettingsPanel";
 import { useSettings } from "../settings/settings";
 import OnlinePanel from "../net/OnlinePanel";
+import { useOnlineLife } from "../net/useOnlineLife";
+import { world } from "../net/world";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -35,6 +37,7 @@ export default function MapPage() {
   const settings = useSettings();
   const admin = isAdmin();
   const district = getDistrict();
+  const life = useOnlineLife();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -101,7 +104,7 @@ export default function MapPage() {
       </div>
 
       {placeShown && <div className="map-place" role="status">{placeShown}</div>}
-      {!loading && !error && <GameHud onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
+      {!loading && !error && life.session && <GameHud session={life.session} onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
       {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && settings.showStats && (
@@ -192,6 +195,20 @@ export default function MapPage() {
       )}
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {!loading && !error && !life.session && (
+        <div className="play-loading" role="status">
+          {life.phase === "offline" ? (
+            <>
+              <span>{life.detail || "Can't reach the world right now."}</span>
+              <button className="btn btn-primary" onClick={() => world.reconnect()}>Try again</button>
+            </>
+          ) : life.phase === "creating" ? (
+            "Starting your life…"
+          ) : (
+            "Connecting to Lagos…"
+          )}
+        </div>
+      )}
       {loading && <div className="play-loading">Building the neighbourhood…</div>}
       {error && <div className="play-error">{error}</div>}
     </div>

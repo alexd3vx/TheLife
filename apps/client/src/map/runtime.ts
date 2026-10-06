@@ -63,6 +63,9 @@ export interface MapRuntime {
     stats(): MapStats;
     teleport(x: number, z: number): void;
     lookAt(x: number, z: number, height?: number, back?: number): void;
+    cam(x: number, y: number, z: number, tx: number, ty: number, tz: number): void;
+    scene: THREE.Scene;
+    camPos(): { x: number; y: number; z: number; tx: number; ty: number; tz: number };
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
     simulate(seconds: number): void;
@@ -343,9 +346,27 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   controls.maxPolarAngle = 1.42;
   controls.screenSpacePanning = false;
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  /** The side of the player with the most open ground, so the camera never starts inside a building. */
+  function openAzimuth(): number {
+    const base = Math.atan2(8, 14);
+    let best = base;
+    let bestScore = -1;
+    for (let i = 0; i < 12; i++) {
+      const a = base + (i * Math.PI) / 6;
+      let score = 0;
+      for (let d = 3; d <= 18; d += 3) if (isFree(groundNav, controller.position.x + Math.sin(a) * d, controller.position.z + Math.cos(a) * d)) score++;
+      if (score > bestScore) {
+        bestScore = score;
+        best = a;
+      }
+      if (score === 6) break;
+    }
+    return best;
+  }
   function resetView() {
+    const a = openAzimuth();
     controls.target.set(controller.position.x, 0.9, controller.position.z);
-    camera.position.set(controller.position.x + 8, 11, controller.position.z + 14);
+    camera.position.set(controller.position.x + Math.sin(a) * 16, 11, controller.position.z + Math.cos(a) * 16);
     controls.update();
   }
   resetView();
@@ -715,6 +736,13 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       lookAt: (x, z, height = 40, back = 60) => {
         controls.target.set(x, 0, z);
         camera.position.set(x + back * 0.4, height, z + back);
+        controls.update();
+      },
+      scene,
+      camPos: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z, tx: controls.target.x, ty: controls.target.y, tz: controls.target.z }),
+      cam: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => {
+        controls.target.set(tx, ty, tz);
+        camera.position.set(x, y, z);
         controls.update();
       },
       tapGround: (x, z) => controller.tapGround(x, z),

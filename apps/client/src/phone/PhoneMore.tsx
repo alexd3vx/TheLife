@@ -1,10 +1,9 @@
 import { GameIcon, type FaName } from "../ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FILMS, GIGS, GIG_GAP_MINUTES, HANG_WORDS, PLAYER, PODCASTS, RECIPES, STORIES, WATER_GOAL, WORKOUTS, addFun, addTodo, balance, billPerWeek, buyTicket, clockOf, deleteTodo,
-  doGig, doWorkout, drinkWater, finishFocus, fuelPrices, glassesToday, nextGigIn, nextWorkoutIn, payBill, payRent, recordScore, streamData, toggleTodo, wordOfDay,
-  type GameState,
+  FILMS, GIGS, GIG_GAP_MINUTES, HANG_WORDS, PLAYER, PODCASTS, RECIPES, STORIES, WATER_GOAL, WORKOUTS, addFun, balance, billPerWeek, clockOf, fuelPrices, glassesToday, nextGigIn, nextWorkoutIn, wordOfDay, type GameState,
 } from "@thelife/game-core";
+import { bookTicket, addTodo, deleteTodo, doGig, doWorkout, drinkWater, finishFocus, payBill, payRent, recordScore, streamData, toggleTodo } from "./remote";
 import { Btn, Row, naira, type Act } from "./PhoneApps";
 import { Icon } from "./icons";
 import { useAppActive, useBackHandler } from "./active";
@@ -203,7 +202,7 @@ export function Nolly({ state, act }: P) {
       <p className="pa-section">Rent a film</p>
       <div className="pa-group">
         {FILMS.map((f) => (
-          <Row key={f.id} icon="play" tone="#d9480f" title={f.title} sub={`${f.genre} · ${f.mins} min · streams about 60 MB`} right={<Btn onClick={() => act((s) => { const r = streamData(s, 60); if (!r.ok) return r; return buyTicket(s, f.title, Math.round(f.price / 5 / 100) * 100 + 300, 18); })}>{naira(Math.round(f.price / 5 / 100) * 100 + 300)}</Btn>} />
+          <Row key={f.id} icon="play" tone="#d9480f" title={f.title} sub={`${f.genre} · ${f.mins} min · streams about 60 MB`} right={<Btn onClick={() => act((s) => bookTicket(s, "rent", f.title))}>{naira(Math.round(f.price / 5 / 100) * 100 + 300)}</Btn>} />
         ))}
       </div>
       <p className="pa-fine center">Day {day}. Rentals lift your mood like a night in.</p>

@@ -2,10 +2,9 @@ import { useBackHandler } from "./active";
 import { GameIcon } from "../ui/icons";
 import { useState } from "react";
 import {
-  HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, buyHomePlan, cancelDownload, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, setMobileData, setWifi,
-  startDownload, storageTotalMB, storageUsedMB, storeAppById, tierAtLeast, uninstallApp,
-  type GameState, type StoreAppId, type StoreCategory,
+  HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, storageTotalMB, storageUsedMB, storeAppById, tierAtLeast, type GameState, type StoreAppId, type StoreCategory,
 } from "@thelife/game-core";
+import { buyHomePlan, cancelDownload, setMobileData, setWifi, startDownload, uninstallApp } from "./remote";
 import { Btn, MB, Row, Tabs, naira, type Act } from "./PhoneApps";
 import { Icon, type IconName } from "./icons";
 import { styleOf } from "./appStyle";

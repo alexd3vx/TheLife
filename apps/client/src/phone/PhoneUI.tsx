@@ -1,9 +1,8 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  appInfo, bestCharger, call, clearNotifications, clockOf, connection, contactsFor, dismissNotification, hasApp, isDead, isPowerCut, markNotificationsRead, modelOf, openApp, plug, powerCutOn,
-  storeAppById, unreadCount, useApp, wallPower, balance,
-  type AnyAppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier, type StoreAppId,
+  appInfo, bestCharger, clockOf, connection, contactsFor, hasApp, isDead, isPowerCut, modelOf, powerCutOn, storeAppById, unreadCount, wallPower, balance, type AnyAppId, type GameState, type PhoneNotification, type PhoneResult, type PhoneTier, type StoreAppId,
 } from "@thelife/game-core";
+import { isOnline, rpc, call, clearNotifications, dismissNotification, markNotificationsRead, openApp, plug, useApp } from "./remote";
 import type { GameSession } from "../play/gameSession";
 import { Battery, Chat, Jobs, Maps, News, Pay, Shop, naira, type Act } from "./PhoneApps";
 import { ExtraApp } from "./PhoneExtras";
@@ -73,13 +72,16 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
   useEffect(() => {
-    phone.inUse = true;
+    // `phone` is replaced whenever the server sends a newer copy, so this reads it fresh and only runs once per opening.
+    session.sim.state.phone.inUse = true;
+    rpc("setInUse", [true]);
     const timer = window.setInterval(refresh, 500);
     return () => {
-      phone.inUse = false;
+      session.sim.state.phone.inUse = false;
+      rpc("setInUse", [false]);
       window.clearInterval(timer);
     };
-  }, [phone, refresh]);
+  }, [session, refresh]);
 
   // Time spent in social, media and some other apps lifts the mood a little.
   useEffect(() => {
@@ -360,7 +362,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
             )}
           </div>
         </div>
-        <div className="phone-side">
+        {!isOnline() && <div className="phone-side">
           <small>Playtest</small>
           <div className="pa-seg">
             {(["basic", "mid", "flagship"] as const).map((t) => (
@@ -370,7 +372,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
             ))}
           </div>
           <small>Try the other phones</small>
-        </div>
+        </div>}
       </div>
     </div>
   );

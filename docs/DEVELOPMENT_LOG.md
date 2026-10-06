@@ -176,3 +176,10 @@ Chronological record of decisions and changes. Newest first.
 - Wrote `TECH_ARCHITECTURE.md` (stack, systems, data model, multiplayer, world model, assets, responsive strategy, repo layout, risks) and `ROADMAP.md` (slice milestones M0–M7 and later phases).
 - Key decisions: isometric 2.5D with PixiJS; React + Vite PWA; Node + Fastify + WebSocket authoritative server; Supabase for Postgres/Auth/Storage; double-entry ledger; instanced lots; storylet engine; AI text with cost caps and fallbacks.
 - No game code written yet. Next: M0 — Foundation, after architecture approval.
+
+## Online life (server-authoritative)
+- Your life (needs, money, phone, jobs, rent) is run by the game server. `packages/server/src/world.ts` holds one `Sim` per player and ticks it every second; `packages/server/src/lives.ts` saves every life to `DATA_DIR/lives.json` (keys are hashed). Coming back later lets time pass (`simulateAbsence`).
+- The client sends a private key in `hello` (`apps/client/src/net/identity.ts`). "New game" makes a new key. Accounts (Supabase) will tie a key to a sign-in later.
+- Actions: `{t:"do", fn, args}` runs a function from the whitelist in `packages/game-core/src/onlineRules.ts` with every argument checked. Prices come from the server (tickets, grocery scale). The phone (`apps/client/src/phone/remote.ts`) runs the same function locally first so it feels instant; the server's `life` snapshot then wins (`GameSession.applyLife`).
+- Characters are made from a background id; the server rebuilds the profile (`buildProfile`) so nobody can pick their own tier or money.
+- Fixed: the water plane (two huge triangles) was drawn over the land on some screen sizes; the spawn is now open street and the camera starts on the open side.

@@ -27,6 +27,7 @@ echo "==> Downloading the game server"
 mkdir -p /opt/thelife && cd /opt/thelife
 curl -fsSL "$SITE/server/thelife-server.mjs" -o thelife-server.mjs
 [ -f package.json ] || echo '{"name":"thelife-server","private":true,"type":"module"}' > package.json
+mkdir -p /opt/thelife/data   # every player's life is saved here, so updates never lose anyone
 npm install --silent --no-audit --no-fund ws
 
 cat > /etc/systemd/system/thelife.service <<UNIT
@@ -35,7 +36,7 @@ Description=TheLife game server
 After=network.target
 [Service]
 WorkingDirectory=/opt/thelife
-Environment=PORT=8787 ROOM=lagos-test ALLOWED_ORIGINS=$ORIGIN
+Environment=PORT=8787 ROOM=lagos-test ALLOWED_ORIGINS=$ORIGIN DATA_DIR=/opt/thelife/data
 ExecStart=/usr/bin/node /opt/thelife/thelife-server.mjs
 Restart=always
 [Install]

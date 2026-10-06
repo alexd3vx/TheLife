@@ -1,6 +1,9 @@
 import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { quizRound, recordScore, clockOf, type GameState, type StoreAppId } from "@thelife/game-core";
+import {
+  quizRound, clockOf, type GameState, type StoreAppId,
+} from "@thelife/game-core";
+import { recordScore } from "./remote";
 import { Btn, type Act } from "./PhoneApps";
 import { useAppActive } from "./active";
 

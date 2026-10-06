@@ -580,7 +580,17 @@ export function generateLagos(seed = 7): District {
   }
 
   // ---- where a new player starts: the street in front of Independence House
-  const start = nearestStreet(toWorld(placePx("Independence House")).x, toWorld(placePx("Independence House")).z + 10);
+  const house = toWorld(placePx("Independence House"));
+  const start = (() => {
+    // Open ground: a street point well away from any building edge, so the first view is a street and not a wall.
+    for (let r = 0; r < 160; r += 2) {
+      for (let a = 0; a < 24; a++) {
+        const px = house.x + Math.cos((a / 24) * Math.PI * 2) * r, pz = house.z + 10 + Math.sin((a / 24) * Math.PI * 2) * r;
+        if (t.classAt(px, pz) === STREET && t.edgeDistance(px, pz) >= 5) return { x: px, z: pz };
+      }
+    }
+    return nearestStreet(house.x, house.z + 10);
+  })();
 
   return {
     seed,

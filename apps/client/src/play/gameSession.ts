@@ -15,9 +15,12 @@ import {
   type GameState,
   type NeedId,
   type Profile,
+  type ActiveAction,
   type SimEvent,
 } from "@thelife/game-core";
 import type { GameBridge } from "./controller";
+import { rotateKey } from "../net/identity";
+import { lastSentId, rpc } from "../phone/remote";
 
 const SAVE_KEY = "thelife.game.v1";
 
@@ -66,6 +69,7 @@ function readSave(): SavedGame | null {
 
 /** Starts a brand new life from a rolled background (replaces any earlier save). */
 export function beginLife(profile: Profile): void {
+  rotateKey(); // a new character is a new life on the server
   try {
     const payload: SavedGame = { state: createGameState(profile), savedAt: Date.now() };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -95,6 +99,20 @@ export function clearGameSave(): void {
   }
 }
 
+/** What the server sends about your life (see the `life` message). */
+export interface LifeSnapshot {
+  state: unknown;
+  ack: number;
+  active: { id: string; done: number; forced: boolean } | null;
+  events: SimEvent[];
+  away?: string[];
+}
+
+function activeFrom(a: LifeSnapshot["active"]): ActiveAction | null {
+  const def = a ? ACTIONS[a.id] : undefined;
+  return a && def ? { def, done: a.done, forced: a.forced } : null;
+}
+
 /** Owns the simulation for the play screen: loads/saves it, steps it, and exposes it to the controller and HUD. */
 export class GameSession implements GameBridge {
   readonly sim: Sim;
@@ -102,10 +120,18 @@ export class GameSession implements GameBridge {
   readonly awaySummary: string[] = [];
   private readonly notices: SimEvent[] = [];
   private sinceSave = 0;
+  /** True when the life is held by the server: this copy runs ahead for smoothness and the server's answer wins. */
+  readonly online: boolean;
+  private serverEvents: SimEvent[] = [];
 
-  constructor(fresh = false) {
-    const saved = fresh ? null : readSave();
-    if (saved) {
+  constructor(fresh = false, server?: LifeSnapshot) {
+    this.online = !!server;
+    const saved = fresh || server ? null : readSave();
+    if (server) {
+      this.sim = new Sim(server.state as GameState);
+      this.sim.active = activeFrom(server.active);
+      if (server.away?.length) this.awaySummary.push(...server.away);
+    } else if (saved) {
       const away = simulateAbsence(saved.state, (Date.now() - saved.savedAt) / 60000);
       this.awaySummary.push(...away.lines);
       this.sim = new Sim(saved.state);
@@ -114,12 +140,23 @@ export class GameSession implements GameBridge {
     }
   }
 
+  /** A newer copy of the life from the server. It is ignored while some of your own actions are still on their way to it. */
+  applyLife(snap: LifeSnapshot): void {
+    this.serverEvents.push(...snap.events);
+    if (snap.ack < lastSentId()) return;
+    Object.assign(this.sim.state, snap.state as GameState);
+    this.sim.active = activeFrom(snap.active);
+  }
+
   // ---- GameBridge
   start(actionId: string) {
-    return this.sim.start(actionId);
+    const result = this.sim.start(actionId);
+    if (result.ok) rpc("start", [actionId]);
+    return result;
   }
   cancel() {
     this.sim.cancel();
+    rpc("cancel");
   }
   active() {
     const a = this.sim.active;
@@ -138,6 +175,7 @@ export class GameSession implements GameBridge {
   buyGroceries() {
     const result = this.sim.buyGroceries();
     if (!result.ok) this.notice(result.reason);
+    else rpc("buyGroceries");
     return result;
   }
 
@@ -146,8 +184,9 @@ export class GameSession implements GameBridge {
     this.sim.step(seconds);
     this.sinceSave += seconds;
     if (this.sinceSave > 4) this.save();
-    const events = [...this.notices.splice(0), ...this.sim.drainEvents()];
-    return events;
+    // Online, the server decides what happened; this copy only runs ahead so the clock and needs move smoothly.
+    const own = this.sim.drainEvents();
+    return [...this.notices.splice(0), ...(this.online ? this.serverEvents.splice(0) : own)];
   }
 
   save(): void {

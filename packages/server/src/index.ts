@@ -108,7 +108,11 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           return;
         }
         case "do": {
-          if (!room.allow(me, "rpc", now)) return send(ws, { t: "done", id: message.id, ok: false, reason: "Slow down a little." });
+          if (!room.allow(me, "rpc", now)) {
+            me.ack = message.id;
+            send(ws, { t: "done", id: message.id, ok: false, reason: "Slow down a little." });
+            return sendLife(me);
+          }
           const result = room.act(me, message.id, message.fn, message.args, now);
           send(ws, result.ok ? { t: "done", id: message.id, ok: true, text: result.text } : { t: "done", id: message.id, ok: false, reason: result.reason });
           sendLife(me);

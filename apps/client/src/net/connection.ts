@@ -1,5 +1,6 @@
 import { loadSavedLook } from "../lab/looks";
 import { getSettings, updateSettings } from "../settings/settings";
+import { playerKey } from "./identity";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
 
 export type NetStatus = "offline" | "connecting" | "online";
@@ -10,6 +11,8 @@ export interface ConnectionEvents {
 }
 
 const SERVER_KEY = "thelife.server";
+/** The game server everyone plays on (used when nothing else is set). */
+export const PUBLIC_SERVER = "wss://46-105-53-216.sslip.io";
 
 /** Where the game server lives: the build-time setting, what the player last typed, or this computer on the local port. */
 export function defaultServerUrl(): string {
@@ -23,6 +26,7 @@ export function defaultServerUrl(): string {
   }
   const built = import.meta.env.VITE_SERVER_URL as string | undefined;
   if (built) return built;
+  if (!import.meta.env.DEV) return PUBLIC_SERVER;
   const host = location.hostname || "localhost";
   return `${location.protocol === "https:" ? "wss" : "ws"}://${host}:8787`;
 }
@@ -59,7 +63,7 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.tries = 0;
-      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()) } satisfies ClientMessage));
+      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()), key: playerKey() } satisfies ClientMessage));
     };
     ws.onmessage = (e) => {
       let message: ServerMessage;
@@ -72,15 +76,16 @@ export class Connection {
       if (message.t === "error") this.fatal = /out of date|full/.test(message.reason);
       this.events.onMessage(message);
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       if (this.closed) return;
-      if (this.fatal || this.tries >= 5) {
-        this.events.onStatus("offline", this.fatal ? "The server turned you away." : "Couldn't reach the server.");
+      if (e.code === 4004) this.fatal = true;
+      if (this.fatal) {
+        this.events.onStatus("offline", e.code === 4004 ? "Your life is open on another screen. Close that one, then reload." : "The server turned you away.");
         return;
       }
       this.tries++;
       this.events.onStatus("connecting", `Reconnecting (${this.tries})…`);
-      this.timer = setTimeout(() => this.open(), Math.min(8000, 700 * 2 ** this.tries));
+      this.timer = setTimeout(() => this.open(), Math.min(8000, 700 * 2 ** Math.min(this.tries, 5)));
     };
     ws.onerror = () => ws.close();
   }
