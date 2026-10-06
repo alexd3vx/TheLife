@@ -90,8 +90,8 @@ export default function IsoPage() {
       <canvas ref={canvasRef} className="play-stage" style={{ width: "100%", height: "100%", display: "block", touchAction: "none" }} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
-        <a className="play-chip" href="#/map">Go outside</a>
       </div>
+      <a className="play-chip" href="#/map" style={{ position: "absolute", left: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 3 }}>Go outside</a>
       {session && ready && !introOn && <GameHud session={session} onHour={(h) => roomRef.current?.setHour(h)} />}
       {status && <div className="play-banner" role="status">{status}</div>}
       {menu && (

@@ -15,6 +15,7 @@ const ArrivalFilm = lazy(() => import("./arrival/ArrivalFilm"));
 const BakePage = lazy(() => import("./iso/bake/BakePage"));
 const IsoPage = lazy(() => import("./iso/IsoPage"));
 const CharTestPage = lazy(() => import("./iso/CharTestPage"));
+const NetTestPage = lazy(() => import("./net/NetTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -72,6 +73,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <PhoneTestPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/nettest")) {
+    return (
+      <Suspense fallback={null}>
+        <NetTestPage />
       </Suspense>
     );
   }

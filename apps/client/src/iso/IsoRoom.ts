@@ -267,8 +267,11 @@ export class IsoRoom {
     const xs = corners.map((c) => c[0]), ys = corners.map((c) => c[1]);
     this.cx = (Math.min(...xs) + Math.max(...xs)) / 2;
     this.cy = (Math.min(...ys) + Math.max(...ys)) / 2 + 20;
-    const roomW = Math.max(...xs) - Math.min(...xs) + 260, roomH = Math.max(...ys) - Math.min(...ys) + 260;
-    this.zoom = Math.min(this.w / roomW, this.h / roomH);
+    const roomW = Math.max(...xs) - Math.min(...xs) + 180, roomH = Math.max(...ys) - Math.min(...ys) + 220;
+    this.portrait = this.h > this.w * 1.1;
+    this.bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    // On a tall phone screen the whole room would be tiny: come in closer and let the camera follow you instead.
+    this.zoom = Math.min(this.w / roomW, this.h / roomH) * (this.portrait ? 1.6 : 1);
     this.fitCx = this.cx;
     this.fitCy = this.cy;
     this.fitZoom = this.zoom;
@@ -315,6 +318,7 @@ export class IsoRoom {
       if (this.pointers.size === 1) {
         if (Math.abs(dx) + Math.abs(dy) > 1.5) this.dragged = this.dragged || Math.hypot(dx, dy) > 3;
         if (this.dragged) {
+          this.lastTouch = this.clock;
           this.cx -= dx / this.zoom;
           this.cy -= dy / this.zoom;
         }
@@ -671,7 +675,17 @@ export class IsoRoom {
       this.cx = door[0] * (1 - k) + this.fitCx * k;
       this.cy = door[1] * (1 - k) + this.fitCy * k;
       this.zoom = this.fitZoom * (from * (1 - k) + k);
+    } else if (this.portrait && this.pointers.size === 0 && this.clock - this.lastTouch > 3) {
+      const [fx, fy] = project(this.pos.x, 0.9, this.pos.z);
+      const b = this.bounds, hw = this.w / 2 / this.zoom, hh = this.h / 2 / this.zoom;
+      const clamp = (v: number, lo: number, hi: number, mid: number) => (lo > hi ? mid : Math.max(lo, Math.min(hi, v)));
+      const tx = clamp(fx, b.minX + hw - 60, b.maxX - hw + 60, this.fitCx);
+      const ty = clamp(fy, b.minY + hh - 60, b.maxY - hh + 60, this.fitCy);
+      const k = 1 - Math.exp(-dt * 2.5);
+      this.cx += (tx - this.cx) * k;
+      this.cy += (ty - this.cy) * k;
     }
+    this.clock += dt;
   }
 
   private emitAt = 0;
@@ -710,6 +724,10 @@ export class IsoRoom {
     }
   }
 
+  private portrait = false;
+  private bounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  private lastTouch = -10;
+  private clock = 0;
   private fitCx = 0;
   private fitCy = 0;
   private fitZoom = 1;
