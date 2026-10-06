@@ -14,8 +14,10 @@ const unconfigured: AuthService = {
 };
 
 export function createAuthService(): AuthService {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  // Pasted settings often carry a stray space, new line or invisible character, which the browser refuses to send in a header.
+  const clean = (v: unknown) => (typeof v === "string" ? v.replace(/[^\x21-\x7e]/g, "") : undefined);
+  const url = clean(import.meta.env.VITE_SUPABASE_URL)?.replace(/\/+$/, "");
+  const anonKey = clean(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
   if (url && anonKey) return createSupabaseService(url, anonKey);
   if (import.meta.env.DEV) return createDevService();

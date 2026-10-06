@@ -12,6 +12,8 @@ function friendlyMessage(message: string): string {
   if (lower.includes("already registered")) return "An account with this email already exists. Try logging in.";
   if (lower.includes("rate limit")) return "Too many attempts. Please wait a moment and try again.";
   if (lower.includes("email not confirmed")) return "Please confirm your email first — check your inbox.";
+  if (lower.includes("iso-8859-1") || lower.includes("failed to execute 'fetch'")) return "The site's login settings have a stray character. Please tell the owner to re-paste the Supabase key.";
+  if (lower.includes("failed to fetch") || lower.includes("networkerror")) return "Can't reach the login service. Check your connection and try again.";
   return message;
 }
 

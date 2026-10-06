@@ -4,6 +4,7 @@ import { MeshBuilder } from "./meshBuilder";
 import { addProp } from "./props";
 import { addInterior } from "./interior";
 import { addPrism } from "./prism";
+import { FacadeBuilder, facadeMaterial } from "./facade";
 import { LANDMARK_WALL, addHangar, addLandmark } from "./landmarks";
 import { asphaltTexture, concreteTexture, glowTexture, pavingTexture } from "./groundTextures";
 
@@ -119,7 +120,7 @@ export function buildInteriorScene(lot: Lot): { group: THREE.Group; geometries: 
   return { group, geometries };
 }
 
-function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
+function addBuilding(b: MeshBuilder, cap: MeshBuilder, fb: FacadeBuilder, lot: Lot, lod: Lod) {
   const f = lot.footprint;
   const height = lot.floors * lot.storey;
   if (lot.kind === "stall") {
@@ -134,7 +135,7 @@ function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
     return;
   }
   if (lot.poly) {
-    addPrism(b, lot, lod);
+    addPrism(fb, b, lot, lod);
     return;
   }
   if (lod === 0 && hasInterior(lot)) {
@@ -304,7 +305,8 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
   let triangles = 0;
   const b = new MeshBuilder();
   const cap = new MeshBuilder();
-  for (const lot of chunk.lots) addBuilding(b, cap, lot, lod);
+  const fb = new FacadeBuilder();
+  for (const lot of chunk.lots) addBuilding(b, cap, fb, lot, lod);
   if (lod <= 1) for (const p of chunk.props) addProp(b, p, lod === 0);
   if (lod === 0) for (const l of chunk.lamps) b.box(l.x - 0.06, 0, l.z - 0.06, l.x + 0.06, 6.2, l.z + 0.06, POLE, 0.9);
   const geo = b.build();
@@ -325,6 +327,15 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
     group.add(mesh);
     geometries.push(capGeo);
     triangles += cap.triangles;
+  }
+  const facadeGeo = fb.build();
+  if (facadeGeo) {
+    const mesh = new THREE.Mesh(facadeGeo, facadeMaterial());
+    mesh.castShadow = lod === 0;
+    mesh.receiveShadow = lod === 0;
+    group.add(mesh);
+    geometries.push(facadeGeo);
+    triangles += fb.triangles;
   }
   if (lod <= 1 && chunk.trees.length) {
     group.add(instancedTrees(chunk.trees, lod === 0));

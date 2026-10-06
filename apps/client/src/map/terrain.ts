@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { BLOCK, MARKET, PARK, STREET, buildRoadField, type District } from "@thelife/game-core";
 import { lampMaterial } from "./chunkBuilder";
+import { setFacadeNight } from "./facade";
 
 // The ground of the Lagos map: water, streets with pavements and lane lines, building plots, parks and the market.
 // The island is 4.5 by 3.2 km, so the ground is one big plane whose pixels are worked out in the shader from two small maps (what
@@ -297,6 +298,7 @@ diffuseColor.rgb = wcol;
     setNight(on) {
       poolMaterial.opacity = on ? 1 : 0;
       lampMaterial.emissiveIntensity = on ? 2.2 : 0;
+      setFacadeNight(on);
       uniforms.uNight.value = on ? 1 : 0;
     },
     setVisible(v) {
