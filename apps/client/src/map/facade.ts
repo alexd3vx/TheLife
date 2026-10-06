@@ -160,7 +160,7 @@ vec3 fGlow = vec3(0.0);
       vec3 frameCol = mix(vec3(0.9, 0.9, 0.88), vec3(0.18, 0.12, 0.09), step(0.5, h21(vec2(seed, 3.0))));
       float t = clamp((fv - sill) / winH, 0.0, 1.0);
       vec3 sky = mix(vec3(0.26, 0.34, 0.42), vec3(0.62, 0.74, 0.86), t) * (0.75 + 0.35 * h21(vec2(k, fl)));
-      vec3 glass = mix(vec3(0.07, 0.09, 0.11), sky, 0.55 + 0.35 * detail);
+      vec3 glass = mix(vec3(0.1, 0.13, 0.16), sky, 0.7 + 0.25 * detail);
       // curtains
       float curtain = step(0.6, cellSeed) * step(fu, -winW * 0.5 + winW * (0.35 + 0.5 * h21(vec2(k, fl + 3.0))));
       vec3 curtainCol = 0.55 + 0.45 * vec3(h21(vec2(k, 1.0 + fl)), h21(vec2(k, 2.0 + fl)), h21(vec2(k, 3.0 + fl)));
@@ -174,8 +174,8 @@ vec3 fGlow = vec3(0.0);
       // burglar bars: ground floors everywhere, upper floors on some buildings
       float bars = step(fl, 0.5) + step(0.55, h21(vec2(seed, 9.0))) * step(0.5, fl);
       if (bars > 0.5) {
-        float bx = step(abs(fract((fu + winW * 0.5) / 0.2) - 0.5), 0.14);
-        float by = step(abs(fract((fv - sill) / 0.33) - 0.5), 0.12);
+        float bx = step(abs(fract((fu + winW * 0.5) / 0.3) - 0.5), 0.07);
+        float by = step(abs(fract((fv - sill) / 0.45) - 0.5), 0.06);
         float grid = max(bx, by) * (1.0 - frame);
         w = mix(w, mix(vec3(0.05), vec3(0.8, 0.8, 0.78), step(0.5, h21(vec2(seed, 5.0)))), grid * 0.9);
       }
