@@ -31,8 +31,8 @@ export function defaultServerUrl(): string {
       /* storage can be blocked */
     }
   }
-  const built = import.meta.env.VITE_SERVER_URL as string | undefined;
-  if (built) return built;
+  // (A server address baked in by the website's build settings is ignored on purpose: an old one there, the retired fly.dev address,
+  // left everyone unable to connect. The built-in address above is the one players use.)
   if (!import.meta.env.DEV) return PUBLIC_SERVER;
   const host = location.hostname || "localhost";
   return `${location.protocol === "https:" ? "wss" : "ws"}://${host}:8787`;
