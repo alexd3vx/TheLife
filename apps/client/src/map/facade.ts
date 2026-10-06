@@ -76,6 +76,7 @@ ${NOISE}
 const FRAG_COLOUR = /* glsl */ `
 vec3 base = vColor;
 float fRough = 0.92;
+float fHeight = 0.0;
 vec3 fGlow = vec3(0.0);
 {
   float floors = vInfo.x;
@@ -104,6 +105,7 @@ vec3 fGlow = vec3(0.0);
       float rib = 0.5 + 0.5 * sin(u * 25.0);
       col = mix(col, vec3(0.55, 0.57, 0.6), 0.7);
       col *= 0.82 + 0.22 * rib;
+      fHeight += rib * 0.012;
       float rust = smoothstep(0.55, 0.85, fbm(vec2(u * 0.7, v * 0.5) + seed * 30.0));
       col = mix(col, vec3(0.45, 0.22, 0.12), rust * 0.65);
       fRough = 0.55 + rust * 0.4;
@@ -114,11 +116,13 @@ vec3 fGlow = vec3(0.0);
       float bx = fract(blk.x + 0.5 * mod(row, 2.0));
       float joint = max(smoothstep(0.05, 0.0, bx) + smoothstep(0.95, 1.0, bx), smoothstep(0.1, 0.0, fract(blk.y)));
       col *= 1.0 - 0.28 * joint * detail;
+      fHeight -= joint * 0.008;
       col *= 0.9 + 0.2 * h21(vec2(floor(blk.x + 0.5 * mod(row, 2.0)), row) + seed * 7.0);
       fRough = 0.97;
     } else {
       col *= 0.9 + 0.2 * grain;
       col *= 0.96 + 0.08 * fine * detail;
+      fHeight += (grain - 0.5) * 0.004 + (fine - 0.5) * 0.0012;
       fRough = 0.9;
     }
 
@@ -180,6 +184,7 @@ vec3 fGlow = vec3(0.0);
         w = mix(w, mix(vec3(0.05), vec3(0.8, 0.8, 0.78), step(0.5, h21(vec2(seed, 5.0)))), grid * 0.9);
       }
       col = w;
+      fHeight -= 0.1 * (1.0 - frame) + 0.03;
       fRough = 0.35 - 0.2 * (1.0 - frame);
       // lit windows at night
       float lit = step(0.55, cellSeed) * (1.0 - frame) * uNight;
@@ -192,12 +197,14 @@ vec3 fGlow = vec3(0.0);
     // Floor slabs: a band under each storey, and a cornice at the top.
     float slab = smoothstep(storey - 0.22, storey - 0.18, fv) * step(fl, floors - 1.5);
     col *= 1.0 - 0.14 * slab * detail;
+    fHeight -= slab * 0.03;
     float topBand = smoothstep(height - 0.45, height - 0.35, v);
     col = mix(col, col * 1.1 + 0.03, topBand * 0.6);
 
     // Shop shutter (corrugated, painted) and signboard.
     if (shutter > 0.5) {
       float ribs = 0.5 + 0.5 * sin(v * 60.0);
+      fHeight += ribs * 0.006;
       vec3 shutterCol = mix(vec3(0.15, 0.32, 0.55), vec3(0.65, 0.18, 0.15), step(0.33, h21(vec2(seed, 11.0))));
       shutterCol = mix(shutterCol, vec3(0.2, 0.45, 0.28), step(0.66, h21(vec2(seed, 11.0))));
       float open = step(0.7, h21(vec2(seed, 21.0))); // open for business: dark inside, goods
@@ -228,6 +235,10 @@ vec3 fGlow = vec3(0.0);
       fRough = 0.6;
     }
 
+    // Soft shadow where walls meet the ground, the corners and under the roofline (the light that does not reach there).
+    float ao = 1.0 - 0.28 * smoothstep(1.3, 0.0, v) - 0.22 * smoothstep(0.9, 0.0, min(u, len - u)) - 0.16 * smoothstep(height - 0.1, height + 0.0, v) * 0.0 - 0.14 * smoothstep(0.35, 0.0, storey - fv) * step(fl, floors - 1.5);
+    col *= mix(1.0, ao, detail * 0.8 + 0.2);
+
     // Weathering: dirt at the foot, rain streaks under the windows, mould near the roof, peeling paint, rising damp.
     float dirt = smoothstep(1.6, 0.0, v) * (0.35 + 0.4 * grain);
     float streak = vnoise(vec2(u * 6.0, v * 0.35 + seed * 20.0));
@@ -255,6 +266,7 @@ vec3 fGlow = vec3(0.0);
     // ------------------------------------------------------------ a corrugated sheet roof
     vec2 p = vUv; // x across the ribs (metres), y up the slope (metres)
     float rib = 0.5 + 0.5 * sin(p.x * 55.0);
+    fHeight += rib * 0.012 * detail;
     float ribFade = detail;
     float rust = smoothstep(0.45, 0.8, fbm(p * 0.7 + seed * 33.0));
     float streak = smoothstep(0.5, 0.9, vnoise(vec2(p.x * 3.0, p.y * 0.4 + seed * 9.0)));
@@ -276,6 +288,20 @@ function patchFacade(material: THREE.MeshStandardMaterial) {
     shader.fragmentShader = `${FRAG_HEAD}\n${shader.fragmentShader}`
       .replace("#include <color_fragment>", `#include <color_fragment>\n${FRAG_COLOUR}`)
       .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = fRough;")
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+{
+  // Relief from the same height map: stucco, block joints, window recesses, ribs. It catches the light like real surface texture.
+  float fd = 1.0 - smoothstep(12.0, 60.0, length(vViewPosition));
+  vec2 dH = clamp(vec2(dFdx(fHeight), dFdy(fHeight)), vec2(-0.02), vec2(0.02)) * fd;
+  vec3 sx = normalize(dFdx(-vViewPosition)), sy = normalize(dFdy(-vViewPosition));
+  vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
+  float det = dot(sx, r1);
+  vec3 grad = sign(det) * (dH.x * r1 + dH.y * r2) * 40.0;
+  normal = normalize(abs(det) * normal - grad * faceDirection);
+}`,
+      )
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += fGlow;");
     // The standard shader only declares vUv when a texture needs it; this one always does.
     shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec2 vUv;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvUv = uv;");
@@ -296,6 +322,31 @@ export function facadeMaterial(): THREE.MeshStandardMaterial {
 
 export function setFacadeNight(on: boolean): void {
   facadeUniforms.uNight.value = on ? 1 : 0;
+  if (material) material.envMapIntensity = on ? 0.12 : 0.6;
+}
+
+/** Gives glass and paint a sky to reflect (a soft gradient from dusty ground to blue zenith, made once). */
+export function setFacadeEnvironment(renderer: THREE.WebGLRenderer): void {
+  const m = facadeMaterial();
+  if (m.envMap) return;
+  const scene = new THREE.Scene();
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: "varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: "varying vec3 vDir; void main() { float y = vDir.y; vec3 ground = vec3(0.42, 0.37, 0.31), horizon = vec3(0.86, 0.9, 0.93), zenith = vec3(0.34, 0.55, 0.85); vec3 c = y < 0.0 ? mix(horizon, ground, smoothstep(0.0, -0.4, y)) : mix(horizon, zenith, smoothstep(0.0, 0.7, y)); gl_FragColor = vec4(c, 1.0); }",
+    }),
+  );
+  scene.add(sky);
+  const pm = new THREE.PMREMGenerator(renderer);
+  const target = pm.fromScene(scene, 0.02);
+  m.envMap = target.texture;
+  m.envMapIntensity = 0.6;
+  m.needsUpdate = true;
+  sky.geometry.dispose();
+  (sky.material as THREE.Material).dispose();
+  pm.dispose();
 }
 
 /** Collects the walls and roofs that use the facade shader: positions, a base colour, metres-along/metres-up, and the building's facts. */

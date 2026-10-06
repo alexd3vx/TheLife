@@ -15,6 +15,7 @@ import { buildTerrain } from "./terrain";
 import { Pedestrians } from "./pedestrians";
 import { AdaptiveQuality } from "../graphics";
 import { getSettings, shadowMapSize, subscribeSettings, type Settings } from "../settings/settings";
+import { setFacadeEnvironment } from "./facade";
 import { PostFX } from "../settings/postfx";
 import { bodyFor, sexOf } from "../lab/looks";
 import { ChunkStreamer, type StreamStats } from "./streamer";
@@ -111,6 +112,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  setFacadeEnvironment(renderer);
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
   container.appendChild(renderer.domElement);
 

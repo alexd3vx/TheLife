@@ -122,7 +122,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       }
       switch (message.t) {
         case "create": {
-          const made = room.createLife(me, message.profile, now);
+          const made = room.createLife(me, message.profile, now, message.replace === true);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });

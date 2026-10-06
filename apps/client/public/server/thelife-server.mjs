@@ -39,6 +39,7 @@ function parseClientMessage(raw) {
       if (!firstName || !finite(p.startingMoney, 1e9)) return null;
       return {
         t: "create",
+        replace: m.replace === true,
         profile: { backgroundId: text(p.backgroundId, 40), sex: p.sex === "female" ? "female" : "male", firstName: firstName.slice(0, 14), surname: cleanName(text(p.surname, 40)).slice(0, 14), hometown: text(p.hometown, 40), startingMoney: Math.round(p.startingMoney), traits }
       };
     }
@@ -3268,6 +3269,18 @@ function generateLagos(seed = 7) {
     terrain: t
   };
 }
+var CHARGE_KINDS = /* @__PURE__ */ new Set(["hotel", "bank", "hospital", "police", "fire", "station", "government", "fuel", "market", "museum", "school"]);
+function chargingSpotNear(d, x, z) {
+  for (const lm of d.landmarks) {
+    if (CHARGE_KINDS.has(lm.kind) && Math.hypot(lm.entrance.x - x, lm.entrance.z - z) < 14) return lm.name;
+  }
+  for (const l of lotIndexOf(d).near(x, z)) {
+    if (l.kind !== "shop" && l.kind !== "stall") continue;
+    const f = l.footprint;
+    if (x > f.minX - 6 && x < f.maxX + 6 && z > f.minZ - 6 && z < f.maxZ + 6) return "a shop";
+  }
+  return null;
+}
 
 // packages/game-core/src/onlineRules.ts
 var no = (reason) => ({ ok: false, reason });
@@ -3456,6 +3469,7 @@ var Room = class {
       events: [],
       away: null,
       lastStepAt: now,
+      lastCreateAt: 0,
       lastRpcAt: {},
       lastMoveAt: now,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now }, rpc: { tokens: LIMITS.rpc.burst, at: now } }
@@ -3487,8 +3501,10 @@ var Room = class {
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
   }
   /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
-  createLife(player, choice, now) {
-    if (player.life) return { ok: false, reason: "You already have a life." };
+  createLife(player, choice, now, replace = false) {
+    if (player.life && !replace) return { ok: false, reason: "You already have a life." };
+    if (player.life && now - player.lastCreateAt < 6e4) return { ok: false, reason: "Wait a minute before starting over again." };
+    player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile));
@@ -3513,6 +3529,10 @@ var Room = class {
       const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1e3));
       p.lastStepAt = now;
       p.life.step(dt);
+      if (p.life.state.phone.plugged === "wall" && p.where === "world" && !chargingSpotNear(this.district, p.x, p.z)) {
+        p.life.state.phone.plugged = null;
+        p.events.push({ kind: "warn", text: "You moved away from the socket and your phone unplugged.", minute: p.life.state.minute });
+      }
       p.events.push(...p.life.drainEvents());
     }
   }
@@ -3524,6 +3544,9 @@ var Room = class {
     if (wait > 0) {
       if (now - (player.lastRpcAt[fn] ?? 0) < wait * 1e3) return { ok: true };
       player.lastRpcAt[fn] = now;
+    }
+    if (fn === "plug" && args[0] === "wall" && player.where === "world" && !chargingSpotNear(this.district, player.x, player.z)) {
+      return { ok: false, reason: "There is no socket here. Charge at home, or at a shop, bank, hotel, hospital or station." };
     }
     const result = runRpc(player.life, fn, args);
     player.events.push(...player.life.drainEvents());
@@ -3698,7 +3721,7 @@ async function startGameServer(options = {}) {
       }
       switch (message.t) {
         case "create": {
-          const made = room.createLife(me, message.profile, now);
+          const made = room.createLife(me, message.profile, now, message.replace === true);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });

@@ -22,6 +22,12 @@ export function setTransport(send: Send | null): void {
  * we stop waiting (the message may have been lost), so a snapshot can never be ignored forever.
  */
 export const lastSentId = (): number => (Date.now() - lastAt < 3000 ? lastId : 0);
+/** Out in the city: says whether there is a socket here (a place's name), or null. At home it always says yes. */
+let chargeChecker: (() => string | null) | null = null;
+export function setChargeChecker(fn: (() => string | null) | null): void {
+  chargeChecker = fn;
+}
+
 export const isOnline = (): boolean => transport !== null;
 
 /** Sends an action to the server (does nothing offline). */
@@ -43,7 +49,11 @@ function remote<A extends [GameState, ...unknown[]], R>(name: string, fn: (...a:
 
 export const openApp = remote("openApp", core.openApp as (s: GameState, a: string) => PhoneResult);
 export const call = remote("call", core.call);
-export const plug = remote("plug", core.plug as (s: GameState, a: "wall" | "bank" | null) => PhoneResult);
+const corePlug = core.plug as (s: GameState, a: "wall" | "bank" | null) => PhoneResult;
+export const plug = remote("plug", (s: GameState, source: "wall" | "bank" | null): PhoneResult => {
+  if (source === "wall" && chargeChecker && !chargeChecker()) return { ok: false, reason: "There is no socket here. Charge at home, or at a shop, bank, hotel, hospital or station." };
+  return corePlug(s, source);
+});
 export const setBankCharging = remote("setBankCharging", core.setBankCharging);
 export const payRent = remote("payRent", core.payRent as (s: GameState, a?: number) => PhoneResult, (a) => (a[1] === undefined ? [] : [a[1]]));
 export const payBill = remote("payBill", core.payBill);

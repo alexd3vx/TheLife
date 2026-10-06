@@ -12,6 +12,8 @@ import { useSettings } from "../settings/settings";
 import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
+import { setChargeChecker } from "../phone/remote";
+import { chargingSpotNear } from "@thelife/game-core";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -69,6 +71,15 @@ export default function MapPage() {
       runtimeRef.current = null;
     };
   }, []);
+
+  // Out in the city a phone only charges beside a place with power.
+  useEffect(() => {
+    setChargeChecker(() => {
+      const pose = runtimeRef.current?.online.pose();
+      return pose ? chargingSpotNear(district, pose.x, pose.z) : null;
+    });
+    return () => setChargeChecker(null);
+  }, [district]);
 
   // The opening shot, once the world is drawn and your life has arrived.
   useEffect(() => {

@@ -20,6 +20,7 @@ import {
 } from "@thelife/game-core";
 import type { GameBridge } from "./controller";
 import { rotateKey } from "../net/identity";
+import { setPending } from "./pendingLife";
 import { lastSentId, rpc } from "../phone/remote";
 
 const SAVE_KEY = "thelife.game.v1";
@@ -70,6 +71,7 @@ function readSave(): SavedGame | null {
 /** Starts a brand new life from a rolled background (replaces any earlier save). */
 export function beginLife(profile: Profile): void {
   rotateKey(); // a new character is a new life on the server
+  setPending(profile);
   try {
     const payload: SavedGame = { state: createGameState(profile), savedAt: Date.now() };
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -88,7 +90,7 @@ export function hasLife(): boolean {
 
 /** Who the player is, for the HUD. */
 export function savedProfile(): Profile | null {
-  return readSave()?.state.profile ?? null;
+  return null; // (kept for the dev test pages; the game itself no longer saves anything on the device)
 }
 
 export function clearGameSave(): void {
@@ -191,6 +193,7 @@ export class GameSession implements GameBridge {
 
   save(): void {
     this.sinceSave = 0;
+    if (this.online) return; // the server keeps your life; nothing about it is stored on this device
     try {
       const payload: SavedGame = { state: this.sim.state, savedAt: Date.now() };
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));

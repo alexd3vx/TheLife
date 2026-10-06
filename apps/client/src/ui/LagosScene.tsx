@@ -201,9 +201,15 @@ function LagosSceneInner() {
           </g>
         </g>
 
-        <g className="scene-birds" fill="none" stroke="#1a0f2a" strokeWidth="1.6" strokeLinecap="round">
-          {[0, 1, 2, 3].map((i) => (
-            <path key={i} d="M0 0 Q6 -6 12 0 Q18 -6 24 0" style={{ animationDelay: `${-i * 4.5}s`, transform: `translateY(${i * 22}px)` }} className="scene-bird" />
+        <g className="scene-birds">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <g key={i} className="scene-bird" style={{ animationDelay: `${-i * 5.2}s`, animationDuration: `${24 + (i % 3) * 5}s`, ["--by" as string]: `${90 + i * 38}px` }}>
+              <g className="bird-body" style={{ transform: `scale(${1.2 - i * 0.12})` }}>
+                <path className="wing wl" d="M0 0 Q-9 -9 -20 -3 Q-10 -3 0 1Z" fill="#1a0f2a" style={{ animationDelay: `${i * 0.13}s` }} />
+                <path className="wing wr" d="M0 0 Q9 -9 20 -3 Q10 -3 0 1Z" fill="#1a0f2a" style={{ animationDelay: `${i * 0.13}s` }} />
+                <ellipse cx="0" cy="1" rx="3.4" ry="1.7" fill="#1a0f2a" />
+              </g>
+            </g>
           ))}
         </g>
 

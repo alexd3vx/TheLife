@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { GameSession, savedProfile, type LifeSnapshot } from "../play/gameSession";
-import { setTransport } from "../phone/remote";
+import { GameSession, type LifeSnapshot } from "../play/gameSession";
+import { clearPending, getPending } from "../play/pendingLife";
+import { setChargeChecker, setTransport } from "../phone/remote";
 import type { NetStatus } from "./connection";
 import { world } from "./world";
 
@@ -24,14 +25,16 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
     const set = (patch: Partial<OnlineLife>) => setState((s) => ({ ...s, ...patch }));
     const offMessage = world.onMessage((m) => {
       if (m.t === "needsLife") {
-        const p = savedProfile();
+        const pending = getPending();
+        const p = pending?.profile;
         if (!p) {
           window.location.hash = "#/create";
           return;
         }
-        world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits } });
+        world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true });
         set({ phase: "creating" });
       } else if (m.t === "life") {
+        clearPending();
         const snap = m as unknown as LifeSnapshot;
         if (!session) {
           session = new GameSession(false, snap);
@@ -50,12 +53,14 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
       else if (st === "connecting" && !session) set({ phase: "connecting", detail: world.detail });
       else if (session && st !== "online") session.notice(st === "offline" ? world.detail || "You lost the connection." : "Reconnecting…");
     });
+    if (where === "home") setChargeChecker(() => "home");
     world.setPlace(where);
     world.connect();
     return () => {
       offMessage();
       offStatus();
       setTransport(null);
+      setChargeChecker(null);
       world.disconnect();
     };
   }, [where]);

@@ -1,5 +1,5 @@
 import type { ClientMessage, RpcArg, ServerMessage } from "@thelife/shared";
-import { savedProfile } from "../play/gameSession";
+import { getPending } from "../play/pendingLife";
 import { Connection, defaultServerUrl, type NetStatus } from "./connection";
 
 type Listener = (m: ServerMessage) => void;
@@ -22,7 +22,7 @@ class World {
 
   connect(): void {
     if (this.conn) return;
-    const p = savedProfile();
+    const p = getPending()?.profile;
     const name = p ? `${p.firstName} ${p.surname}`.trim() : "Player";
     this.conn = new Connection(defaultServerUrl(), name || "Player", {
       onStatus: (s, d) => {

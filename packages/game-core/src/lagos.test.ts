@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK, STREET, WATER, generateLagos, generatePlan, hasInterior, indexChunks, indexLots, lagosTerrain, nearPolygon, walkableAt } from "./index.js";
+import { BLOCK, STREET, WATER, chargingSpotNear, generateLagos, generatePlan, hasInterior, indexChunks, indexLots, lagosTerrain, nearPolygon, walkableAt } from "./index.js";
 
 const d = generateLagos();
 const t = lagosTerrain();
@@ -87,6 +87,18 @@ describe("Lagos Island", () => {
     // Nearly everything must be reachable; a few sit in walled yards or across the water. (Walking there in the game uses a finer search.)
     expect(unreachable.length).toBeLessThan(d.landmarks.length * 0.15);
   }, 60_000);
+});
+
+describe("charging", () => {
+  it("has sockets at places with power, and none in the middle of nowhere", () => {
+    const bank = d.landmarks.find((l) => l.kind === "bank")!;
+    expect(chargingSpotNear(d, bank.entrance.x, bank.entrance.z)).toBe(bank.name);
+    expect(chargingSpotNear(d, 5, 5)).toBeNull();
+    // Some street far from every place with power exists, and there the phone cannot charge.
+    let lonely = 0;
+    for (let x = 100; x < d.bounds.maxX; x += 97) for (let z = 100; z < d.bounds.maxZ; z += 89) if (t.classAt(x, z) === STREET && !chargingSpotNear(d, x, z)) lonely++;
+    expect(lonely).toBeGreaterThan(50);
+  });
 });
 
 describe("long routes", () => {

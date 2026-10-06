@@ -22,6 +22,7 @@ export function AuthPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   function switchTab(next: Tab) {
     setTab(next);
@@ -54,7 +55,7 @@ export function AuthPage() {
         setFormError(result.message);
       } else if (result.needsEmailConfirmation) {
         switchTab("login");
-        setNotice("Check your inbox — we sent a link to confirm your email, then log in.");
+        setSentTo(email);
       }
     } catch {
       setFormError("Something went wrong. Check your connection and try again.");
@@ -106,6 +107,24 @@ export function AuthPage() {
           </>
         )}
 
+        {sentTo ? (
+          <div className="auth-done" role="status">
+            <div className="auth-done-mark" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="64" height="64"><rect x="8" y="16" width="48" height="34" rx="5" fill="#ffd98a" /><path d="M10 20l22 18 22-18" fill="none" stroke="#7a4a12" strokeWidth="3" strokeLinejoin="round" /></svg>
+            </div>
+            <h2>Check your inbox</h2>
+            <p>
+              We sent a link to <strong>{sentTo}</strong>. Open it to confirm your email, then come back here and log in. (If it is not there, look in spam.)
+            </p>
+            <button className="btn btn-primary" onClick={() => setSentTo(null)}>
+              I've confirmed, log me in
+            </button>
+            <button className="link-button" onClick={() => { setSentTo(null); switchTab("signup"); }}>
+              Use a different email
+            </button>
+          </div>
+        ) : (
+        <>
         <div className="tabs" role="tablist" aria-label="Account">
           <button role="tab" aria-selected={!isSignUp} className="tab" onClick={() => switchTab("login")}>
             Log in
@@ -187,6 +206,9 @@ export function AuthPage() {
             {busy ? "One moment…" : isSignUp ? "Create account" : "Log in"}
           </button>
         </form>
+
+        </>
+        )}
 
         <p className="fine">
           This game is for adults and includes mature themes. By continuing you agree to play fair and respect other

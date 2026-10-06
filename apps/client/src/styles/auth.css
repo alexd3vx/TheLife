@@ -166,7 +166,12 @@
 .scene-palm.right { animation-duration: 9s; animation-direction: alternate-reverse; }
 @keyframes sway { from { transform: rotate(-1.6deg); } to { transform: rotate(1.8deg); } }
 .scene-bird { animation: bird 26s linear infinite; }
-@keyframes bird { from { translate: -100px 140px; } to { translate: 1700px 60px; } }
+@keyframes bird { 0% { transform: translate3d(-80px, var(--by, 120px), 0); } 50% { transform: translate3d(820px, calc(var(--by, 120px) - 40px), 0); } 100% { transform: translate3d(1700px, calc(var(--by, 120px) + 10px), 0); } }
+.bird-body { transform-box: fill-box; }
+.wing { transform-box: fill-box; animation: flap .42s ease-in-out infinite alternate; }
+.wing.wl { transform-origin: 100% 100%; }
+.wing.wr { transform-origin: 0% 100%; }
+@keyframes flap { from { transform: scaleY(1) rotate(0deg); } to { transform: scaleY(-0.7) rotate(0deg); } }
 .scene-bars { position: absolute; left: 0; right: 0; height: 6vh; background: #000; z-index: 1; animation: bars 2.4s cubic-bezier(.2,.7,.2,1) both; }
 .scene-bars.top { top: 0; }
 .scene-bars.bottom { bottom: 0; }
@@ -193,3 +198,13 @@
   .auth.cine .auth-panel .auth-title, .auth.cine .auth-panel .auth-sub, .auth.cine .auth-panel .brand { display: none; }
   .scene-bars { height: 5vh; }
 }
+
+.auth-done { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 18px 6px 8px; animation: rise-in .7s cubic-bezier(.2,.7,.2,1) both; }
+.auth-done h2 { margin: 0; font-family: var(--font-display); font-size: 1.6rem; }
+.auth-done p { margin: 0; color: var(--text-muted); max-width: 34ch; }
+.auth-done .btn { width: 100%; }
+.auth-done-mark { animation: mail-float 3s ease-in-out infinite; }
+@keyframes mail-float { 50% { transform: translateY(-6px) rotate(-3deg); } }
+
+.home-cine .auth-panel { align-self: center; display: grid; gap: 12px; max-width: 420px; }
+.home-cine .auth-tagline h1 { font-size: clamp(2.2rem, 5vw, 4rem); }

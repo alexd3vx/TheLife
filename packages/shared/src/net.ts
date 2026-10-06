@@ -40,7 +40,7 @@ export type ClientMessage =
   /** Moves the player between home and the city (others only see them while they are in the city). */
   | { t: "place"; where: Where }
   /** Starts a new life. The server rebuilds the whole profile from the background id, so only these choices are used. */
-  | { t: "create"; profile: NewLife }
+  | { t: "create"; profile: NewLife; /** Throw the current life away and start this one instead ("New game"). */ replace?: boolean }
   /** Asks the server to run one game action (a whitelisted function) on this player's life. */
   | { t: "do"; id: number; fn: string; args: RpcArg[] }
   | { t: "move"; x: number; y: number; z: number; yaw: number; clip: string; level: number }
@@ -101,6 +101,7 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       if (!firstName || !finite(p.startingMoney, 1e9)) return null;
       return {
         t: "create",
+        replace: m.replace === true,
         profile: { backgroundId: text(p.backgroundId, 40), sex: p.sex === "female" ? "female" : "male", firstName: firstName.slice(0, 14), surname: cleanName(text(p.surname, 40)).slice(0, 14), hometown: text(p.hometown, 40), startingMoney: Math.round(p.startingMoney), traits },
       };
     }

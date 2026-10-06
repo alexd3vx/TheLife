@@ -11,7 +11,8 @@ import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge, type Status } from "./controller";
-import { GameSession, clearGameSave, type HudSnapshot } from "./gameSession";
+import { GameSession, type HudSnapshot } from "./gameSession";
+import { markRestart } from "./pendingLife";
 import type { SimEvent } from "@thelife/game-core";
 import { HOUSE_LAYOUT, buildShowroomLayout, type Layout } from "./layout";
 import { FURNITURE } from "@thelife/game-core";
@@ -418,7 +419,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       session?.buyGroceries();
     },
     newGame() {
-      clearGameSave();
+      markRestart();
       window.location.hash = "#/create";
     },
     dispose() {

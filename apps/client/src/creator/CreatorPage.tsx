@@ -7,7 +7,7 @@ import { loadManifest, type AssetManifest } from "../lab/manifest";
 import { PROC_BOTTOMS, PROC_TOPS } from "../lab/procedural/garments";
 import { PROC_HAIR } from "../lab/procedural/hair";
 import { createViewer, type Viewer } from "../lab/viewer";
-import { beginLife } from "../play/gameSession";
+import { setPending, takeRestart } from "../play/pendingLife";
 import "./creator.css";
 
 const naira = (n: number) => `₦${n.toLocaleString()}`;
@@ -113,7 +113,7 @@ export default function CreatorPage() {
   const start = useCallback(() => {
     if (!profile) return;
     saveLook(look);
-    beginLife({ ...profile, traits: sanitizeTraits(traits), firstName: firstName.trim() || profile.firstName, surname: surname.trim() || profile.surname });
+    setPending({ ...profile, traits: sanitizeTraits(traits), firstName: firstName.trim() || profile.firstName, surname: surname.trim() || profile.surname }, takeRestart());
     window.location.hash = "#/play";
   }, [profile, look, firstName, surname, traits]);
 

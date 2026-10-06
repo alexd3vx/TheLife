@@ -1,53 +1,46 @@
 import { isAdmin } from "./admin";
-import { lazy, Suspense } from "react";
 import { useAuth } from "../auth/AuthProvider";
-
-const HeroCanvas = lazy(() => import("../world3d/HeroCanvas"));
+import { LagosScene } from "./LagosScene";
 
 const linkStyle = { textAlign: "center", textDecoration: "none", display: "grid", placeItems: "center" } as const;
 
-// Temporary in-game screen. Replaced by the character creator and the world in later milestones.
+/** The first screen after signing in: a warm welcome over the Lagos evening, and the way into the game. */
 export function HomePlaceholder() {
-  const { user, save, leave } = useAuth();
+  const { user, profile, leave } = useAuth();
+  const name = profile?.displayName || user?.email?.split("@")[0] || "";
 
   return (
-    <main className="home">
-      <div className="home-scene" aria-hidden="true">
-        <Suspense fallback={null}>
-          <HeroCanvas />
-        </Suspense>
-      </div>
-      <section className="home-card">
-        <h1>You're in.</h1>
-        {user ? (
-          <p>
-            Signed in as <strong>{user.email}</strong>.
-          </p>
-        ) : (
-          <p>
-            Your life is saved on this device.
-          </p>
-        )}
-        {save && <p className="muted">Save started {new Date(save.createdAt).toLocaleDateString()}</p>}
-        <a className="btn btn-primary" href="#/play" style={linkStyle}>
+    <main className="auth cine home-cine">
+      <LagosScene />
+      <section className="auth-tagline">
+        <div className="brand-line">
+          <span className="brand-mark" aria-hidden="true" />
+          Alexion Studios presents
+        </div>
+        <h1>{name ? `Welcome, ${name}.` : "Welcome."}</h1>
+        <p>Your life in Lagos is waiting.</p>
+      </section>
+      <section className="auth-panel">
+        <a className="btn btn-primary btn-wide" href="#/play" style={linkStyle}>
           Play
         </a>
-        <a className="btn btn-ghost" href="#/settings" style={linkStyle}>
+        <a className="btn btn-ghost btn-wide" href="#/settings" style={linkStyle}>
           Settings
         </a>
         {isAdmin() && (
           <>
             <a className="btn btn-ghost" href="#/showroom" style={linkStyle}>
-              Furniture showroom (test)
+              Furniture showroom (admin)
             </a>
             <a className="btn btn-ghost" href="#/lab" style={linkStyle}>
-              Character and asset lab (test)
+              Character and asset lab (admin)
             </a>
           </>
         )}
         <button className="btn btn-ghost" onClick={() => void leave()}>
           {user ? "Log out" : "Back to start"}
         </button>
+        {user && <p className="fine">Signed in as {user.email}</p>}
       </section>
     </main>
   );

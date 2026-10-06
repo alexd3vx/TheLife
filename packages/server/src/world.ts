@@ -1,4 +1,4 @@
-import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
+import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, chargingSpotNear, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
@@ -20,6 +20,7 @@ export interface Player extends PlayerView {
   /** "While you were away" lines, sent once with the first snapshot. */
   away: string[] | null;
   lastStepAt: number;
+  lastCreateAt: number;
   lastRpcAt: Record<string, number>;
   lastMoveAt: number;
   /** Token buckets for rate limits. */
@@ -71,6 +72,7 @@ export class Room {
       events: [],
       away: null,
       lastStepAt: now,
+      lastCreateAt: 0,
       lastRpcAt: {},
       lastMoveAt: now,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now }, rpc: { tokens: LIMITS.rpc.burst, at: now } },
@@ -106,8 +108,10 @@ export class Room {
   }
 
   /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
-  createLife(player: Player, choice: NewLifeChoices, now: number): { ok: true } | { ok: false; reason: string } {
-    if (player.life) return { ok: false, reason: "You already have a life." };
+  createLife(player: Player, choice: NewLifeChoices, now: number, replace = false): { ok: true } | { ok: false; reason: string } {
+    if (player.life && !replace) return { ok: false, reason: "You already have a life." };
+    if (player.life && now - player.lastCreateAt < 60_000) return { ok: false, reason: "Wait a minute before starting over again." };
+    player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile));
@@ -135,6 +139,11 @@ export class Room {
       const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1000));
       p.lastStepAt = now;
       p.life.step(dt);
+      // Walk away from the socket and the phone comes unplugged.
+      if (p.life.state.phone.plugged === "wall" && p.where === "world" && !chargingSpotNear(this.district, p.x, p.z)) {
+        p.life.state.phone.plugged = null;
+        p.events.push({ kind: "warn", text: "You moved away from the socket and your phone unplugged.", minute: p.life.state.minute });
+      }
       p.events.push(...p.life.drainEvents());
     }
   }
@@ -147,6 +156,9 @@ export class Room {
     if (wait > 0) {
       if (now - (player.lastRpcAt[fn] ?? 0) < wait * 1000) return { ok: true };
       player.lastRpcAt[fn] = now;
+    }
+    if (fn === "plug" && args[0] === "wall" && player.where === "world" && !chargingSpotNear(this.district, player.x, player.z)) {
+      return { ok: false, reason: "There is no socket here. Charge at home, or at a shop, bank, hotel, hospital or station." };
     }
     const result = runRpc(player.life, fn, args);
     player.events.push(...player.life.drainEvents());

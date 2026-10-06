@@ -590,3 +590,21 @@ export function coarseRoute(t: LagosTerrain, x0: number, z0: number, x1: number,
   out.push({ x: x1, z: z1 });
   return out;
 }
+
+const CHARGE_KINDS = new Set(["hotel", "bank", "hospital", "police", "fire", "station", "government", "fuel", "market", "museum", "school"]);
+
+/**
+ * Is there a socket you can use here? Out in the city a phone can only charge inside or beside a place that has power: a bank, hotel,
+ * hospital, station, fuel station, market and so on, or at a shop. Returns what it is (for the message), or null.
+ */
+export function chargingSpotNear(d: District, x: number, z: number): string | null {
+  for (const lm of d.landmarks) {
+    if (CHARGE_KINDS.has(lm.kind) && Math.hypot(lm.entrance.x - x, lm.entrance.z - z) < 14) return lm.name;
+  }
+  for (const l of lotIndexOf(d).near(x, z)) {
+    if (l.kind !== "shop" && l.kind !== "stall") continue;
+    const f = l.footprint;
+    if (x > f.minX - 6 && x < f.maxX + 6 && z > f.minZ - 6 && z < f.maxZ + 6) return "a shop";
+  }
+  return null;
+}

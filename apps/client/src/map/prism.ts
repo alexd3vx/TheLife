@@ -112,6 +112,15 @@ export function addPrism(fb: FacadeBuilder, b: MeshBuilder, lot: Lot, lod: 0 | 1
   }
   if (lod !== 0) return;
 
+  // A plinth at the foot of every wall, and a cornice under the roofline: the lines that make a block read as a building.
+  const stone = paint.clone().multiplyScalar(0.7).lerp(CONCRETE, 0.4);
+  for (const e of edges) {
+    if (e.len < 2.5) continue;
+    const mx = (e.x0 + e.x1) / 2, mz = (e.z0 + e.z1) / 2;
+    obox(b, mx, 0, mz, [e.ux, e.uz], [e.nx, e.nz], e.len / 2, 0.5, 0.07, stone);
+    if (!gable && lot.floors >= 2) obox(b, mx, top - 0.26, mz, [e.ux, e.uz], [e.nx, e.nz], e.len / 2 + 0.05, 0.26, 0.3, paint.clone().multiplyScalar(1.04));
+  }
+
   // ---------------------------------------------------------------- things that stick out (close up only)
   if (!gable) {
     // A parapet round the roof edge.
