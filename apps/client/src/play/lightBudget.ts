@@ -10,7 +10,7 @@ export class LightBudget {
   private frame = 0;
   private readonly p = new THREE.Vector3();
 
-  constructor(private readonly scene: THREE.Scene, private readonly keep = 4) {}
+  constructor(private readonly scene: THREE.Scene, public keep = 4) {}
 
   /** Call every frame with where the player is. */
   update(focus: THREE.Vector3): void {

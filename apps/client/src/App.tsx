@@ -11,6 +11,7 @@ const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
 const PhoneTestPage = lazy(() => import("./phone/PhoneTestPage"));
 const MapPage = lazy(() => import("./map/MapPage"));
 const CreatorPage = lazy(() => import("./creator/CreatorPage"));
+const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(window.location.hash);
@@ -49,6 +50,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <PhoneTestPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/settings")) {
+    return (
+      <Suspense fallback={null}>
+        <SettingsPanel />
       </Suspense>
     );
   }

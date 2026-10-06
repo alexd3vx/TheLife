@@ -3,7 +3,10 @@ import { LightBudget } from "./lightBudget";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { isFree } from "@thelife/shared";
-import { AdaptiveQuality, type Quality } from "../graphics";
+import { AdaptiveQuality } from "../graphics";
+import { getSettings, shadowMapSize, subscribeSettings } from "../settings/settings";
+import { PostFX } from "../settings/postfx";
+import { bodyFor, sexOf } from "../lab/looks";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
@@ -38,8 +41,6 @@ export interface TapMenu {
 export interface PlayRuntime {
   dispose(): void;
   buyGroceries(): void;
-  quality(): Quality;
-  setQuality(q: Quality): void;
   /** Draws the 3D scene less while the phone covers it. */
   setPhoneOpen(open: boolean): void;
   /** The running game, for the phone screen. Null in the showroom. */
@@ -85,15 +86,19 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : HOUSE_LAYOUT;
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" });
+    renderer = new THREE.WebGLRenderer({ antialias: getSettings().antialias, powerPreference: "high-performance" });
   } catch {
     return null;
   }
   const small = window.matchMedia("(max-width: 860px)").matches;
   // Quality adapts to the device (see graphics.ts): sharp by default, shadow refreshes are given up first.
+  let fx: PostFX | null = null;
   const quality = new AdaptiveQuality((r) => {
     renderer.setPixelRatio(r);
-    if (container.clientWidth) renderer.setSize(container.clientWidth, container.clientHeight, false);
+    if (container.clientWidth) {
+      renderer.setSize(container.clientWidth, container.clientHeight, false);
+      fx?.setSize(container.clientWidth, container.clientHeight, r);
+    }
   });
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.enabled = true;
@@ -272,6 +277,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     const { clientWidth, clientHeight } = container;
     if (!clientWidth || !clientHeight) return;
     renderer.setSize(clientWidth, clientHeight, false);
+    fx?.setSize(clientWidth, clientHeight, quality.ratio);
     camera.aspect = clientWidth / clientHeight;
     camera.fov = camera.aspect < 0.9 ? 52 : 38;
     camera.updateProjectionMatrix();
@@ -301,6 +307,33 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return set;
   }
   const lightBudget = new LightBudget(world.scene);
+  let frameGap = 0;
+  let lastFrameAt = 0;
+
+  // ---- the player's settings, applied now and whenever they change
+  fx = new PostFX(renderer, world.scene, camera);
+  fx.setSize(container.clientWidth || 1, container.clientHeight || 1, quality.ratio);
+  function applySettings() {
+    const st = getSettings();
+    quality.configure(st);
+    world.sun.castShadow = st.shadows !== "off";
+    const size = shadowMapSize(st.shadows);
+    if (world.sun.shadow.mapSize.x !== size) {
+      world.sun.shadow.mapSize.set(size, size);
+      world.sun.shadow.map?.dispose();
+      world.sun.shadow.map = null;
+    }
+    renderer.shadowMap.needsUpdate = true;
+    void fx?.set(st.bloom, st.bloomStrength);
+    frameGap = st.fpsCap ? 1000 / st.fpsCap - 2 : 0;
+    lightBudget.keep = st.lights;
+    controls.rotateSpeed = st.cameraSpeed;
+    controls.zoomSpeed = st.cameraSpeed;
+    const want = bodyFor(sexOf(avatar.look.body), st.textureStyle === "realistic");
+    if (avatar.look.body !== want) void avatar.setLook({ body: want });
+  }
+  applySettings();
+  const unsubscribeSettings = subscribeSettings(applySettings);
   let renderEvery = 1;
   let frameNo = 0;
   let lowFor = 0;
@@ -311,6 +344,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
+    if (frameGap && performance.now() - lastFrameAt < frameGap) return; // frame rate limit from the settings
+    lastFrameAt = performance.now();
     const dt = Math.min(clock.getDelta(), 0.1) * timeScale;
     if (document.hidden) return;
     const t0 = performance.now();
@@ -351,7 +386,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     frameNo++;
     if (frameNo % quality.shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
     // With the phone open the scene is hidden behind it, so draw it rarely: smoother phone, cooler device.
-    if (renderEvery === 1 || frames % renderEvery === 0) renderer.render(world.scene, camera);
+    if (renderEvery === 1 || frames % renderEvery === 0) fx ? fx.render() : renderer.render(world.scene, camera);
     renderMs += performance.now() - t1;
     updateMs += t1 - t0;
     timedFrames++;
@@ -372,8 +407,6 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
 
   return {
     session,
-    quality: () => quality.mode,
-    setQuality: (q) => quality.setQuality(q),
     setFollow(on) {
       follow = on;
     },
@@ -389,6 +422,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       window.location.hash = "#/create";
     },
     dispose() {
+      unsubscribeSettings();
+      fx?.dispose();
       stopped = true;
       cancelAnimationFrame(raf);
       observer.disconnect();

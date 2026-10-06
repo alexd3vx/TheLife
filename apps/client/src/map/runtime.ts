@@ -12,7 +12,10 @@ import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
 import { buildGroundDetail, buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
 import { Pedestrians } from "./pedestrians";
-import { AdaptiveQuality, type Quality } from "../graphics";
+import { AdaptiveQuality } from "../graphics";
+import { getSettings, shadowMapSize, subscribeSettings, type Settings } from "../settings/settings";
+import { PostFX } from "../settings/postfx";
+import { bodyFor, sexOf } from "../lab/looks";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 import { RemotePlayers } from "./remotePlayers";
 import { DoorManager } from "./doors";
@@ -44,8 +47,6 @@ export interface MapRuntime {
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
-  quality(): Quality;
-  setQuality(q: Quality): void;
   /** Switches between day and night (street lamps light up). */
   setNight(on: boolean): void;
   /** Flies over the whole district while measuring the frame rate. */
@@ -87,14 +88,18 @@ const TAP_MAX_TIME = 450;
 export async function startMap(container: HTMLElement, manifest: AssetManifest, events: MapEvents): Promise<MapRuntime | null> {
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" });
+    renderer = new THREE.WebGLRenderer({ antialias: getSettings().antialias, powerPreference: "high-performance" });
   } catch {
     return null;
   }
   const small = window.matchMedia("(max-width: 860px)").matches;
+  let fx: PostFX | null = null;
   const quality = new AdaptiveQuality((r) => {
     renderer.setPixelRatio(r);
-    if (container.clientWidth) renderer.setSize(container.clientWidth, container.clientHeight, false);
+    if (container.clientWidth) {
+      renderer.setSize(container.clientWidth, container.clientHeight, false);
+      fx?.setSize(container.clientWidth, container.clientHeight, r);
+    }
   });
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -114,9 +119,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   const sun = new THREE.DirectionalLight("#fff0d6", 2.6);
   const SUN_OFFSET = new THREE.Vector3(-30, 50, 36);
   sun.castShadow = true;
-  const shadowSize = 1024;
+  let shadowSize = 1024;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
-  const span = 46; // shadows cover this far around the player
+  let span = 46; // shadows cover this far around the player
   Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 5, far: 140 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.05;
@@ -392,13 +397,55 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const { clientWidth, clientHeight } = container;
     if (!clientWidth || !clientHeight) return;
     renderer.setSize(clientWidth, clientHeight, false);
+    fx?.setSize(clientWidth, clientHeight, quality.ratio);
     camera.aspect = clientWidth / clientHeight;
     camera.fov = camera.aspect < 0.9 ? 55 : 40;
     camera.updateProjectionMatrix();
   }
+  fx = new PostFX(renderer, scene, camera);
   resize();
   const observer = new ResizeObserver(resize);
   observer.observe(container);
+
+  // ---- the player's settings, applied now and whenever they change
+  let frameGap = 0;
+  let lastFrameAt = 0;
+  const FAR = 700;
+  function applySettings() {
+    const st: Settings = getSettings();
+    quality.configure(st);
+    const shadowsOn = st.shadows !== "off";
+    sun.castShadow = shadowsOn;
+    const size = shadowMapSize(st.shadows);
+    if (size !== shadowSize) {
+      shadowSize = size;
+      sun.shadow.mapSize.set(size, size);
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+    }
+    span = 46 * st.shadowDistance;
+    Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span });
+    sun.shadow.camera.updateProjectionMatrix();
+    renderer.shadowMap.needsUpdate = true;
+    void fx?.set(st.bloom, st.bloomStrength);
+    frameGap = st.fpsCap ? 1000 / st.fpsCap - 2 : 0;
+    controls.rotateSpeed = st.cameraSpeed;
+    controls.zoomSpeed = st.cameraSpeed;
+    streamer.setDrawDistance(st.drawDistance);
+    const fogNear = 140 * st.drawDistance, fogFar = 330 * st.drawDistance;
+    if (scene.fog instanceof THREE.Fog) {
+      scene.fog.near = night ? 90 * st.drawDistance : fogNear;
+      scene.fog.far = night ? 360 * st.drawDistance : fogFar;
+    }
+    camera.far = FAR;
+    peds.setDensity(st.crowd / 100);
+    remotes.setNameTags(st.nameTags);
+    // Cartoon or realistic characters: the same person, the other body.
+    const want = bodyFor(sexOf(avatar.look.body), st.textureStyle === "realistic");
+    if (avatar.look.body !== want) void avatar.setLook({ body: want });
+  }
+  applySettings();
+  const unsubscribeSettings = subscribeSettings(applySettings);
 
   // ---- loop, with the same adaptive quality as the house
   const clock = new THREE.Clock();
@@ -432,6 +479,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   function loop() {
     if (stopped) return;
     raf = requestAnimationFrame(loop);
+    if (frameGap && performance.now() - lastFrameAt < frameGap) return; // frame rate limit from the settings
+    lastFrameAt = performance.now();
     const rawDt = clock.getDelta();
     const dt = Math.min(rawDt, 0.1);
     if (document.hidden) return;
@@ -472,7 +521,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
     frameNo++;
     if (frameNo % quality.shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
-    renderer.render(scene, camera);
+    fx?.render();
     if (tourFrames) {
       tourFrames.push(rawDt * 1000);
       tourPeakCalls = Math.max(tourPeakCalls, renderer.info.render.calls);
@@ -542,15 +591,11 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   return {
     resetView,
     goTo,
-    quality: () => quality.mode,
-    setQuality(q) {
-      quality.setQuality(q);
-    },
     setNight(on) {
       night = on;
       groundDetail.setNight(on);
       SKY.set(on ? "#0d1426" : "#a9cbe8");
-      scene.fog = new THREE.Fog(SKY, on ? 90 : 140, on ? 360 : 330);
+      scene.fog = new THREE.Fog(SKY, (on ? 90 : 140) * getSettings().drawDistance, (on ? 360 : 330) * getSettings().drawDistance);
       hemi.intensity = on ? 0.38 : 0.85;
       sun.intensity = on ? 0.35 : 2.6;
       sun.color.set(on ? "#8fa8d8" : "#fff0d6");
@@ -574,6 +619,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       correct: (x, z) => controller.place(x, z, controller.yaw),
     },
     dispose() {
+      unsubscribeSettings();
+      fx?.dispose();
       remotes.dispose();
       doors.dispose();
       peds.dispose();

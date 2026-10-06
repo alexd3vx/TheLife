@@ -93,6 +93,13 @@ export class Pedestrians {
     void heads;
   }
 
+  private shown = 1;
+
+  /** Share of the crowd that is shown (0 to 1). */
+  setDensity(fraction: number): void {
+    this.shown = Math.max(0, Math.min(1, fraction));
+  }
+
   setVisible(v: boolean): void {
     this.root.visible = v;
   }
@@ -109,7 +116,7 @@ export class Pedestrians {
         p.loop = loopAround(focusX, focusZ);
         p.s = Math.random() * p.loop.length;
       }
-      const near = far < SHOW_RANGE;
+      const near = far < SHOW_RANGE && i < this.peds.length * this.shown;
       this.q.setFromAxisAngle(this.v.set(0, 1, 0), pos.yaw);
       this.base.compose(this.v.set(pos.x, 0, pos.z), this.q, near ? this.one : this.zero);
       const swing = Math.sin(this.time * (4.2 * p.speed) + p.phase) * 0.7;

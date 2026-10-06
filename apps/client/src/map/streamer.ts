@@ -4,6 +4,7 @@ import { buildChunk, type BuiltChunk, type Lod } from "./chunkBuilder";
 
 /** Distances (metres from the player to the nearest edge of a chunk) at which detail steps down. Past the last, a chunk is not loaded. */
 export const LOD_RINGS = [60, 130, 230] as const;
+export type Rings = readonly [number, number, number];
 const HYSTERESIS = 12; // a chunk changes level only once it is this far past the line, so it doesn't flicker back and forth
 
 interface Loaded {
@@ -39,6 +40,13 @@ export class ChunkStreamer {
     this.root.name = "chunks";
   }
 
+  private rings: Rings = LOD_RINGS;
+
+  /** Scales how far chunks are loaded (1 = normal), from the draw-distance setting. */
+  setDrawDistance(scale: number): void {
+    this.rings = [LOD_RINGS[0] * Math.max(0.7, scale), LOD_RINGS[1] * scale, LOD_RINGS[2] * scale];
+  }
+
   private wanted(chunk: ChunkData, px: number, pz: number): Lod | null {
     const b = chunk.bounds;
     const dx = Math.max(b.minX - px, 0, px - b.maxX);
@@ -47,9 +55,9 @@ export class ChunkStreamer {
     const have = this.loaded.get(chunk)?.lod;
     // Hysteresis: judge against a ring pushed outward if already loaded finer, inward if coarser.
     const pad = (ring: number, level: number) => (have === undefined ? 0 : have <= level ? HYSTERESIS : -HYSTERESIS) + ring;
-    if (dist <= pad(LOD_RINGS[0], 0)) return 0;
-    if (dist <= pad(LOD_RINGS[1], 1)) return 1;
-    if (dist <= pad(LOD_RINGS[2], 2)) return 2;
+    if (dist <= pad(this.rings[0], 0)) return 0;
+    if (dist <= pad(this.rings[1], 1)) return 1;
+    if (dist <= pad(this.rings[2], 2)) return 2;
     return null;
   }
 

@@ -1,4 +1,5 @@
 import { loadSavedLook } from "../lab/looks";
+import { getSettings, updateSettings } from "../settings/settings";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
 
 export type NetStatus = "offline" | "connecting" | "online";
@@ -12,6 +13,8 @@ const SERVER_KEY = "thelife.server";
 
 /** Where the game server lives: the build-time setting, what the player last typed, or this computer on the local port. */
 export function defaultServerUrl(): string {
+  const chosen = getSettings().serverUrl;
+  if (chosen) return chosen;
   try {
     const saved = localStorage.getItem(SERVER_KEY);
     if (saved) return saved;
@@ -25,6 +28,7 @@ export function defaultServerUrl(): string {
 }
 
 export function rememberServerUrl(url: string): void {
+  updateSettings({ serverUrl: url });
   try {
     localStorage.setItem(SERVER_KEY, url);
   } catch {

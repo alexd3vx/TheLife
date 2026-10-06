@@ -5,7 +5,8 @@ import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
 import type { HudSnapshot } from "./gameSession";
 import PhoneUI from "../phone/PhoneUI";
-import { NEXT_QUALITY, QUALITY_LABEL, loadQuality, type Quality } from "../graphics";
+import SettingsPanel from "../settings/SettingsPanel";
+import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
 
@@ -50,7 +51,8 @@ export default function PlayPage() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(null);
   const [menu, setMenu] = useState<TapMenu | null>(null);
-  const [quality, setQuality] = useState<Quality>(loadQuality());
+  const [showSettings, setShowSettings] = useState(false);
+  const settings = useSettings();
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
@@ -145,7 +147,7 @@ export default function PlayPage() {
             {hud.profile.firstName} {hud.profile.surname}
           </span>
         )}
-        <span className="play-fps">{stats}</span>
+        {settings.showFps && <span className="play-fps">{stats}</span>}
       </div>
 
       {hud && (
@@ -220,8 +222,8 @@ export default function PlayPage() {
           Follow
         </button>
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
-        <button onClick={() => { const q = NEXT_QUALITY[quality]; runtimeRef.current?.setQuality(q); setQuality(q); }} title="Graphics quality: Auto keeps it sharp and adapts, High never compromises, Low is fastest">
-          Graphics: {QUALITY_LABEL[quality]}
+        <button onClick={() => setShowSettings(true)}>
+          <GameIcon name="settings" /> Settings
         </button>
         <button
           className="is-dim"
@@ -256,6 +258,7 @@ export default function PlayPage() {
           </span>
         </button>
       )}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {phoneOpen && runtimeRef.current?.session && (
         <PhoneUI session={runtimeRef.current.session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />
       )}

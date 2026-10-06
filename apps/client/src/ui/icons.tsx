@@ -4,7 +4,7 @@ import {
   FaCloudBolt, FaCloudRain, FaCrown, FaDiceOne, FaDiceTwo, FaDiceThree, FaDiceFour, FaDiceFive, FaDiceSix, FaFaceFrown, FaFaceGrinBeam, FaFaceMeh, FaFaceSmile, FaFaceTired, FaFire, FaFlag,
   FaGasPump, FaGraduationCap, FaHand, FaHospital, FaHouse, FaMobileScreen, FaMoon, FaMosque, FaMoneyBillWave, FaMusic, FaPalette, FaPause, FaPencil, FaPersonRunning, FaPersonWalking,
   FaPlane, FaShieldHalved, FaShower, FaSun, FaToilet, FaUtensils, FaXmark, FaMapLocationDot, FaStar, FaCross, FaStarAndCrescent, FaPlay, FaDice, FaAppleWhole, FaLemon, FaCarrot,
-  FaPepperHot, FaFish, FaEgg, FaCookie, FaSeedling, FaCircleDot,
+  FaPepperHot, FaFish, FaEgg, FaCookie, FaSeedling, FaCircleDot, FaGear,
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 
@@ -19,7 +19,7 @@ export const FA = {
   sunny: FaSun, cloudy: FaCloud, rain: FaCloudRain, storm: FaCloudBolt,
   d1: FaDiceOne, d2: FaDiceTwo, d3: FaDiceThree, d4: FaDiceFour, d5: FaDiceFive, d6: FaDiceSix,
   m1: FaFaceTired, m2: FaFaceFrown, m3: FaFaceMeh, m4: FaFaceSmile, m5: FaFaceGrinBeam,
-  apple: FaAppleWhole, lemon: FaLemon, carrot: FaCarrot, pepper: FaPepperHot, fish: FaFish, egg: FaEgg, cookie: FaCookie, seed: FaSeedling,
+  settings: FaGear, apple: FaAppleWhole, lemon: FaLemon, carrot: FaCarrot, pepper: FaPepperHot, fish: FaFish, egg: FaEgg, cookie: FaCookie, seed: FaSeedling,
 } satisfies Record<string, IconType>;
 
 export type FaName = keyof typeof FA;

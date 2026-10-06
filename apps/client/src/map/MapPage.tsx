@@ -5,7 +5,8 @@ import type { TapMenu } from "../play/runtime";
 import { getDistrict } from "./districtData";
 import DistrictMap from "./DistrictMap";
 import { PIN_STYLE } from "./pins";
-import { NEXT_QUALITY, QUALITY_LABEL, loadQuality, type Quality } from "../graphics";
+import SettingsPanel from "../settings/SettingsPanel";
+import { useSettings } from "../settings/settings";
 import OnlinePanel from "../net/OnlinePanel";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
@@ -26,7 +27,8 @@ export default function MapPage() {
   const [placeShown, setPlaceShown] = useState<string | null>(null);
   const [bigMap, setBigMap] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
-  const [quality, setQuality] = useState<Quality>(loadQuality());
+  const [showSettings, setShowSettings] = useState(false);
+  const settings = useSettings();
   const district = getDistrict();
 
   useEffect(() => {
@@ -85,13 +87,13 @@ export default function MapPage() {
           ←<span className="play-chip-label"> House</span>
         </a>
         <span className="play-chip">Neighbourhood test</span>
-        {stats && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
+        {stats && settings.showFps && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 
       {placeShown && <div className="map-place" role="status">{placeShown}</div>}
       {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
 
-      {stats && (
+      {stats && settings.showStats && (
         <div className="map-stats" aria-label="Map statistics">
           <span>Draw calls <b>{stats.calls}</b></span>
           <span>Triangles <b>{Math.round(stats.triangles / 1000)}k</b></span>
@@ -148,7 +150,7 @@ export default function MapPage() {
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
         <button onClick={() => runtimeRef.current?.zoomOut()}>Whole district</button>
         <button onClick={() => setBigMap(true)}>Map</button>
-        <button onClick={() => { const q = NEXT_QUALITY[quality]; runtimeRef.current?.setQuality(q); setQuality(q); }} title="Graphics quality">Graphics: {QUALITY_LABEL[quality]}</button>
+        <button onClick={() => setShowSettings(true)}><GameIcon name="settings" /> Settings</button>
         <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day" : "Night"}</button>
         <button onClick={runTour} disabled={touring !== null}>
           {touring === null ? "Run the performance tour" : `Touring… ${touring}%`}
@@ -171,6 +173,7 @@ export default function MapPage() {
         </div>
       )}
 
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {loading && <div className="play-loading">Building the neighbourhood…</div>}
       {error && <div className="play-error">{error}</div>}
     </div>

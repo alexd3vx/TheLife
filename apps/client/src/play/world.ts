@@ -21,6 +21,8 @@ export interface PlacedItem {
 
 export interface World {
   scene: THREE.Scene;
+  /** The sun, so the settings can change its shadows. */
+  sun: THREE.DirectionalLight;
   layout: Layout;
   nav: NavGrid;
   items: PlacedItem[];
@@ -441,6 +443,7 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
 
   return {
     scene,
+    sun,
     layout,
     prewarm,
     nav,

@@ -70,6 +70,14 @@ export class RemotePlayers {
 
   constructor(private readonly manifest: AssetManifest) {}
 
+  /** Show or hide the names above other players. */
+  setNameTags(on: boolean): void {
+    this.nameTags = on;
+    for (const r of this.players.values()) r.tag.visible = on;
+  }
+
+  private nameTags = true;
+
   get count(): number {
     return this.players.size;
   }
@@ -116,6 +124,7 @@ export class RemotePlayers {
     const arms = [limb(shirt, 0.12, 0.55, -0.27, 1.45), limb(shirt, 0.12, 0.55, 0.27, 1.45)];
     const figure = [...group.children];
     const tag = nameTag(view.name);
+    tag.visible = this.nameTags;
     group.add(tag);
     group.position.set(view.x, view.y, view.z);
     group.rotation.y = view.yaw;
