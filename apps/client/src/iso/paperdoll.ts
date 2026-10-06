@@ -173,6 +173,8 @@ export class PaperDoll implements CharProvider {
       for (const p of present) for (const c of p.meta.cells) baked.add(c[0]);
       const dirs = [0, 1, 2, 3, 4, 5, 6, 7].filter((d) => baked.has(d) || (MIRROR[d] !== undefined && baked.has(MIRROR[d]!)));
       for (const dir of dirs) {
+        await new Promise<void>((r) => setTimeout(r, 0)); // let the game draw a frame between directions (this used to freeze it for a moment)
+        if (gen !== this.generation) return;
         const flip = !baked.has(dir);
         const src = flip ? MIRROR[dir]! : dir;
         const nFrames = Math.max(...present.flatMap((p) => p.meta.cells.filter((c) => c[0] === src).map((c) => c[1] + 1)), 0);

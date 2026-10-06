@@ -192,7 +192,13 @@ export class IsoRoom {
   private async preloadChar() {
     // standing, walking, sitting down and getting up first; the rest while you play
     await this.char.prepare(["Idle_Loop", "Walk_Loop", "Sitting_Enter", "Sitting_Exit"]);
-    for (const c of ["Sitting_Idle_Loop", "Life_Cook_Loop", "Life_Eat_Loop", "Life_Sleep_Loop", "Life_Type_Loop", "Life_Brush_Loop", "Life_Wash_Loop", "Life_Read_Loop", "Dance_Loop"]) this.char.ensure(c);
+    // one at a time, so playing never stutters while they are put together
+    void (async () => {
+      for (const c of ["Sitting_Idle_Loop", "Life_Cook_Loop", "Life_Eat_Loop", "Life_Sleep_Loop", "Life_Type_Loop", "Life_Brush_Loop", "Life_Wash_Loop", "Life_Read_Loop", "Life_Eat_Standing_Loop"]) {
+        await this.char.prepare([c]).catch(() => undefined);
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    })();
   }
 
   // ------------------------------------------------------------------ the floor plan: walking and using things
@@ -278,7 +284,7 @@ export class IsoRoom {
   }
 
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5) * this.quality;
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (!w || !h) return;
     this.canvas.width = Math.round(w * this.dpr);
@@ -500,7 +506,34 @@ export class IsoRoom {
     this.time += dt;
     this.update(dt);
     this.render();
+    this.adapt(dt);
   };
+
+  /**
+   * Keeps the game responsive on slow phones: if frames take too long the picture is drawn at a lower resolution (the sprites are baked
+   * sharper than a phone needs), and it climbs back when there is room to spare.
+   */
+  private quality = 1;
+  private slow = 0;
+  private fast = 0;
+  private adapt(dt: number) {
+    if (dt > 0.034) {
+      this.slow += dt;
+      this.fast = 0;
+    } else if (dt < 0.02) {
+      this.fast += dt;
+      this.slow = Math.max(0, this.slow - dt);
+    }
+    if (this.slow > 0.8 && this.quality > 0.55) {
+      this.quality = Math.max(0.55, this.quality - 0.15);
+      this.slow = 0;
+      this.resize();
+    } else if (this.fast > 6 && this.quality < 1) {
+      this.quality = Math.min(1, this.quality + 0.15);
+      this.fast = 0;
+      this.resize();
+    }
+  }
 
   /** Starts the arrival. `quick` is for someone coming back (the room is already theirs). */
   playIntro(quick = false): void {
