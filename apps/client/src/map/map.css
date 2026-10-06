@@ -49,3 +49,8 @@
 
 .map-enter { position: absolute; z-index: 4; left: 50%; bottom: 96px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; padding: 14px 26px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-weight: 800; text-decoration: none; box-shadow: 0 8px 28px rgba(0,0,0,.45); animation: enter-pop .35s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes enter-pop { from { opacity: 0; transform: translate(-50%, 12px) scale(.9); } to { opacity: 1; transform: translateX(-50%); } }
+
+.map-rides { flex-wrap: wrap; }
+.map-rides button { display: grid; gap: 2px; text-align: center; min-width: 84px; }
+.map-rides button small { font-size: .72rem; opacity: .8; font-weight: 500; }
+.map-rides button:disabled { opacity: .4; }

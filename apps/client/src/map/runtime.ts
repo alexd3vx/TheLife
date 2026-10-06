@@ -60,6 +60,8 @@ export interface MapRuntime {
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
+  /** Puts the character at a spot straight away (the end of a fast trip) and brings the camera behind them. */
+  placeAt(x: number, z: number): void;
   /** Switches between day and night (street lamps light up). For testing: it overrides the clock. */
   setNight(on: boolean): void;
   /** The game clock: the sky, the sun, the lamps and the weather follow it. */
@@ -845,6 +847,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       inputBlocked = on;
     },
     goTo,
+    placeAt(x, z) {
+      controller.place(x, z, 0);
+      resetView();
+    },
     setNight(on) {
       clockOverride = on ? 23 : 12;
       sky.setHour(clockOverride);

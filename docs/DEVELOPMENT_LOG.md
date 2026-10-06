@@ -240,3 +240,10 @@ Chronological record of decisions and changes. Newest first.
 - **Connection:** a leftover `VITE_SERVER_URL` in the Vercel settings pointed the game at the retired fly.dev server. Production now always uses the built-in VPS address. `#/nettest` checks a device's connection step by step.
 - **Wardrobe:** garments are smoothed so they hang like cloth; new shirt (collar), blazer (open V, lapels, white shirt, collar), sweater, suit trousers and a tie accessory. Garments can now have extra layers with their own colour (`Extra` in `lab/procedural/garments.ts`).
 - Dev pages: `#/livetest` (the live character big; `window.__live.setLook({...})`).
+
+## Round 6, later still: the 3D house is home again
+
+- The owner prefers the 3D house; it is the default home again. The isometric room stays as an option (Settings > Display > Home view, and `#/iso`).
+- 3D house: the character uses the look saved with the life; plaster walls with skirting and crown; contact shadow under the character; Medium preset now has anti-aliasing and medium shadows.
+- **Edit home in 3D** (`play/runtime.ts`, `world.ts`): tap a piece to pick it up, tap the floor to put it down; Turn, Sell and Shop. `world.relayout` swaps changed furniture in place; `world.fits` checks walls, other pieces and that everything reachable stays reachable. The same server rules as the isometric room (`home.ts`).
+- **Fast travel** (`game-core/travel.ts`, `arrival/TravelFilm.tsx`, `map/MapPage.tsx`): the Map button (and the minimap) open the city map; pick a place and choose how to get there. Danfo, keke, taxi or your own driver depend on your background; the fare comes from the distance on the server. A short hand-inked ride scene plays, then you arrive at the door.

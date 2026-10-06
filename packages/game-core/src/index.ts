@@ -25,3 +25,4 @@ export * from "./lagosClock.js";
 export * from "./bag.js";
 export * from "./kitchen.js";
 export * from "./home.js";
+export * from "./travel.js";

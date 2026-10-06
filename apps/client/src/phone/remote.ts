@@ -113,3 +113,6 @@ type HR = core.HomeResultLike;
 export const homeMove = remote("homeMove", core.homeMove as (s: GameState, id: string, x: number, z: number, rot: number) => HR);
 export const homeSell = remote("homeSell", core.homeSell as (s: GameState, id: string, furniture?: string) => HR, (a) => [a[1] as string, (a[2] as string | undefined) ?? null]);
 export const homeBuy = remote("homeBuy", core.homeBuy as (s: GameState, furniture: string, x: number, z: number, rot: number) => HR);
+
+// ---- getting around
+export const payRide = remote("payRide", core.payRide as (s: GameState, id: string, meters: number) => core.RideResult);

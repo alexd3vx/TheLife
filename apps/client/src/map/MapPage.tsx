@@ -12,8 +12,9 @@ import { useSettings } from "../settings/settings";
 import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
-import { setChargeChecker } from "../phone/remote";
-import { chargingSpotNear } from "@thelife/game-core";
+import { payRide, setChargeChecker } from "../phone/remote";
+import TravelFilm from "../arrival/TravelFilm";
+import { chargingSpotNear, rideOptions } from "@thelife/game-core";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
 import { input } from "../controls/input";
 import { useWelcomeBack } from "../arrival/useWelcomeBack";
@@ -39,6 +40,7 @@ export default function MapPage() {
   const [miniSpan, setMiniSpan] = useState(320);
   const [picked, setPicked] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [trip, setTrip] = useState<{ id: string; name: string; line: string; seconds: number; x: number; z: number } | null>(null);
   const settings = useSettings();
   const admin = isAdmin();
   const district = getDistrict();
@@ -87,6 +89,7 @@ export default function MapPage() {
   useEffect(() => {
     runtimeRef.current?.setHome(home ? { door: home.door, spawn: home.spawn, tier: home.tier } : null);
   }, [home, loading]);
+  if (import.meta.env.DEV) (window as unknown as { __mapUi: unknown }).__mapUi = { pick: setPicked, open: () => setBigMap(true) };
   const atHome = !!(home && stats && Math.hypot(stats.position.x - home.spawn.x, stats.position.z - home.spawn.z) < 7);
 
   // Keyboard and on-screen controls: what the interact button does depends on what is close.
@@ -199,6 +202,20 @@ export default function MapPage() {
       </div>
 
       {welcome.node}
+      {trip && (
+        <TravelFilm
+          tier={(life.session?.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"}
+          to={trip.name}
+          line={trip.line}
+          seconds={trip.seconds}
+          onDone={() => {
+            runtimeRef.current?.placeAt(trip.x, trip.z);
+            setPlaceShown(trip.name);
+            window.setTimeout(() => setPlaceShown(null), 3200);
+            setTrip(null);
+          }}
+        />
+      )}
       {intro === "playing" && (
         <div className="intro" onPointerDown={() => runtimeRef.current?.skipIntro()}>
           <div className="intro-bar top" />
@@ -240,7 +257,7 @@ export default function MapPage() {
             <button onClick={() => setMiniSpan((s) => Math.max(160, s * 0.7))} aria-label="Zoom the minimap in">+</button>
             <button onClick={() => setMiniSpan((s) => Math.min(900, s / 0.7))} aria-label="Zoom the minimap out">−</button>
           </div>
-          <button className="map-mini-open" onClick={() => window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "maps" }))} aria-label="Open LifeMaps on your phone" />
+          <button className="map-mini-open" onClick={() => setBigMap(true)} aria-label="Open the city map" />
         </div>
       )}
       {bigMap && (
@@ -252,13 +269,37 @@ export default function MapPage() {
           {picked && (() => {
             const lm = district.landmarks.find((l) => l.id === picked)!;
             const dist = stats ? Math.round(Math.hypot(lm.entrance.x - stats.position.x, lm.entrance.z - stats.position.z)) : 0;
+            const session = life.session;
+            const tier = session?.sim.state.profile?.tier as "lapo" | "middle" | "nepo" | undefined;
+            const options = rideOptions(tier, dist);
+            const money = session ? session.sim.state.ledger.accounts["player"] ?? 0 : 0;
+            const go = (id: string) => {
+              if (id === "walk") {
+                runtimeRef.current?.goTo(lm.id, "walk");
+                setBigMap(false);
+                return;
+              }
+              if (!session) return;
+              const r = payRide(session.sim.state, id, dist);
+              if (!r.ok) return session.notice(r.reason);
+              session.notice(r.text);
+              const o = options.find((x) => x.id === id)!;
+              setBigMap(false);
+              setPicked(null);
+              setTrip({ id: lm.id, name: lm.name, line: o.line, seconds: Math.max(3.5, Math.min(7, 3 + dist / 600)), x: lm.entrance.x, z: lm.entrance.z });
+            };
             return (
               <div className="map-sheet">
                 <strong>{lm.name}</strong>
                 <span>{PIN_STYLE[lm.kind].label} · {dist} m away</span>
-                <div className="map-sheet-actions">
-                  <button onClick={() => { runtimeRef.current?.goTo(lm.id, "walk"); setBigMap(false); }}>Walk there</button>
-                  <button onClick={() => { runtimeRef.current?.goTo(lm.id, "run"); setBigMap(false); }}>Run there</button>
+                <div className="map-sheet-actions map-rides">
+                  {options.map((o) => (
+                    <button key={o.id} disabled={o.fare > money} onClick={() => go(o.id)}>
+                      {o.label}
+                      <small>{o.fare > 0 ? `₦${o.fare.toLocaleString()} · ` : ""}{o.minutes} min</small>
+                    </button>
+                  ))}
+                  <button onClick={() => { runtimeRef.current?.goTo(lm.id, "run"); setBigMap(false); }}>Run<small>on foot</small></button>
                   <button className="is-ghost" onClick={() => setPicked(null)}>Back</button>
                 </div>
               </div>
@@ -281,7 +322,7 @@ export default function MapPage() {
       <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
         {admin && <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out (test)</button>}
-        {admin && <button onClick={() => setBigMap(true)}>Map (test)</button>}
+        <button onClick={() => setBigMap(true)}><GameIcon name="map" /> Map</button>
         <button onClick={() => setShowSettings(true)}><GameIcon name="settings" /> Settings</button>
         {admin && <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day (test)" : "Night (test)"}</button>}
         {admin && (

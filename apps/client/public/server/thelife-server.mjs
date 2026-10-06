@@ -3746,6 +3746,32 @@ function homeFor(d, tier, key) {
   return list[hash2(key) % list.length];
 }
 
+// packages/game-core/src/travel.ts
+var km = (m) => Math.max(0.1, m / 1e3);
+function rideOptions(tier, meters) {
+  const t = tier ?? "middle";
+  const d = km(meters);
+  const out = [{ id: "walk", label: "Walk", fare: 0, minutes: Math.max(1, Math.round(meters / 85)), line: "On foot" }];
+  if (t !== "nepo") {
+    out.push({ id: "danfo", label: "Danfo", fare: Math.round((100 + 80 * d) / 10) * 10, minutes: Math.max(4, Math.round(5 + d * 6)), line: "Packed danfo, conductor shouting the stops" });
+    out.push({ id: "keke", label: "Keke", fare: Math.round((200 + 170 * d) / 10) * 10, minutes: Math.max(3, Math.round(3 + d * 4)), line: "Keke through the back streets" });
+  }
+  if (t !== "lapo") out.push({ id: "taxi", label: "Taxi", fare: Math.round((900 + 520 * d) / 50) * 50, minutes: Math.max(3, Math.round(3 + d * 3)), line: "A cab through the traffic" });
+  if (t === "nepo") out.push({ id: "driver", label: "Your driver", fare: 0, minutes: Math.max(3, Math.round(3 + d * 3)), line: "Your driver, the AC on" });
+  return out;
+}
+function payRide(state, ride, meters) {
+  if (typeof meters !== "number" || !Number.isFinite(meters) || meters < 0 || meters > 2e4) return { ok: false, reason: "That didn't look right." };
+  const option = rideOptions(state.profile?.tier, meters).find((o) => o.id === ride);
+  if (!option) return { ok: false, reason: "That isn't an option for you." };
+  if (option.fare > 0) {
+    const r = transfer(state.ledger, PLAYER, SINK, option.fare, `${option.label} fare`, state.minute);
+    if (!r.ok) return { ok: false, reason: `The ${option.label.toLowerCase()} costs \u20A6${option.fare.toLocaleString()}. You don't have enough.` };
+    state.stats.totalSpent += option.fare;
+  }
+  return { ok: true, text: option.fare > 0 ? `${option.label}: \u20A6${option.fare.toLocaleString()}.` : `${option.label}.`, fare: option.fare };
+}
+
 // packages/game-core/src/onlineRules.ts
 var no = (reason) => ({ ok: false, reason });
 var yes = { ok: true };
@@ -3765,6 +3791,7 @@ var HANDLERS = {
   homeMove: (sim, [id, x, z, rot]) => str(id, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeMove(sim.state, id, x, z, rot) : no(bad),
   homeSell: (sim, [id, furniture]) => str(id, 40) ? homeSell(sim.state, id, typeof furniture === "string" ? furniture : void 0) : no(bad),
   homeBuy: (sim, [furniture, x, z, rot]) => str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture, x, z, rot) : no(bad),
+  payRide: (sim, [id, meters]) => str(id, 12) && typeof meters === "number" ? payRide(sim.state, id, meters) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),
