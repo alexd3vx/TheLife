@@ -53,10 +53,10 @@ export const PRESET_LABEL: Record<Preset, string> = { recommended: "Recommended"
 type GraphicsKeys = "resolution" | "autoAdjust" | "fpsCap" | "shadows" | "shadowDistance" | "antialias" | "bloom" | "bloomStrength" | "lights" | "drawDistance" | "crowd";
 
 const GRAPHICS: Record<Exclude<Preset, "recommended" | "custom">, Pick<Settings, GraphicsKeys>> = {
-  low: { resolution: 0.75, autoAdjust: true, fpsCap: 30, shadows: "off", shadowDistance: 0.7, antialias: false, bloom: false, bloomStrength: 0.4, lights: 1, drawDistance: 0.6, crowd: 30 },
-  medium: { resolution: 1, autoAdjust: true, fpsCap: 60, shadows: "low", shadowDistance: 1, antialias: false, bloom: false, bloomStrength: 0.5, lights: 2, drawDistance: 0.85, crowd: 60 },
-  high: { resolution: 1.5, autoAdjust: true, fpsCap: 0, shadows: "medium", shadowDistance: 1, antialias: true, bloom: true, bloomStrength: 0.5, lights: 4, drawDistance: 1, crowd: 100 },
-  ultra: { resolution: 2, autoAdjust: false, fpsCap: 0, shadows: "high", shadowDistance: 1.3, antialias: true, bloom: true, bloomStrength: 0.7, lights: 8, drawDistance: 1.2, crowd: 100 },
+  low: { resolution: 1, autoAdjust: true, fpsCap: 30, shadows: "off", shadowDistance: 0.7, antialias: false, bloom: false, bloomStrength: 0.4, lights: 1, drawDistance: 0.6, crowd: 30 },
+  medium: { resolution: 2, autoAdjust: true, fpsCap: 60, shadows: "low", shadowDistance: 1, antialias: false, bloom: false, bloomStrength: 0.5, lights: 2, drawDistance: 0.85, crowd: 60 },
+  high: { resolution: 2.5, autoAdjust: true, fpsCap: 0, shadows: "medium", shadowDistance: 1, antialias: true, bloom: true, bloomStrength: 0.5, lights: 4, drawDistance: 1, crowd: 100 },
+  ultra: { resolution: 3, autoAdjust: false, fpsCap: 0, shadows: "high", shadowDistance: 1.3, antialias: true, bloom: true, bloomStrength: 0.7, lights: 8, drawDistance: 1.2, crowd: 100 },
 };
 
 /** The best preset for this device: phones and weak computers get less, strong computers more. */
@@ -65,7 +65,8 @@ export function recommendedPreset(): Exclude<Preset, "recommended" | "custom"> {
   const cores = nav.hardwareConcurrency ?? 4;
   const memory = nav.deviceMemory ?? 4;
   const phone = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  if (phone) return memory <= 4 || cores <= 6 ? "low" : "medium";
+  // (the picture is flat painted art, light to draw: a phone only needs the low preset if it is really weak, and it should look sharp)
+  if (phone) return memory <= 2 || cores <= 4 ? "low" : "medium";
   if (cores >= 12 && memory >= 8) return "high";
   return cores >= 6 ? "medium" : "low";
 }
@@ -110,7 +111,7 @@ function parse(raw: unknown): Settings {
   const pick = <T extends string | number>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
   return {
     preset: pick(r.preset, ["recommended", "low", "medium", "high", "ultra", "custom"] as const, d.preset),
-    resolution: clamp(r.resolution, 0.5, 2, d.resolution),
+    resolution: clamp(r.resolution, 0.5, 3, d.resolution),
     autoAdjust: typeof r.autoAdjust === "boolean" ? r.autoAdjust : d.autoAdjust,
     fpsCap: pick(r.fpsCap, [0, 30, 45, 60] as const, d.fpsCap),
     shadows: pick(r.shadows, ["off", "low", "medium", "high"] as const, d.shadows),

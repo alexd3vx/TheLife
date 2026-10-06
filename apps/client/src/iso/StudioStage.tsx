@@ -3,6 +3,7 @@ import type { Look } from "../lab/looks";
 import { PaperDoll } from "./paperdoll";
 import { sharpNow } from "./assets";
 import { LiveChar } from "./livechar";
+import { getSettings } from "../settings/settings";
 
 const DIRS = 8;
 
@@ -65,7 +66,7 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       t += dt;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, getSettings().resolution);
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);

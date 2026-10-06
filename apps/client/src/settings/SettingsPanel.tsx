@@ -132,8 +132,8 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
             <p className="st-note">Recommended for this device: <b>{PRESET_LABEL[rec]}</b>. Change any option below and the preset becomes Custom.</p>
 
             <h3>Picture</h3>
-            <Row title="Resolution" hint="Higher is sharper but heavier. 100% is one pixel per screen pixel.">
-              <Slider label="Resolution" value={s.resolution} min={0.5} max={2} step={0.25} onChange={(v) => set({ resolution: v })} format={(v) => `${Math.round(v * 100)}%`} />
+            <Row title="Resolution" hint="Higher is sharper but heavier. 100% is one pixel per screen pixel; phone screens are usually 200% to 300%. If the picture looks soft, raise this.">
+              <Slider label="Resolution" value={s.resolution} min={0.5} max={3} step={0.25} onChange={(v) => set({ resolution: v })} format={(v) => `${Math.round(v * 100)}%`} />
             </Row>
             <Row title="Adjust automatically" hint="Lowers resolution and shadow updates if the frame rate drops, then raises them again.">
               <Toggle label="Adjust automatically" on={s.autoAdjust} onChange={(v) => set({ autoAdjust: v })} />

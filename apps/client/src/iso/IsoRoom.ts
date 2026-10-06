@@ -4,6 +4,7 @@ import type { Layout, Placement } from "../play/layout";
 import { propImage, propsMeta, sharpNow, spriteSharp, type PropMeta, type SpriteMeta } from "./assets";
 import type { CharProvider } from "./charProvider";
 import type { LiveChar } from "./livechar";
+import { getSettings, subscribeSettings } from "../settings/settings";
 import { HALF_H, HALF_W, PX_PER_M_UP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
@@ -287,7 +288,9 @@ export class IsoRoom {
   }
 
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5) * this.quality;
+    const st = getSettings();
+    // the player's resolution setting is the highest pixel ratio the picture is drawn at; the automatic adjustment only ever lowers it
+    this.dpr = Math.min(window.devicePixelRatio || 1, st.resolution) * (st.autoAdjust ? this.quality : 1);
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (!w || !h) return;
     this.canvas.width = Math.round(w * this.dpr);
@@ -356,10 +359,12 @@ export class IsoRoom {
     c.addEventListener("wheel", wheel, { passive: false });
     const ro = new ResizeObserver(() => this.resize());
     ro.observe(c);
+    const offSettings = subscribeSettings(() => this.resize()); // the picture changes size the moment the resolution setting does
     this.resize();
     this.raf = requestAnimationFrame(this.frame);
     return () => {
       cancelAnimationFrame(this.raf);
+      offSettings();
       ro.disconnect();
       c.removeEventListener("pointerdown", down);
       c.removeEventListener("pointermove", move);
@@ -504,6 +509,8 @@ export class IsoRoom {
 
   private frame = (now: number) => {
     this.raf = requestAnimationFrame(this.frame);
+    const cap = getSettings().fpsCap;
+    if (cap && this.last && now - this.last < 1000 / cap - 3) return; // a lower frame rate limit saves battery and heat
     const dt = Math.min(0.1, this.last ? (now - this.last) / 1000 : 0.016);
     this.last = now;
     this.time += dt;
@@ -520,6 +527,15 @@ export class IsoRoom {
   private slow = 0;
   private fast = 0;
   private adapt(dt: number) {
+    if (!getSettings().autoAdjust) {
+      this.slow = 0;
+      this.fast = 0;
+      if (this.quality !== 1) {
+        this.quality = 1;
+        this.resize();
+      }
+      return;
+    }
     if (dt > 0.034) {
       this.slow += dt;
       this.fast = 0;

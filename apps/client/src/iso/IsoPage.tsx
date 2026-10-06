@@ -14,6 +14,7 @@ import { LiveChar } from "./livechar";
 import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
+import SettingsPanel from "../settings/SettingsPanel";
 
 /** The home in 2.5D: a painted isometric room. A preview of the new look, at #/iso. */
 export default function IsoPage() {
@@ -27,6 +28,7 @@ export default function IsoPage() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; options: { label: string; run(): void }[] } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const session = life.session;
   const welcome = useWelcomeBack(life, ready);
@@ -114,6 +116,14 @@ export default function IsoPage() {
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
       </div>
       <a className="play-chip" href="#/map" style={{ position: "absolute", left: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 3 }}>Go outside</a>
+      <button className="play-chip" aria-label="Settings" onClick={() => setShowSettings(true)} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 52px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
+        Settings
+      </button>
+      {showSettings && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 80 }}>
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </div>
+      )}
       {session && ready && !introOn && <GameHud session={session} onHour={(h) => roomRef.current?.setHour(h)} />}
       {status && <div className="play-banner" role="status">{status}</div>}
       {menu && (
