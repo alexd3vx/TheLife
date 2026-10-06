@@ -10,4 +10,3 @@ assets-src/*
 dist-artifact
 tools/osm/raw/
 apps/client/public/sprites/**/*.png
-apps/client/public/sprites/char2/

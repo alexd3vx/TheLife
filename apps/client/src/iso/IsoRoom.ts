@@ -2,7 +2,7 @@ import { blockOutside, blockRect, createNavGrid, findPath, isFree, nearestFree, 
 import { ACTIONS, furnitureById } from "@thelife/game-core";
 import type { Layout, Placement } from "../play/layout";
 import { propImage, propsMeta, type PropMeta, type SpriteMeta } from "./assets";
-import { StaticChar, type CharProvider } from "./charProvider";
+import type { CharProvider } from "./charProvider";
 import { HALF_H, HALF_W, PX_PER_M_UP, SPRITE_SHARP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
@@ -141,9 +141,9 @@ export class IsoRoom {
     private readonly layout: Layout,
     private readonly tier: Tier,
     private readonly game: IsoGame | null,
-    char?: CharProvider,
+    char: CharProvider,
   ) {
-    if (char) this.char = char;
+    this.char = char;
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.pos = { x: layout.start.x, z: layout.start.z };
     this.yaw = layout.start.yaw;
@@ -153,11 +153,6 @@ export class IsoRoom {
 
   async load(): Promise<void> {
     const props = await propsMeta();
-    if (!this.char) {
-      const stat = new StaticChar();
-      await stat.init();
-      this.char = stat;
-    }
     // (the character is a paper doll of sprite layers; see paperdoll.ts)
     const items: Item[] = [];
     const byId = new Map<string, Item>();

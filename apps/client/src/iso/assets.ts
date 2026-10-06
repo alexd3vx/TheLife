@@ -10,22 +10,13 @@ export interface PropMeta {
   size: [number, number, number];
   [rot: number]: SpriteMeta;
 }
-export interface CharFrameMeta extends SpriteMeta {
-  dir: number;
-  frame: number;
-}
-
 const BASE = `${import.meta.env.BASE_URL}sprites/`;
 
 let propsIndex: Promise<Record<string, PropMeta>> | null = null;
-let charIndex: Promise<{ frames: Record<string, CharFrameMeta[]> }> | null = null;
 const images = new Map<string, Promise<HTMLImageElement>>();
 
 export function propsMeta(): Promise<Record<string, PropMeta>> {
   return (propsIndex ??= fetch(`${BASE}props.json`).then((r) => r.json()));
-}
-export function charMeta(): Promise<{ frames: Record<string, CharFrameMeta[]> }> {
-  return (charIndex ??= fetch(`${BASE}char.json`).then((r) => r.json()));
 }
 
 export function loadImage(path: string): Promise<HTMLImageElement> {
@@ -43,4 +34,3 @@ export function loadImage(path: string): Promise<HTMLImageElement> {
 }
 
 export const propImage = (id: string, rot: number) => loadImage(`props/${id}_${rot}.webp`);
-export const charImage = (clip: string, dir: number, frame: number) => loadImage(`char/${clip}_${dir}_${frame}.webp`);

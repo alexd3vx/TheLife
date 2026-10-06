@@ -66,7 +66,7 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
       if (!n) return;
       const f = d.frame(clip, state.current.dir, Math.floor(t * (state.current.walking ? 10 : 4)) % n);
       if (!f) return;
-      const k = Math.min(h / 240, w / 170); // screen pixels per game pixel (a person is about 140 game pixels tall)
+      const k = Math.min(h / 300, w / 215); // screen pixels per game pixel (a person is about 140 game pixels tall)
       const s = k / 1.5; // the pictures were drawn 1.5 times larger than that
       const sx = s * (lookRef.current.build ?? 1), sy = s * (lookRef.current.height ?? 1);
       const ox = w / 2, oy = h * 0.8;
