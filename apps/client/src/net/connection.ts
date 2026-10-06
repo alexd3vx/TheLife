@@ -86,7 +86,10 @@ export class Connection {
         return;
       }
       if (message.t === "welcome") this.events.onStatus("online");
-      if (message.t === "error") this.fatal = /out of date|full/.test(message.reason);
+      if (message.t === "error") {
+        this.lastReason = message.reason;
+        this.fatal = /out of date|full/.test(message.reason);
+      }
       this.events.onMessage(message);
     };
     ws.onclose = (e) => {
@@ -97,13 +100,19 @@ export class Connection {
         return;
       }
       this.tries++;
-      this.events.onStatus("connecting", `Reconnecting (${this.tries})…`);
+      // A login problem won't fix itself by knocking again: say so after a couple of tries instead of looping quietly.
+      if (this.lastReason && /log in|login/i.test(this.lastReason) && this.tries >= 2) {
+        this.events.onStatus("offline", `${this.lastReason} (Sign out from the menu and sign in again.)`);
+        return;
+      }
+      this.events.onStatus("connecting", this.lastReason ? `${this.lastReason} Retrying (${this.tries})…` : `Reconnecting (${this.tries})…`);
       this.timer = setTimeout(() => this.open(), Math.min(8000, 700 * 2 ** Math.min(this.tries, 5)));
     };
     ws.onerror = () => ws.close();
   }
 
   private fatal = false;
+  private lastReason = "";
 
   get online(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
