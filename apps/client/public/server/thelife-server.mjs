@@ -3282,6 +3282,98 @@ function chargingSpotNear(d, x, z) {
   return null;
 }
 
+// packages/game-core/src/homes.ts
+var FACE = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+function hash2(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+function doorOf(d, lot) {
+  const poly = lot.poly;
+  if (!poly || poly.length < 3) return null;
+  const f = FACE[lot.facing];
+  const cx = (lot.footprint.minX + lot.footprint.maxX) / 2, cz = (lot.footprint.minZ + lot.footprint.maxZ) / 2;
+  let best = null, bestScore = -1;
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, z0] = poly[i], [x1, z1] = poly[(i + 1) % poly.length];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    if (len < 3) continue;
+    let nx = (z1 - z0) / len, nz = -(x1 - x0) / len;
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    if (nx * (mx - cx) + nz * (mz - cz) < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const align = nx * f[0] + nz * f[1];
+    const score = align * Math.min(len, 10);
+    if (align < 0.55 || score <= bestScore) continue;
+    for (const r of [2.4, 3.2, 4]) {
+      const sx = mx + nx * r, sz = mz + nz * r;
+      if (d.terrain && d.terrain.classAt(sx, sz) === STREET && walkableAt(d, sx, sz, 0.5)) {
+        best = { lotId: lot.id, door: { x: mx + nx * 0.05, z: mz + nz * 0.05 }, spawn: { x: sx, z: sz }, normal: { x: nx, z: nz }, yaw: Math.atan2(-nx, -nz) + Math.PI };
+        bestScore = score;
+        break;
+      }
+    }
+  }
+  return best;
+}
+var cache = /* @__PURE__ */ new WeakMap();
+function reachableFromSpawn(d) {
+  const S = 6;
+  const w = Math.ceil(d.bounds.maxX / S), h = Math.ceil(d.bounds.maxZ / S);
+  const seen = new Uint8Array(w * h);
+  const ok = (cx, cz) => walkableAt(d, (cx + 0.5) * S, (cz + 0.5) * S, 0.3);
+  const start = Math.floor(d.spawn.z / S) * w + Math.floor(d.spawn.x / S);
+  const queue = [start];
+  seen[start] = 1;
+  for (let head = 0; head < queue.length; head++) {
+    const i = queue[head];
+    const x = i % w, z = i / w | 0;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, nz = z + dz;
+      if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+      const j = nz * w + nx;
+      if (!seen[j] && ok(nx, nz)) {
+        seen[j] = 1;
+        queue.push(j);
+      }
+    }
+  }
+  return (x, z) => seen[Math.floor(z / S) * w + Math.floor(x / S)] === 1;
+}
+function homeCandidates(d) {
+  let hit = cache.get(d);
+  if (hit) return hit;
+  const out = { lapo: [], middle: [], nepo: [] };
+  const reach = reachableFromSpawn(d);
+  for (const lot of d.lots) {
+    if (!lot.poly || lot.landmark) continue;
+    const f = lot.footprint;
+    const w = f.maxX - f.minX, h = f.maxZ - f.minZ;
+    const area = w * h;
+    const x = (f.minX + f.maxX) / 2;
+    let tier = null;
+    if (x > d.bounds.maxX * 0.7 && lot.kind === "house" && area > 140 && lot.floors <= 3) tier = "nepo";
+    else if (x > d.bounds.maxX * 0.35 && x <= d.bounds.maxX * 0.7 && (lot.kind === "flats" || lot.kind === "shop") && lot.floors >= 2 && lot.floors <= 6 && area > 90) tier = "middle";
+    else if (x <= d.bounds.maxX * 0.35 && lot.kind === "house" && area < 160 && lot.floors <= 2) tier = "lapo";
+    if (!tier) continue;
+    const home = doorOf(d, lot);
+    if (home && reach(home.spawn.x, home.spawn.z)) out[tier].push(home);
+  }
+  cache.set(d, out);
+  return out;
+}
+function homeFor(d, tier, key) {
+  const list = homeCandidates(d)[tier];
+  if (list.length === 0) {
+    const s = d.spawn;
+    return { lotId: "", door: { x: s.x, z: s.z }, spawn: { x: s.x, z: s.z }, normal: { x: 0, z: 1 }, yaw: 0 };
+  }
+  return list[hash2(key) % list.length];
+}
+
 // packages/game-core/src/onlineRules.ts
 var no = (reason) => ({ ok: false, reason });
 var yes = { ok: true };
@@ -3468,6 +3560,7 @@ var Room = class {
       ack: 0,
       events: [],
       away: null,
+      home: null,
       lastStepAt: now,
       lastCreateAt: 0,
       lastRpcAt: {},
@@ -3498,6 +3591,7 @@ var Room = class {
     player.away = away.lines.length ? away.lines : null;
     player.life = new Sim(state);
     player.lastStepAt = now;
+    this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
   }
   /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
@@ -3509,10 +3603,26 @@ var Room = class {
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile));
     player.lastStepAt = now;
+    this.assignHome(player);
     player.away = null;
     this.rename(player, `${profile.firstName} ${profile.surname}`.trim());
     this.saveLife(player, now);
     return { ok: true };
+  }
+  /** A player's home is a building of their background, the same one every time (their account decides). */
+  assignHome(player) {
+    const tier = player.life?.state.profile?.tier;
+    player.home = tier ? homeFor(this.district, tier, player.key) : null;
+  }
+  /** Puts a player on the pavement outside their own front door (stepping out of the house, or arriving). */
+  stepOutside(player) {
+    const h = player.home;
+    if (!h) return;
+    player.x = h.spawn.x;
+    player.z = h.spawn.z;
+    player.y = 0;
+    player.yaw = h.yaw;
+    player.level = 0;
   }
   rename(player, name) {
     const clean = name.slice(0, 20) || player.name;
@@ -3663,6 +3773,15 @@ async function startGameServer(options = {}) {
     const text = JSON.stringify(message);
     for (const [id, ws] of sockets) if (id !== except && ws.readyState === ws.OPEN) ws.send(text);
   };
+  const sendHome = (p, moveThere) => {
+    const ws = sockets.get(p.id);
+    if (!ws || !p.home) return;
+    send(ws, { t: "home", lotId: p.home.lotId, door: p.home.door, spawn: p.home.spawn, yaw: p.home.yaw, tier: p.life?.state.profile?.tier ?? "middle" });
+    if (moveThere) {
+      room.stepOutside(p);
+      send(ws, { t: "correct", x: p.x, y: 0, z: p.z, level: 0 });
+    }
+  };
   const sendLife = (p) => {
     const ws = sockets.get(p.id);
     const snap = room.snapshot(p);
@@ -3715,8 +3834,10 @@ async function startGameServer(options = {}) {
         sockets.set(me.id, ws);
         send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
-        if (me.life) sendLife(me);
-        else send(ws, { t: "needsLife" });
+        if (me.life) {
+          sendLife(me);
+          sendHome(me, me.where === "world");
+        } else send(ws, { t: "needsLife" });
         return;
       }
       switch (message.t) {
@@ -3726,12 +3847,14 @@ async function startGameServer(options = {}) {
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
+          sendHome(me, me.where === "world");
           return;
         }
         case "place": {
           if (me.where === message.where) return;
           me.where = message.where;
           if (me.where === "world") {
+            sendHome(me, true);
             broadcast({ t: "join", player: room.view(me) }, me.id);
             for (const other of room.inWorld()) if (other.id !== me.id) send(ws, { t: "join", player: room.view(other) });
           } else broadcast({ t: "leave", id: me.id }, me.id);
@@ -3833,18 +3956,18 @@ async function startGameServer(options = {}) {
 function supabaseVerifier(url, anonKey) {
   if (!url || !anonKey) return void 0;
   const base = url.replace(/\/$/, "");
-  const cache = /* @__PURE__ */ new Map();
+  const cache2 = /* @__PURE__ */ new Map();
   return async (token) => {
-    const hit = cache.get(token);
+    const hit = cache2.get(token);
     if (hit && hit.until > Date.now()) return hit.user;
     const res = await fetch(`${base}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: anonKey } });
     if (!res.ok) return null;
     const body = await res.json();
     if (typeof body.id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.id)) return null;
     const user = { id: body.id, email: typeof body.email === "string" ? body.email : void 0 };
-    cache.set(token, { until: Date.now() + 5 * 6e4, user });
-    if (cache.size > 2e3) for (const k of cache.keys()) {
-      cache.delete(k);
+    cache2.set(token, { until: Date.now() + 5 * 6e4, user });
+    if (cache2.size > 2e3) for (const k of cache2.keys()) {
+      cache2.delete(k);
       break;
     }
     return user;

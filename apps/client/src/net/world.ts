@@ -11,6 +11,8 @@ type Listener = (m: ServerMessage) => void;
 class World {
   status: NetStatus = "offline";
   detail = "";
+  /** Where the player lives (a front door in the city), once the server has said. */
+  home: Extract<ServerMessage, { t: "home" }> | null = null;
   /** The newest welcome, so panels that open later still know who is here. */
   lastWelcome: Extract<ServerMessage, { t: "welcome" }> | null = null;
   /** At home, or out in the city. Others only see you in the city. */
@@ -32,6 +34,7 @@ class World {
       },
       onMessage: (m) => {
         if (m.t === "welcome") this.lastWelcome = m;
+        if (m.t === "home") this.home = m;
         this.listeners.forEach((l) => l(m));
       },
     }, () => this.where);
@@ -47,6 +50,7 @@ class World {
     this.conn?.close();
     this.conn = null;
     this.lastWelcome = null;
+    this.home = null;
     this.seq = 0;
   }
 

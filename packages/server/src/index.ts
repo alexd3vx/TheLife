@@ -59,6 +59,17 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     for (const [id, ws] of sockets) if (id !== except && ws.readyState === ws.OPEN) ws.send(text);
   };
 
+  /** Tells a player where they live (and, if they are in the city, puts them at their door). */
+  const sendHome = (p: Player, moveThere: boolean) => {
+    const ws = sockets.get(p.id);
+    if (!ws || !p.home) return;
+    send(ws, { t: "home", lotId: p.home.lotId, door: p.home.door, spawn: p.home.spawn, yaw: p.home.yaw, tier: p.life?.state.profile?.tier ?? "middle" });
+    if (moveThere) {
+      room.stepOutside(p);
+      send(ws, { t: "correct", x: p.x, y: 0, z: p.z, level: 0 });
+    }
+  };
+
   /** Sends a player their life as the server has it (and, once, what happened while they were away). */
   const sendLife = (p: Player) => {
     const ws = sockets.get(p.id);
@@ -116,8 +127,10 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         sockets.set(me.id, ws);
         send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
-        if (me.life) sendLife(me);
-        else send(ws, { t: "needsLife" });
+        if (me.life) {
+          sendLife(me);
+          sendHome(me, me.where === "world");
+        } else send(ws, { t: "needsLife" });
         return;
       }
       switch (message.t) {
@@ -127,12 +140,15 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
+          sendHome(me, me.where === "world");
           return;
         }
         case "place": {
           if (me.where === message.where) return;
           me.where = message.where;
           if (me.where === "world") {
+            sendHome(me, true); // you step out of your own front door
+
             broadcast({ t: "join", player: room.view(me) }, me.id);
             for (const other of room.inWorld()) if (other.id !== me.id) send(ws, { t: "join", player: room.view(other) });
           } else broadcast({ t: "leave", id: me.id }, me.id);

@@ -199,3 +199,8 @@ Chronological record of decisions and changes. Newest first.
 - Creator: after the look step each step is a full page (the person steps aside, sticky buttons).
 - Opening shot: the camera swoops down from above the city, letterbox bars and a title card (once per tab, tap to skip).
 - Roads: the street picture is now 1.5 m texels with a lateral-offset channel so the centre line is exact; medians and narrow lanes no longer wobble.
+
+## Homes in the city, arrival film, home layouts
+- `game-core/homes.ts`: every player has a home door on a real building that fits their background (nepo: detached houses in the east, middle: flats in the middle, lapo: small houses in the old west), reachable on foot from the spawn. The server picks it from the account/key (same every time), sends a `home` message, and puts you at your door (`correct`) when you step out (`place world`).
+- The house scene is now your private interior; the layouts are `play/layouts.ts` (lapo room with a bathroom cubicle, the middle flat, a nepo duplex). "Go outside" / "Enter home" connect the two. Your door is drawn in the street (a door, a lamp, a glowing mat) and a button appears when you stand at it.
+- `arrival/ArrivalFilm.tsx`: the opening film after a character is made (title, flight, approach, landing, ride, home), tinted per background; vector + CSS only; tap to skip.

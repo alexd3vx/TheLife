@@ -47,6 +47,8 @@ export interface MapRuntime {
   dispose(): void;
   resetView(): void;
   /** The opening shot: the camera swoops down from above the city to behind the character. Resolves when it ends or is skipped. */
+  /** Draws the player's own front door (and a glowing mat) in the street. */
+  setHome(h: { door: { x: number; z: number }; spawn: { x: number; z: number }; tier: string } | null): void;
   playIntro(): Promise<void>;
   skipIntro(): void;
   zoomOut(): void;
@@ -404,6 +406,40 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     camPulledAt.copy(camera.position);
     camPulled = true;
   }
+  // ---- your own front door
+  let homeGroup: THREE.Group | null = null;
+  function setHome(h: { door: { x: number; z: number }; spawn: { x: number; z: number }; tier: string } | null) {
+    if (homeGroup) {
+      scene.remove(homeGroup);
+      homeGroup.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose();
+      });
+      homeGroup = null;
+    }
+    if (!h) return;
+    const g = new THREE.Group();
+    const nx = h.spawn.x - h.door.x, nz = h.spawn.z - h.door.z;
+    const len = Math.hypot(nx, nz) || 1;
+    const yaw = Math.atan2(nx / len, nz / len); // the door's front faces along the normal
+    const colour = h.tier === "nepo" ? "#1c2530" : h.tier === "middle" ? "#6b4a2b" : "#3f6b8f";
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.15, 0.12), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.55 }));
+    door.position.set(h.door.x + (nx / len) * 0.06, 1.08, h.door.z + (nz / len) * 0.06);
+    door.rotation.y = yaw;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.35, 0.08), new THREE.MeshStandardMaterial({ color: "#d9d2c4", roughness: 0.8 }));
+    frame.position.set(h.door.x + (nx / len) * 0.03, 1.18, h.door.z + (nz / len) * 0.03);
+    frame.rotation.y = yaw;
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: "#fff0c4", emissive: new THREE.Color("#ffd58a"), emissiveIntensity: 1.6 }));
+    lamp.position.set(h.door.x + (nx / len) * 0.25, 2.55, h.door.z + (nz / len) * 0.25);
+    const mat = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 28), new THREE.MeshBasicMaterial({ color: "#7dffb5", transparent: true, opacity: 0.55, depthWrite: false }));
+    mat.rotation.x = -Math.PI / 2;
+    mat.position.set(h.spawn.x, 0.06, h.spawn.z);
+    g.add(frame, door, lamp, mat);
+    scene.add(g);
+    homeGroup = g;
+  }
+
   // ---- the opening shot
   let intro: { t: number; duration: number; a0: number; done(): void } | null = null;
   function playIntro(): Promise<void> {
@@ -759,6 +795,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   return {
     resetView,
+    setHome,
     playIntro,
     skipIntro,
     goTo,
@@ -787,7 +824,11 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         clip: localSpeed > 2.6 ? "Jog_Fwd_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
         level: floorLevel,
       }),
-      correct: (x, z) => controller.place(x, z, controller.yaw),
+      correct: (x, z) => {
+        const far = Math.hypot(controller.position.x - x, controller.position.z - z) > 30;
+        controller.place(x, z, controller.yaw);
+        if (far) resetView(); // a long jump (home, a ride): bring the camera too
+      },
     },
     dispose() {
       terrain.dispose();

@@ -1,4 +1,4 @@
-import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, chargingSpotNear, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
+import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
@@ -19,6 +19,7 @@ export interface Player extends PlayerView {
   events: SimEvent[];
   /** "While you were away" lines, sent once with the first snapshot. */
   away: string[] | null;
+  home: Home | null;
   lastStepAt: number;
   lastCreateAt: number;
   lastRpcAt: Record<string, number>;
@@ -71,6 +72,7 @@ export class Room {
       ack: 0,
       events: [],
       away: null,
+      home: null,
       lastStepAt: now,
       lastCreateAt: 0,
       lastRpcAt: {},
@@ -104,6 +106,7 @@ export class Room {
     player.away = away.lines.length ? away.lines : null;
     player.life = new Sim(state);
     player.lastStepAt = now;
+    this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
   }
 
@@ -116,10 +119,28 @@ export class Room {
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile));
     player.lastStepAt = now;
+    this.assignHome(player);
     player.away = null;
     this.rename(player, `${profile.firstName} ${profile.surname}`.trim());
     this.saveLife(player, now);
     return { ok: true };
+  }
+
+  /** A player's home is a building of their background, the same one every time (their account decides). */
+  private assignHome(player: Player): void {
+    const tier = player.life?.state.profile?.tier;
+    player.home = tier ? homeFor(this.district, tier, player.key) : null;
+  }
+
+  /** Puts a player on the pavement outside their own front door (stepping out of the house, or arriving). */
+  stepOutside(player: Player): void {
+    const h = player.home;
+    if (!h) return;
+    player.x = h.spawn.x;
+    player.z = h.spawn.z;
+    player.y = 0;
+    player.yaw = h.yaw;
+    player.level = 0;
   }
 
   private rename(player: Player, name: string): void {

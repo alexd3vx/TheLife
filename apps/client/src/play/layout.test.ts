@@ -5,6 +5,7 @@ import { LIFE_CLIP_NAMES } from "../lab/procedural/lifeClips";
 import { PROCEDURAL_BUILDERS } from "../furniture/procedural";
 import { MODEL_META } from "../furniture/models";
 import { HOUSE_LAYOUT, buildShowroomLayout } from "./layout";
+import { LAPO_ROOM, NEPO_DUPLEX } from "./layouts";
 
 // Data-integrity checks: a typo in the house layout, the catalog, an action, or a model name should fail here, not as
 // a silent missing object in the game.
@@ -43,8 +44,7 @@ describe("furniture catalog and models", () => {
   });
 });
 
-describe("house layout", () => {
-  const layout = HOUSE_LAYOUT;
+describe.each([["flat", HOUSE_LAYOUT], ["lapo room", LAPO_ROOM], ["nepo duplex", NEPO_DUPLEX]] as const)("home layout: %s", (_name, layout) => {
   const itemIds = ids(layout.items);
 
   it("only uses catalog furniture", () => {

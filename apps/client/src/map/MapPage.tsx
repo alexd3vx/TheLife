@@ -72,6 +72,19 @@ export default function MapPage() {
     };
   }, []);
 
+  // Your own front door: drawn in the street, and a button to go in when you are standing at it.
+  const [home, setHomeState] = useState(world.home);
+  useEffect(() => {
+    setHomeState(world.home);
+    return world.onMessage((m) => {
+      if (m.t === "home") setHomeState(m);
+    });
+  }, []);
+  useEffect(() => {
+    runtimeRef.current?.setHome(home ? { door: home.door, spawn: home.spawn, tier: home.tier } : null);
+  }, [home, loading]);
+  const atHome = !!(home && stats && Math.hypot(stats.position.x - home.spawn.x, stats.position.z - home.spawn.z) < 7);
+
   // Out in the city a phone only charges beside a place with power.
   useEffect(() => {
     setChargeChecker(() => {
@@ -161,9 +174,14 @@ export default function MapPage() {
         </div>
       )}
 
+      {atHome && intro === "off" && (
+        <a className="map-enter" href="#/play">
+          <GameIcon name="home" /> Enter home
+        </a>
+      )}
       {stats && !bigMap && (
         <div className="map-mini">
-          <DistrictMap district={district} player={stats.position} others={runtimeRef.current?.online.remotes.list() ?? []} compact span={miniSpan} />
+          <DistrictMap district={district} player={stats.position} home={home ? home.door : null} others={runtimeRef.current?.online.remotes.list() ?? []} compact span={miniSpan} />
           <div className="map-mini-zoom">
             <button onClick={() => setMiniSpan((s) => Math.max(160, s * 0.7))} aria-label="Zoom the minimap in">+</button>
             <button onClick={() => setMiniSpan((s) => Math.min(900, s / 0.7))} aria-label="Zoom the minimap out">−</button>

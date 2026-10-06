@@ -61,6 +61,8 @@ export type ServerMessage =
   | { t: "life"; state: unknown; ack: number; active: { id: string; done: number; forced: boolean } | null; events: { kind: "info" | "good" | "warn" | "bad"; text: string; minute: number }[]; away?: string[] }
   /** The answer to one `do`. */
   | { t: "done"; id: number; ok: boolean; text?: string; reason?: string }
+  /** Where you live: the front door in the city and where you stand when you step out. */
+  | { t: "home"; lotId: string; door: { x: number; z: number }; spawn: { x: number; z: number }; yaw: number; tier: string }
   /** You have no life on this server yet: send `create`. */
   | { t: "needsLife" }
   | { t: "correct"; x: number; y: number; z: number; level: number }

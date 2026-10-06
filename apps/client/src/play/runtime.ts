@@ -14,7 +14,8 @@ import { CharacterController, type GameBridge, type Status } from "./controller"
 import { GameSession, type HudSnapshot } from "./gameSession";
 import { markRestart } from "./pendingLife";
 import type { SimEvent } from "@thelife/game-core";
-import { HOUSE_LAYOUT, buildShowroomLayout, type Layout } from "./layout";
+import { buildShowroomLayout, type Layout } from "./layout";
+import { layoutForTier } from "./layouts";
 import { FURNITURE } from "@thelife/game-core";
 import { buildWorld, type PlacedItem } from "./world";
 
@@ -84,7 +85,7 @@ export type PlayMode = "house" | "showroom";
 
 export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode; session?: GameSession } = {}): Promise<PlayRuntime | null> {
   const showroom = options.mode === "showroom";
-  const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : HOUSE_LAYOUT;
+  const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : layoutForTier((options.session ?? undefined)?.sim.state.profile?.tier);
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: getSettings().antialias, powerPreference: "high-performance" });

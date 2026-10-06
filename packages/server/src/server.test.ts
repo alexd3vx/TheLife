@@ -299,6 +299,23 @@ describe("game server", () => {
     expect((await a.next("leave")).id).toBe(wb.id);
   });
 
+  it("gives each player a home door for their background, and puts them there when they step outside", async () => {
+    server = await startGameServer({ port: 0 });
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws);
+    await new Promise((r) => ws.once("open", r));
+    const a = new Client(ws);
+    ws.send(JSON.stringify({ t: "hello", name: "Ada", protocol: PROTOCOL_VERSION, key: newKey(), where: "home" }));
+    await a.next("needsLife");
+    a.send({ t: "create", profile: CHOICE });
+    const home = await a.next("home");
+    expect(home.tier).toBe("middle");
+    expect(home.spawn.x).toBeGreaterThan(0);
+    a.send({ t: "place", where: "world" });
+    const fix = await a.next("correct");
+    expect(Math.hypot(fix.x - home.spawn.x, fix.z - home.spawn.z)).toBeLessThan(0.01);
+  });
+
   it("answers the health check", async () => {
     server = await startGameServer({ port: 0 });
     const body = (await (await fetch(`http://127.0.0.1:${server.port}/health`)).json()) as { ok: boolean };

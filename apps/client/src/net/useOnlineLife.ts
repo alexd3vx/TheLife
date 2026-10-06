@@ -8,6 +8,8 @@ import { world } from "./world";
 export type LifePhase = "connecting" | "creating" | "ready" | "offline";
 
 export interface OnlineLife {
+  /** True once, right after this player's character was made: time for the arrival film. */
+  justArrived: boolean;
   phase: LifePhase;
   session: GameSession | null;
   detail: string;
@@ -18,7 +20,7 @@ export interface OnlineLife {
  * the character you made in the creator is sent to it (the server rebuilds the profile itself and only takes your choices).
  */
 export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
-  const [state, setState] = useState<OnlineLife>({ phase: "connecting", session: null, detail: "" });
+  const [state, setState] = useState<OnlineLife>({ justArrived: false, phase: "connecting", session: null, detail: "" });
 
   useEffect(() => {
     let session: GameSession | null = null;
@@ -32,7 +34,7 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
           return;
         }
         world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true });
-        set({ phase: "creating" });
+        set({ phase: "creating", justArrived: true });
       } else if (m.t === "life") {
         clearPending();
         const snap = m as unknown as LifeSnapshot;

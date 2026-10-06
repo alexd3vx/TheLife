@@ -3,6 +3,7 @@ import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
+import ArrivalFilm from "../arrival/ArrivalFilm";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
@@ -57,6 +58,7 @@ export default function PlayPage() {
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSettings();
   const life = useOnlineLife("home");
+  const [filmDone, setFilmDone] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
@@ -285,7 +287,10 @@ export default function PlayPage() {
         </div>
       )}
 
-      {(loading || !life.session) && !error && (
+      {life.justArrived && life.session && !filmDone && (
+        <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} onDone={() => setFilmDone(true)} />
+      )}
+      {(loading || !life.session) && !error && !(life.justArrived && !filmDone) && (
         <div className="play-loading">
           {life.phase === "offline" ? (
             <>

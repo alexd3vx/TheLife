@@ -1,0 +1,57 @@
+.film { position: fixed; inset: 0; z-index: 50; background: #05030a; color: #fff; overflow: hidden; cursor: pointer; }
+.film .scene { position: absolute; }
+.film-tint { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light; transition: background .8s; }
+.film-nepo .film-tint { background: linear-gradient(180deg, rgba(255, 210, 120, .45), rgba(255, 150, 60, .2)); }
+.film-middle .film-tint { background: rgba(255, 255, 255, 0); }
+.film-lapo .film-tint { background: linear-gradient(180deg, rgba(70, 90, 140, .55), rgba(30, 40, 70, .35)); }
+.film-bars { position: absolute; left: 0; right: 0; height: 10vh; background: #000; z-index: 3; }
+.film-bars.top { top: 0; } .film-bars.bottom { bottom: 0; }
+
+.film-title { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; z-index: 2; animation: film-in 1.4s ease both; }
+.film-title small { letter-spacing: .5em; text-transform: uppercase; color: #ffd98a; font-size: .8rem; }
+.film-title h1 { font-family: var(--font-display); font-size: clamp(3.4rem, 12vw, 8rem); margin: 0; letter-spacing: -.02em; text-shadow: 0 0 60px rgba(255, 200, 120, .45); animation: film-title 3.6s ease both; }
+.film-title em { font-style: normal; opacity: .75; letter-spacing: .2em; font-size: .9rem; }
+.film-flare { position: absolute; left: 50%; top: 52%; width: 70vw; height: 2px; transform: translate(-50%, -50%) scaleX(0); background: linear-gradient(90deg, transparent, #ffd98a, transparent); animation: film-flare 3.2s ease-out both; }
+@keyframes film-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes film-title { 0% { opacity: 0; letter-spacing: .1em; } 35%, 80% { opacity: 1; } 100% { opacity: 0; letter-spacing: .06em; } }
+@keyframes film-flare { 0% { transform: translate(-50%, -50%) scaleX(0); opacity: 0; } 30% { opacity: 1; } 60% { transform: translate(-50%, -50%) scaleX(1); } 100% { transform: translate(-50%, -50%) scaleX(1.2); opacity: 0; } }
+
+.film-plane { position: absolute; width: 38vmin; left: 0; top: 26%; z-index: 2; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .5)); animation: film-fly 6.5s cubic-bezier(.3, .1, .6, 1) both; }
+.film-nepo .film-plane { width: 24vmin; }
+@keyframes film-fly { from { transform: translate3d(-45vw, 12vh, 0) rotate(2deg) scale(.7); } to { transform: translate3d(105vw, -4vh, 0) rotate(-2deg) scale(1.2); } }
+.film-blink { animation: film-blink 1s steps(1) infinite; }
+@keyframes film-blink { 50% { opacity: 0; } }
+
+.film-runway { position: absolute; left: 0; right: 0; bottom: 8vh; width: 100%; height: 60%; z-index: 2; transform-origin: 50% 40%; animation: film-approach 5.5s ease-in both; }
+@keyframes film-approach { from { transform: scale(.8) translate3d(0, 6%, 0); opacity: .2; } to { transform: scale(1.35) translate3d(0, 0, 0); opacity: 1; } }
+.rw-light { animation: rw-blink 1.2s ease-in-out infinite; }
+@keyframes rw-blink { 50% { opacity: .35; } }
+.rw-centre { animation: rw-run .8s linear infinite; }
+@keyframes rw-run { to { stroke-dashoffset: -24; } }
+.beat-approach .scene, .beat-landed .scene { animation: film-shake 5.5s ease-in both; }
+@keyframes film-shake { 85% { transform: none; } 90% { transform: translate3d(0, 6px, 0); } 94% { transform: translate3d(0, -3px, 0); } 100% { transform: none; } }
+
+.film-caption { position: absolute; left: 7vw; bottom: 16vh; max-width: min(520px, 86vw); z-index: 4; text-shadow: 0 2px 24px rgba(0, 0, 0, .75); animation: film-caption 6s ease both; }
+.film-caption small { color: #ffd98a; letter-spacing: .28em; text-transform: uppercase; font-size: .78rem; }
+.film-caption p { margin: 6px 0 0; font-size: clamp(1.05rem, 2.6vw, 1.5rem); font-family: var(--font-display); }
+@keyframes film-caption { 0%, 8% { opacity: 0; transform: translate3d(0, 14px, 0); } 22%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+.film-landed { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; z-index: 4; padding: 0 8vw; text-shadow: 0 2px 30px rgba(0, 0, 0, .8); animation: film-caption 5s ease both; }
+.film-landed small { color: #ffd98a; letter-spacing: .4em; text-transform: uppercase; }
+.film-landed h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 3.6rem); margin: 0; }
+.film-landed p { margin: 0 auto; max-width: 40ch; opacity: .9; }
+
+.film-road { position: absolute; left: 0; right: 0; bottom: 10vh; height: 34vh; z-index: 2; background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .65) 40%, #0a0612); }
+.film-lane { position: absolute; left: 0; right: 0; bottom: 30%; height: 4px; background: repeating-linear-gradient(90deg, #e8e0c8 0 60px, transparent 60px 120px); animation: film-lane .6s linear infinite; }
+@keyframes film-lane { to { background-position: -120px 0; } }
+.film-car { position: absolute; bottom: 36%; left: 0; width: 22vmin; height: 8vmin; animation: film-drive 6s ease-in-out both; }
+.film-car-body { position: absolute; inset: 22% 0 0; background: #07050c; border-radius: 40% 40% 10% 10% / 70% 70% 10% 10%; box-shadow: 0 0 0 2px rgba(255, 255, 255, .08); }
+.film-nepo .film-car-body { background: #030208; }
+.film-lapo .film-car-body { background: #6a5a22; }
+.film-middle .film-car-body { background: #c9b320; }
+.film-car-lamp { position: absolute; right: -4%; top: 52%; width: 10%; height: 14%; border-radius: 50%; background: #fff6d0; box-shadow: 0 0 28px 12px rgba(255, 240, 180, .8), 40vmin 0 80px 30px rgba(255, 240, 180, .25); }
+@keyframes film-drive { from { transform: translate3d(-30vw, 0, 0); } to { transform: translate3d(110vw, 0, 0); } }
+
+.film-skip { position: absolute; right: 18px; bottom: calc(10vh + 14px); z-index: 6; background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .25); border-radius: 99px; padding: 8px 18px; font: inherit; cursor: pointer; backdrop-filter: blur(6px); }
+.film-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; z-index: 6; background: rgba(255, 255, 255, .12); }
+.film-progress span { display: block; height: 100%; background: #ffd98a; transition: width .5s linear; }
