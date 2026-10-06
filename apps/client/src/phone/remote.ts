@@ -107,3 +107,9 @@ export const cancelRecipe = remote("cancelRecipe", core.cancelRecipe as (s: Game
 export const chooseDish = remote("chooseDish", core.chooseDish as (s: GameState, id: string) => KR);
 export const discardDish = remote("discardDish", core.discardDish as (s: GameState, id: string) => KR);
 export const discardLot = remote("discardLot", core.discardLot as (s: GameState, id: string) => KR);
+
+// ---- the home
+type HR = core.HomeResultLike;
+export const homeMove = remote("homeMove", core.homeMove as (s: GameState, id: string, x: number, z: number, rot: number) => HR);
+export const homeSell = remote("homeSell", core.homeSell as (s: GameState, id: string, furniture?: string) => HR, (a) => [a[1] as string, (a[2] as string | undefined) ?? null]);
+export const homeBuy = remote("homeBuy", core.homeBuy as (s: GameState, furniture: string, x: number, z: number, rot: number) => HR);

@@ -1,3 +1,4 @@
+import type { HomeChanges } from "@thelife/game-core";
 import { HOUSE_LAYOUT, type Layout, type Placement, type WallDef } from "./layout";
 
 // Where each background lives, indoors. The middle class has the flat (HOUSE_LAYOUT); a lapo rents one room with a cubicle for a
@@ -129,4 +130,40 @@ export const NEPO_DUPLEX: Layout = {
 /** The home layout for a background. */
 export function layoutForTier(tier: string | undefined): Layout {
   return tier === "lapo" ? LAPO_ROOM : tier === "nepo" ? NEPO_DUPLEX : HOUSE_LAYOUT;
+}
+
+/**
+ * The starting layout with what the player changed on top: pieces moved or turned, pieces sold, pieces bought. Things resting on a
+ * moved piece (a laptop on a desk) go with it.
+ */
+export function layoutWithHome(base: Layout, home: HomeChanges | undefined): Layout {
+  if (!home) return base;
+  const removed = new Set(home.removed);
+  const items: Placement[] = [];
+  const byId = new Map(base.items.map((i) => [i.id, i]));
+  const shift = (id: string): { dx: number; dz: number } => {
+    const m = home.moved[id];
+    const b = byId.get(id);
+    return m && b ? { dx: m.x - b.x, dz: m.z - b.z } : { dx: 0, dz: 0 };
+  };
+  for (const it of base.items) {
+    if (removed.has(it.id)) continue;
+    const m = home.moved[it.id];
+    if (m) {
+      items.push({ ...it, x: m.x, z: m.z, rot: m.rot });
+      continue;
+    }
+    if (it.onTopOf) {
+      const { dx, dz } = shift(it.onTopOf);
+      if (dx || dz) {
+        items.push({ ...it, x: it.x + dx, z: it.z + dz });
+        continue;
+      }
+    }
+    items.push(it);
+  }
+  for (const a of home.added) items.push({ id: a.id, furniture: a.furniture, x: a.x, z: a.z, rot: a.rot });
+  // something resting on a piece that was sold would hang in the air: drop it too
+  const ids = new Set(items.map((i) => i.id));
+  return { ...base, items: items.filter((i) => !i.onTopOf || ids.has(i.onTopOf)) };
 }

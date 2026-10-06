@@ -7,7 +7,6 @@ import { useWelcomeBack } from "../arrival/useWelcomeBack";
 import { getPending } from "../play/pendingLife";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
-import { layoutForTier } from "../play/layouts";
 import { IsoRoom, type IsoGame, type Tier } from "./IsoRoom";
 import { PaperDoll } from "./paperdoll";
 import { LiveChar } from "./livechar";
@@ -15,6 +14,9 @@ import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
 import SettingsPanel from "../settings/SettingsPanel";
+import HomeShop from "./HomeShop";
+import { homeBuy, homeMove, homeSell } from "../phone/remote";
+import { layoutForTier, layoutWithHome } from "../play/layouts";
 
 /** The home in 2.5D: a painted isometric room. A preview of the new look, at #/iso. */
 export default function IsoPage() {
@@ -29,6 +31,10 @@ export default function IsoPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; options: { label: string; run(): void }[] } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [sel, setSel] = useState<{ id: string; furniture: string; name: string; bought: boolean; price: number } | null>(null);
+  const appliedHome = useRef("null");
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const session = life.session;
   const welcome = useWelcomeBack(life, ready);
@@ -68,12 +74,25 @@ export default function IsoPage() {
         return;
       }
       liveRef = live;
-      const room = new IsoRoom(canvas, layoutForTier(tier), tier, game, char);
+      const room = new IsoRoom(canvas, layoutWithHome(layoutForTier(tier), session.sim.state.home), tier, game, char);
+      appliedHome.current = JSON.stringify(session.sim.state.home ?? null);
       room.live = live;
       roomRef.current = room;
       room.onStatus = setStatus;
       room.onMenu = setMenu;
       room.onKitchen = setKitchen;
+      room.onSelect = setSel;
+      room.onEditChange = (c) => {
+        const st = session.sim.state;
+        const r = c.kind === "move" ? homeMove(st, c.id, c.x, c.z, c.rot) : homeSell(st, c.id, c.bought ? undefined : c.furniture);
+        if (!r.ok) {
+          session.notice(r.reason);
+          return;
+        }
+        if (c.kind === "sell") session.notice(r.text);
+        appliedHome.current = JSON.stringify(st.home ?? null);
+        void room.setLayout(layoutWithHome(layoutForTier(tier), st.home));
+      };
       room.introDone = () => setIntroOn(false);
       await room.load();
       if (gone) return;
@@ -88,6 +107,46 @@ export default function IsoPage() {
       roomRef.current = null;
     };
   }, [session, tier]);
+
+  // The server has the final word on the home: if its version differs from what is on screen, redraw it.
+  useEffect(() => {
+    if (!session) return;
+    const t = setInterval(() => {
+      const now = JSON.stringify(session.sim.state.home ?? null);
+      if (now !== appliedHome.current && roomRef.current && !roomRef.current.introPlaying) {
+        appliedHome.current = now;
+        void roomRef.current.setLayout(layoutWithHome(layoutForTier(tier), session.sim.state.home));
+      }
+    }, 1500);
+    return () => clearInterval(t);
+  }, [session, tier]);
+
+  const buy = (furniture: string) => {
+    const room = roomRef.current;
+    if (!room || !session) return;
+    const spot = room.findSpotFor(furniture);
+    if (!spot) return session.notice("There's no free space for that. Sell or move something first.");
+    const st = session.sim.state;
+    const r = homeBuy(st, furniture, spot.x, spot.z, 0);
+    if (!r.ok) return session.notice(r.reason);
+    session.notice(r.text);
+    appliedHome.current = JSON.stringify(st.home ?? null);
+    const id = st.home!.added[st.home!.added.length - 1]!.id;
+    setShopOpen(false);
+    void room.setLayout(layoutWithHome(layoutForTier(tier), st.home)).then(() => room.selectId(id));
+  };
+  const toggleEdit = () => {
+    const room = roomRef.current;
+    if (!room) return;
+    if (editing) {
+      room.stopEdit();
+      setEditing(false);
+      setShopOpen(false);
+    } else {
+      room.startEdit();
+      setEditing(true);
+    }
+  };
 
   // The arrival: once the room's pictures are loaded, and any film or welcome-back scene has finished, the room paints itself in.
   // A new person's arrival film starts the moment they come through the creator, over the connecting and loading (not after).
@@ -115,16 +174,35 @@ export default function IsoPage() {
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
       </div>
-      <a className="play-chip" href="#/map" style={{ position: "absolute", left: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 3 }}>Go outside</a>
-      <button className="play-chip" aria-label="Settings" onClick={() => setShowSettings(true)} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 52px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
+      {!editing && <a className="play-chip" href="#/map" style={{ position: "absolute", left: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 3 }}>Go outside</a>}
+      {!editing && <button className="play-chip" aria-label="Settings" onClick={() => setShowSettings(true)} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 52px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
         Settings
-      </button>
+      </button>}
+      {session && ready && !introOn && !editing && (
+        <button className="play-chip" onClick={toggleEdit} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 104px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
+          Edit home
+        </button>
+      )}
+      {editing && (
+        <>
+          <div className="home-hint">{sel ? "Drag it, or tap the floor to move it." : "Tap a piece of furniture to pick it up."}</div>
+          <div className="home-bar">
+            <button disabled={!sel} onClick={() => roomRef.current?.rotateSelected()}>Turn</button>
+            <button className="danger" disabled={!sel} onClick={() => roomRef.current?.sellSelected()}>
+              {sel ? `Sell ${sel.bought ? "₦" + Math.floor(sel.price * 0.6).toLocaleString() : "₦" + Math.floor(sel.price * 0.25).toLocaleString()}` : "Sell"}
+            </button>
+            <button onClick={() => setShopOpen(true)}>Shop</button>
+            <button className="primary" onClick={toggleEdit}>Done</button>
+          </div>
+        </>
+      )}
+      {editing && shopOpen && session && <HomeShop session={session} onBuy={buy} onClose={() => setShopOpen(false)} />}
       {showSettings && (
         <div style={{ position: "absolute", inset: 0, zIndex: 80 }}>
           <SettingsPanel onClose={() => setShowSettings(false)} />
         </div>
       )}
-      {session && ready && !introOn && <GameHud session={session} onHour={(h) => roomRef.current?.setHour(h)} />}
+      {session && ready && !introOn && !editing && <GameHud session={session} onHour={(h) => roomRef.current?.setHour(h)} />}
       {status && <div className="play-banner" role="status">{status}</div>}
       {menu && (
         <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (canvasRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, menu.y + 10) }}>

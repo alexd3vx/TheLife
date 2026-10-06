@@ -142,7 +142,7 @@ export class IsoRoom {
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly layout: Layout,
+    private layout: Layout,
     private readonly tier: Tier,
     private readonly game: IsoGame | null,
     char: CharProvider,
@@ -157,6 +157,25 @@ export class IsoRoom {
 
   async load(): Promise<void> {
     await spriteSharp();
+    await this.rebuildItems();
+    await this.learnSizes();
+    if (!this.live) await this.preloadChar();
+    this.fit();
+  }
+
+  /** Swaps in a changed layout (after furniture was moved, bought or sold) without reloading the room. */
+  async setLayout(layout: Layout): Promise<void> {
+    this.layout = layout;
+    const keep = this.selected?.def.id ?? null;
+    this.selected = null;
+    this.dragging = false;
+    await this.rebuildItems();
+    this.floorCache = null;
+    if (!isFree(this.nav, this.pos.x, this.pos.z)) this.pos = nearestFree(this.nav, this.pos.x, this.pos.z, 3) ?? { x: layout.start.x, z: layout.start.z };
+    if (keep) this.select(this.items.find((i) => i.def.id === keep) ?? null);
+  }
+
+  private async rebuildItems(): Promise<void> {
     const props = await propsMeta();
     // (the character is a paper doll of sprite layers; see paperdoll.ts)
     const items: Item[] = [];
@@ -187,10 +206,8 @@ export class IsoRoom {
       }
     }));
     this.items = items;
-    this.buildNav();
+    this.nav = this.makeNav(items);
     for (const it of items) this.deriveUse(it, byId);
-    if (!this.live) await this.preloadChar();
-    this.fit();
   }
 
   private async preloadChar() {
@@ -213,21 +230,21 @@ export class IsoRoom {
     return { hx: (quarter ? sz : sx) / 2, hz: (quarter ? sx : sz) / 2 };
   }
 
-  private buildNav() {
+  private makeNav(items: Item[]): NavGrid {
     const nav = createNavGrid(this.layout.area, NAV_CELL);
     blockOutside(nav, this.layout.area, 0.4);
     const t = (this.layout.house?.wallThickness ?? 0.2) / 2;
     for (const w of this.layout.walls) {
       blockRect(nav, { minX: Math.min(w.a[0], w.b[0]) - t, maxX: Math.max(w.a[0], w.b[0]) + t, minZ: Math.min(w.a[1], w.b[1]) - t, maxZ: Math.max(w.a[1], w.b[1]) + t }, CHAR_RADIUS);
     }
-    for (const it of this.items) {
+    for (const it of items) {
       if (it.def.onTopOf || it.def.y) continue; // on a shelf or the ceiling
       if (it.def.furniture === "p_rug" || it.def.furniture === "p_doormat" || it.def.furniture === "ceiling_fan") continue;
       const { hx, hz } = this.footprint(it);
       // chairs and beds can be sat on and slept on, so they are not walls; but leave them closed so nobody walks through them
       blockRect(nav, { minX: it.def.x - hx, maxX: it.def.x + hx, minZ: it.def.z - hz, maxZ: it.def.z + hz }, CHAR_RADIUS * 0.6);
     }
-    this.nav = nav;
+    return nav;
   }
 
   private deriveUse(it: Item, byId: Map<string, Item>) {
@@ -316,6 +333,7 @@ export class IsoRoom {
       this.pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       this.dragged = false;
       this.onMenu?.(null);
+      if (this.editing && this.selected && this.pointers.size === 1 && this.editItemAt(e.offsetX, e.offsetY) === this.selected) this.beginDrag(this.selected);
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
         this.pinch = Math.hypot(a!.x - b!.x, a!.y - b!.y);
@@ -329,7 +347,9 @@ export class IsoRoom {
       p.y = e.offsetY;
       if (this.pointers.size === 1) {
         if (Math.abs(dx) + Math.abs(dy) > 1.5) this.dragged = this.dragged || Math.hypot(dx, dy) > 3;
-        if (this.dragged) {
+        if (this.dragging) {
+          if (this.dragged) this.dragTo(e.offsetX, e.offsetY);
+        } else if (this.dragged) {
           this.lastTouch = this.clock;
           this.cx -= dx / this.zoom;
           this.cy -= dy / this.zoom;
@@ -345,7 +365,8 @@ export class IsoRoom {
     const up = (e: PointerEvent) => {
       const had = this.pointers.has(e.pointerId);
       this.pointers.delete(e.pointerId);
-      if (had && this.pointers.size === 0 && !this.dragged) this.tap(e.offsetX, e.offsetY);
+      if (this.dragging) this.endDrag();
+      else if (had && this.pointers.size === 0 && !this.dragged) this.tap(e.offsetX, e.offsetY);
       this.pinch = 0;
     };
     const wheel = (e: WheelEvent) => {
@@ -403,6 +424,7 @@ export class IsoRoom {
 
   private tap(px: number, py: number) {
     if (this.intro) return this.skipIntro();
+    if (this.editing) return this.editTap(px, py);
     if (this.move) return;
     const it = this.itemAt(px, py);
     if (it && it.action) {
@@ -503,6 +525,200 @@ export class IsoRoom {
       this.clipTime = 0;
       if (it.mount === "enter") this.pos = { x: target.def.x, z: target.def.z };
     }
+  }
+
+  // ------------------------------------------------------------------ editing the home
+
+  /** Is the home being rearranged? Taps then pick furniture instead of walking. */
+  editing = false;
+  private selected: Item | null = null;
+  private dragging = false;
+  private dragFrom: { def: Placement; kids: { it: Item; def: Placement }[] } | null = null;
+  private dragValid = true;
+  /** Tells the page what is selected (null = nothing) so it can show its buttons. */
+  onSelect?: (info: { id: string; furniture: string; name: string; bought: boolean; price: number } | null) => void;
+  /** Asks the page to make a change real: it runs the game rules, then hands the new layout back through setLayout. */
+  onEditChange?: (c: { kind: "move"; id: string; x: number; z: number; rot: number } | { kind: "sell"; id: string; furniture: string; bought: boolean }) => void;
+
+  startEdit(): void {
+    this.stopDoing();
+    this.path = [];
+    this.pending = null;
+    this.mode = "idle";
+    this.editing = true;
+  }
+
+  stopEdit(): void {
+    this.editing = false;
+    this.select(null);
+  }
+
+  private movable(it: Item): boolean {
+    return !!it.meta && !it.def.y && !it.def.onTopOf && it.def.furniture !== "ceiling_fan" && it.def.furniture !== "caged_hanging_light";
+  }
+
+  select(it: Item | null): void {
+    this.selected = it && this.movable(it) ? it : null;
+    const sel = this.selected;
+    this.onSelect?.(sel ? { id: sel.def.id, furniture: sel.def.furniture, name: furnitureById(sel.def.furniture)?.name ?? sel.def.furniture, bought: /^n\d+$/.test(sel.def.id), price: furnitureById(sel.def.furniture)?.price ?? 0 } : null);
+  }
+
+  /** Selects a piece by its id (after it was bought, say). */
+  selectId(id: string): void {
+    this.select(this.items.find((i) => i.def.id === id) ?? null);
+  }
+
+  private editItemAt(px: number, py: number): Item | null {
+    const sx = (px - this.w / 2) / this.zoom + this.cx, sy = (py - this.h / 2) / this.zoom + this.cy;
+    for (let i = this.drawn.length - 1; i >= 0; i--) {
+      const d = this.drawn[i]!;
+      if (!d.item || !d.box || !d.img || !this.movable(d.item)) continue;
+      const b = d.box;
+      if (sx < b.x || sx > b.x + b.w || sy < b.y || sy > b.y + b.h) continue;
+      if (this.opaqueAt(d.img, (sx - b.x) / b.w, (sy - b.y) / b.h)) return d.item;
+    }
+    return null;
+  }
+
+  private static readonly FLAT = new Set(["p_rug", "p_doormat"]);
+  private static snap = (v: number) => Math.round(v * 4) / 4;
+
+  /** Can a piece of this footprint stand here? Inside the walls, off the walls, clear of other furniture and not shutting the door in. */
+  private fits(self: Item | null, x: number, z: number, rotQ: number, size: [number, number, number], furniture: string, ignore: Set<Item>): boolean {
+    const quarter = rotQ % 2 === 1;
+    const hx = (quarter ? size[2] : size[0]) / 2, hz = (quarter ? size[0] : size[2]) / 2;
+    const r = { minX: x - hx + 0.03, maxX: x + hx - 0.03, minZ: z - hz + 0.03, maxZ: z + hz - 0.03 };
+    const b = this.layout.house?.bounds ?? this.layout.area;
+    const t = (this.layout.house?.wallThickness ?? 0.2) / 2;
+    if (r.minX < b.minX + t || r.maxX > b.maxX - t || r.minZ < b.minZ + t || r.maxZ > b.maxZ - t) return false;
+    const hit = (a: { minX: number; maxX: number; minZ: number; maxZ: number }) => r.minX < a.maxX && r.maxX > a.minX && r.minZ < a.maxZ && r.maxZ > a.minZ;
+    for (const w of this.layout.walls) {
+      if (hit({ minX: Math.min(w.a[0], w.b[0]) - t, maxX: Math.max(w.a[0], w.b[0]) + t, minZ: Math.min(w.a[1], w.b[1]) - t, maxZ: Math.max(w.a[1], w.b[1]) + t })) return false;
+    }
+    const flat = IsoRoom.FLAT.has(furniture);
+    const tentative: Item[] = [];
+    for (const o of this.items) {
+      if (o === self || ignore.has(o)) continue;
+      tentative.push(o);
+      if (flat || o.def.onTopOf || o.def.y || IsoRoom.FLAT.has(o.def.furniture) || o.def.furniture === "ceiling_fan") continue;
+      const f = this.footprint(o);
+      if (hit({ minX: o.def.x - f.hx, maxX: o.def.x + f.hx, minZ: o.def.z - f.hz, maxZ: o.def.z + f.hz })) return false;
+    }
+    if (flat) return true;
+    // never wall yourself in: the door must stay reachable from where the character starts
+    const probe: Item = { def: { id: "_probe", furniture, x, z, rot: rotQ * 90 }, action: undefined, size, rot: rotQ, meta: null, image: null, base: 0, approach: { x, z }, face: 0, mount: null };
+    const nav = this.makeNav([...tentative, probe]);
+    const door = this.doorPoint();
+    const inside = { x: door.x, z: door.z - 0.6 };
+    const start = nearestFree(nav, this.layout.start.x, this.layout.start.z, 1.5);
+    const gate = nearestFree(nav, inside.x, inside.z, 1.5);
+    return !!start && !!gate && !!findPath(nav, start, gate);
+  }
+
+  private fitsItem(it: Item, x: number, z: number, rotQ: number): boolean {
+    const kids = new Set(this.items.filter((o) => o.def.onTopOf === it.def.id));
+    return this.fits(it, x, z, rotQ, it.size, it.def.furniture, kids);
+  }
+
+  /** The nearest free spot to the middle of the house for something new, or null if there isn't one. */
+  findSpotFor(furniture: string): { x: number; z: number } | null {
+    const size = (this.propSize(furniture)) ?? [0.8, 0.8, 0.8];
+    const b = this.layout.house?.bounds ?? this.layout.area;
+    const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+    const cands: { x: number; z: number; d: number }[] = [];
+    for (let x = b.minX; x <= b.maxX; x += 0.25) for (let z = b.minZ; z <= b.maxZ; z += 0.25) cands.push({ x, z, d: Math.hypot(x - cx, z - cz) });
+    cands.sort((p, q) => p.d - q.d);
+    for (const c of cands) if (this.fits(null, c.x, c.z, 0, size, furniture, new Set())) return { x: c.x, z: c.z };
+    return null;
+  }
+
+  private propSizes = new Map<string, [number, number, number]>();
+  private propSize(furniture: string): [number, number, number] | null {
+    return this.propSizes.get(furniture) ?? null;
+  }
+  /** Remembers the sizes of the catalogue's pieces, so the room can check where a new one fits. */
+  async learnSizes(): Promise<void> {
+    const props = await propsMeta();
+    for (const [id, m] of Object.entries(props)) if (m.size) this.propSizes.set(id, m.size);
+  }
+
+  private beginDrag(it: Item): void {
+    const kids = this.items.filter((o) => o.def.onTopOf === it.def.id).map((o) => ({ it: o, def: o.def }));
+    this.dragFrom = { def: it.def, kids };
+    this.dragging = true;
+    this.dragValid = true;
+  }
+
+  private dragTo(px: number, py: number): void {
+    const it = this.selected, from = this.dragFrom;
+    if (!it || !from) return;
+    const p = this.screenToWorld(px, py);
+    const x = IsoRoom.snap(p.x), z = IsoRoom.snap(p.z);
+    const dx = x - from.def.x, dz = z - from.def.z;
+    it.def = { ...from.def, x, z };
+    for (const k of from.kids) k.it.def = { ...k.def, x: k.def.x + dx, z: k.def.z + dz };
+    this.dragValid = this.fitsItem(it, x, z, it.rot);
+  }
+
+  private endDrag(): void {
+    const it = this.selected, from = this.dragFrom;
+    this.dragging = false;
+    this.dragFrom = null;
+    if (!it || !from) return;
+    const moved = it.def.x !== from.def.x || it.def.z !== from.def.z;
+    if (moved && this.dragValid) {
+      this.onEditChange?.({ kind: "move", id: it.def.id, x: it.def.x, z: it.def.z, rot: it.rot * 90 });
+      return;
+    }
+    // it doesn't fit there: back to where it was
+    it.def = from.def;
+    for (const k of from.kids) k.it.def = k.def;
+    if (moved) this.setStatus("That doesn't fit there.");
+  }
+
+  rotateSelected(): void {
+    const it = this.selected;
+    if (!it) return;
+    const q = (it.rot + 1) % 4;
+    if (!this.fitsItem(it, it.def.x, it.def.z, q)) return this.setStatus("There isn't room to turn it.");
+    this.onEditChange?.({ kind: "move", id: it.def.id, x: it.def.x, z: it.def.z, rot: q * 90 });
+  }
+
+  sellSelected(): void {
+    const it = this.selected;
+    if (!it) return;
+    this.onEditChange?.({ kind: "sell", id: it.def.id, furniture: it.def.furniture, bought: /^n\d+$/.test(it.def.id) });
+  }
+
+  private editTap(px: number, py: number): void {
+    const hit = this.editItemAt(px, py);
+    if (hit) return this.select(hit === this.selected ? null : hit);
+    const it = this.selected;
+    if (!it) return;
+    // tapping the floor sends the selected piece there
+    const p = this.screenToWorld(px, py);
+    const x = IsoRoom.snap(p.x), z = IsoRoom.snap(p.z);
+    if (!this.fitsItem(it, x, z, it.rot)) return this.setStatus("That doesn't fit there.");
+    this.onEditChange?.({ kind: "move", id: it.def.id, x, z, rot: it.rot * 90 });
+  }
+
+  /** The glow on the floor under the selected piece: green where it fits, red where it doesn't. */
+  private footprintGlow(c: CanvasRenderingContext2D, it: Item): void {
+    const { hx, hz } = this.footprint(it);
+    const pts = [project(it.def.x - hx, 0, it.def.z - hz), project(it.def.x + hx, 0, it.def.z - hz), project(it.def.x + hx, 0, it.def.z + hz), project(it.def.x - hx, 0, it.def.z + hz)];
+    c.save();
+    c.beginPath();
+    pts.forEach((q, i) => (i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])));
+    c.closePath();
+    const ok = !this.dragging || this.dragValid;
+    c.fillStyle = ok ? "rgba(110,225,150,.34)" : "rgba(235,90,80,.4)";
+    c.fill();
+    c.lineWidth = 2.5;
+    c.strokeStyle = ok ? "rgba(150,255,185,.95)" : "rgba(255,130,120,.95)";
+    c.setLineDash([9, 6]);
+    c.lineDashOffset = -this.time * 22;
+    c.stroke();
+    c.restore();
   }
 
   // ------------------------------------------------------------------ frame
@@ -1029,7 +1245,7 @@ export class IsoRoom {
         box,
         draw: (cx) => {
           if (layer > -1 && !ceiling) this.shadow(cx, it.def.x, it.def.z, it.base, hx * pop, hz * pop);
-          const lit = this.hoverItem === it;
+          const lit = this.hoverItem === it || (this.editing && this.selected === it);
           if (lit) cx.filter = "brightness(1.12)";
           if (pop < 1) {
             // ease-out-back: drops from above, overshoots a touch, settles
@@ -1047,6 +1263,7 @@ export class IsoRoom {
         },
       };
       list.push(draw);
+      if (this.editing && this.selected === it) list.push({ key: -900, draw: (cx) => this.footprintGlow(cx, it) });
     }
     // the character
     const sprite = this.charSprite();

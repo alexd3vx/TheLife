@@ -3,3 +3,26 @@
 .iso-bar { display: block; width: 120px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; margin-top: 14px; }
 .iso-bar i { display: block; height: 100%; background: #f2a43a; transition: width .3s ease; }
 .play-loading { flex-direction: column; }
+
+/* ---- edit home */
+.home-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6; display: flex; gap: 8px; padding: 8px; border-radius: 16px; background: rgba(20, 17, 15, .9); max-width: calc(100vw - 24px); }
+.home-bar button { font: inherit; font-weight: 700; color: #f2ede4; background: #2c2824; border: 0; border-radius: 12px; padding: 10px 14px; min-height: 44px; cursor: pointer; white-space: nowrap; }
+.home-bar button.primary { background: #f2a73b; color: #2b1a05; }
+.home-bar button.danger { background: #5b2a24; }
+.home-bar button:disabled { opacity: .4; }
+.home-hint { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(12px, env(safe-area-inset-top)) + 112px); z-index: 5; padding: 8px 14px; border-radius: 12px; background: rgba(20, 17, 15, .85); color: #f2ede4; font-size: .9rem; text-align: center; max-width: calc(100vw - 24px); }
+.home-shop { position: absolute; inset: auto 0 0 0; z-index: 7; max-height: 72%; display: flex; flex-direction: column; background: #1b1714; color: #f2ede4; border-radius: 18px 18px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, .5); }
+@media (min-width: 720px) { .home-shop { inset: auto calc(50% - 280px) 0 calc(50% - 280px); } }
+.home-shop header { display: flex; align-items: center; gap: 12px; padding: 14px 16px 6px; }
+.home-shop h3 { margin: 0; flex: 1; font-size: 1.1rem; }
+.home-shop-money { color: #f6c969; font-variant-numeric: tabular-nums; }
+.home-shop-close { font-size: 1.5rem; line-height: 1; background: none; border: 0; color: inherit; cursor: pointer; padding: 4px 8px; }
+.home-shop nav { display: flex; gap: 6px; overflow-x: auto; padding: 6px 12px; }
+.home-shop nav button { flex: none; font: inherit; color: inherit; background: #2c2824; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.home-shop nav button.is-on { background: #f2a73b; color: #2b1a05; font-weight: 700; }
+.home-shop ul { list-style: none; margin: 0; padding: 6px 12px 16px; overflow-y: auto; display: grid; gap: 8px; }
+.home-shop li { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; background: #24201c; }
+.home-shop li img { width: 64px; height: 64px; object-fit: contain; }
+.home-shop li small { display: block; color: #f6c969; }
+.home-shop li button { font: inherit; font-weight: 700; background: #f2a73b; color: #2b1a05; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+.home-shop li button:disabled { opacity: .35; }

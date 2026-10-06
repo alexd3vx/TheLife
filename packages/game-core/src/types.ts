@@ -26,6 +26,7 @@ export interface Ledger {
 import type { Profile } from "./profile.js";
 import type { PhoneState } from "./phone.js";
 import type { KitchenState } from "./kitchen.js";
+import type { HomeChanges } from "./home.js";
 
 export interface Inventory {
   /** Raw food portions from the shop. */
@@ -43,6 +44,8 @@ export interface GameState {
   inventory: Inventory;
   /** The fridge, the cupboard and the cooked food. */
   kitchen: KitchenState;
+  /** What the player changed in their home: furniture moved, sold and bought. */
+  home?: HomeChanges;
   /** How the character looks (a cleaned JSON string; see the client's Look). Kept with the life, on the server. */
   look?: string;
   /** Skill experience by skill id. */

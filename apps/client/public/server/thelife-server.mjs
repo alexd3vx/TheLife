@@ -2369,51 +2369,6 @@ function parseProfile(raw) {
   };
 }
 
-// packages/game-core/src/persist.ts
-function parseGameState(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw;
-  if (r.version !== 1 || typeof r.minute !== "number" || !r.ledger || typeof r.ledger !== "object") return null;
-  const accounts = r.ledger.accounts;
-  if (!accounts || typeof accounts !== "object") return null;
-  let total = 0;
-  for (const value of Object.values(accounts)) {
-    if (typeof value !== "number" || !Number.isFinite(value)) return null;
-    total += value;
-  }
-  if (total !== 0) return null;
-  const fresh = createGameState();
-  const needs = createNeeds();
-  for (const id of NEED_IDS) {
-    const value = r.needs?.[id];
-    needs[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fresh.needs[id];
-  }
-  const entries = Array.isArray(r.ledger.entries) ? r.ledger.entries.slice(-300) : [];
-  const inventory = {
-    portions: Math.max(0, Math.floor(r.inventory?.portions ?? 0)),
-    meals: Math.max(0, Math.floor(r.inventory?.meals ?? 0))
-  };
-  const profile = parseProfile(r.profile);
-  return {
-    version: 1,
-    minute: Math.max(0, r.minute),
-    needs,
-    ledger: { accounts: { ...accounts }, entries, nextId: r.ledger.nextId ?? entries.length + 1 },
-    inventory,
-    kitchen: parseKitchen(r.kitchen, profile?.tier),
-    ...typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {},
-    skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
-    incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
-    rentOwed: Math.max(0, r.rentOwed ?? 0),
-    lastRentDay: Math.max(0, r.lastRentDay ?? 0),
-    profile,
-    phone: parsePhone(r.phone, profile),
-    lastAllowanceDay: Math.max(0, r.lastAllowanceDay ?? 0),
-    warned: {},
-    stats: { ...fresh.stats, ...r.stats ?? {} }
-  };
-}
-
 // packages/game-core/src/catalog.ts
 var item = (id, name, category, price, action, toggle) => ({
   id,
@@ -2524,6 +2479,138 @@ var FURNITURE = [
   item("p_doormat", "Doormat", "decor", 3500)
 ];
 var byId2 = new Map(FURNITURE.map((f) => [f.id, f]));
+function furnitureById(id) {
+  return byId2.get(id);
+}
+
+// packages/game-core/src/home.ts
+var emptyHome = () => ({ moved: {}, removed: [], added: [], nextId: 1 });
+var MAX_ADDED = 60;
+var MAX_MOVED = 200;
+var REFUND_BOUGHT = 0.6;
+var REFUND_STARTING = 0.25;
+var fail4 = (reason) => ({ ok: false, reason });
+var finite2 = (n, lim) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= lim;
+var turn = (rot) => (Math.round(rot / 90) * 90 % 360 + 360) % 360;
+function parseHome(raw) {
+  const out = emptyHome();
+  if (!raw || typeof raw !== "object") return out;
+  const r = raw;
+  if (r.moved && typeof r.moved === "object") {
+    for (const [id, v] of Object.entries(r.moved).slice(0, MAX_MOVED)) {
+      const m = v;
+      if (id.length <= 40 && finite2(m?.x, 40) && finite2(m?.z, 40)) out.moved[id] = { x: m.x, z: m.z, rot: turn(typeof m.rot === "number" ? m.rot : 0) };
+    }
+  }
+  if (Array.isArray(r.removed)) out.removed = r.removed.filter((s) => typeof s === "string" && s.length <= 40).slice(0, MAX_MOVED);
+  if (Array.isArray(r.added)) {
+    for (const a of r.added.slice(0, MAX_ADDED)) {
+      if (a && typeof a.id === "string" && a.id.length <= 20 && typeof a.furniture === "string" && furnitureById(a.furniture) && finite2(a.x, 40) && finite2(a.z, 40)) {
+        out.added.push({ id: a.id, furniture: a.furniture, x: a.x, z: a.z, rot: turn(typeof a.rot === "number" ? a.rot : 0) });
+      }
+    }
+  }
+  out.nextId = typeof r.nextId === "number" && Number.isInteger(r.nextId) && r.nextId > 0 ? r.nextId : out.added.length + 1;
+  return out;
+}
+function homeMove(state, id, x, z, rot) {
+  if (!id || id.length > 40 || !finite2(x, 40) || !finite2(z, 40) || !finite2(rot, 720)) return fail4("That didn't look right.");
+  const h = state.home ??= emptyHome();
+  const bought = h.added.find((a) => a.id === id);
+  if (bought) {
+    bought.x = x;
+    bought.z = z;
+    bought.rot = turn(rot);
+    return { ok: true, text: "Moved." };
+  }
+  if (h.removed.includes(id)) return fail4("You sold that.");
+  if (!(id in h.moved) && Object.keys(h.moved).length >= MAX_MOVED) return fail4("That's a lot of rearranging for one house.");
+  h.moved[id] = { x, z, rot: turn(rot) };
+  return { ok: true, text: "Moved." };
+}
+function homeSell(state, id, startingFurniture) {
+  if (!id || id.length > 40) return fail4("That didn't look right.");
+  const h = state.home ??= emptyHome();
+  const bought = h.added.findIndex((a) => a.id === id);
+  let price = 0;
+  let share = REFUND_STARTING;
+  if (bought >= 0) {
+    price = furnitureById(h.added[bought].furniture)?.price ?? 0;
+    share = REFUND_BOUGHT;
+    h.added.splice(bought, 1);
+  } else {
+    if (h.removed.includes(id)) return fail4("You already sold that.");
+    if (typeof startingFurniture !== "string" || !furnitureById(startingFurniture)) return fail4("The shop doesn't buy that.");
+    if (h.removed.length >= MAX_MOVED) return fail4("There is nothing left to sell.");
+    price = furnitureById(startingFurniture).price;
+    h.removed.push(id);
+    delete h.moved[id];
+  }
+  const back = Math.floor(price * share);
+  if (back > 0) {
+    const r = transfer(state.ledger, MINT, PLAYER, back, "Sold furniture", state.minute);
+    if (!r.ok) return { ok: true, text: "Sold." };
+  }
+  return { ok: true, text: back > 0 ? `Sold for \u20A6${back.toLocaleString()}.` : "Sold." };
+}
+function homeBuy(state, furniture, x, z, rot) {
+  const def = furnitureById(furniture);
+  if (!def) return fail4("The shop doesn't have that.");
+  if (!finite2(x, 40) || !finite2(z, 40) || !finite2(rot, 720)) return fail4("That didn't look right.");
+  const h = state.home ??= emptyHome();
+  if (h.added.length >= MAX_ADDED) return fail4("There's no room in the house for more.");
+  const r = transfer(state.ledger, PLAYER, SINK, def.price, def.name, state.minute);
+  if (!r.ok) return fail4(`That costs \u20A6${def.price.toLocaleString()}. You don't have enough.`);
+  state.stats.totalSpent += def.price;
+  h.added.push({ id: `n${h.nextId++}`, furniture, x, z, rot: turn(rot) });
+  return { ok: true, text: `Bought the ${def.name.toLowerCase()} for \u20A6${def.price.toLocaleString()}.` };
+}
+
+// packages/game-core/src/persist.ts
+function parseGameState(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw;
+  if (r.version !== 1 || typeof r.minute !== "number" || !r.ledger || typeof r.ledger !== "object") return null;
+  const accounts = r.ledger.accounts;
+  if (!accounts || typeof accounts !== "object") return null;
+  let total = 0;
+  for (const value of Object.values(accounts)) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  if (total !== 0) return null;
+  const fresh = createGameState();
+  const needs = createNeeds();
+  for (const id of NEED_IDS) {
+    const value = r.needs?.[id];
+    needs[id] = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fresh.needs[id];
+  }
+  const entries = Array.isArray(r.ledger.entries) ? r.ledger.entries.slice(-300) : [];
+  const inventory = {
+    portions: Math.max(0, Math.floor(r.inventory?.portions ?? 0)),
+    meals: Math.max(0, Math.floor(r.inventory?.meals ?? 0))
+  };
+  const profile = parseProfile(r.profile);
+  return {
+    version: 1,
+    minute: Math.max(0, r.minute),
+    needs,
+    ledger: { accounts: { ...accounts }, entries, nextId: r.ledger.nextId ?? entries.length + 1 },
+    inventory,
+    kitchen: parseKitchen(r.kitchen, profile?.tier),
+    ...r.home ? { home: parseHome(r.home) } : {},
+    ...typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {},
+    skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
+    incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
+    rentOwed: Math.max(0, r.rentOwed ?? 0),
+    lastRentDay: Math.max(0, r.lastRentDay ?? 0),
+    profile,
+    phone: parsePhone(r.phone, profile),
+    lastAllowanceDay: Math.max(0, r.lastAllowanceDay ?? 0),
+    warned: {},
+    stats: { ...fresh.stats, ...r.stats ?? {} }
+  };
+}
 
 // packages/game-core/src/buildingPlan.ts
 var DOOR_WIDTH = 1.2;
@@ -3675,6 +3762,9 @@ var HANDLERS = {
   cancel: (sim) => sim.cancel(),
   buyGroceries: (sim) => sim.buyGroceries(),
   buyIngredient: (sim, [id, q]) => str(id, 30) && int(q, 1, 12) ? buyIngredient(sim.state, id, q, sim.traits.groceries) : no(bad),
+  homeMove: (sim, [id, x, z, rot]) => str(id, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeMove(sim.state, id, x, z, rot) : no(bad),
+  homeSell: (sim, [id, furniture]) => str(id, 40) ? homeSell(sim.state, id, typeof furniture === "string" ? furniture : void 0) : no(bad),
+  homeBuy: (sim, [furniture, x, z, rot]) => str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture, x, z, rot) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),

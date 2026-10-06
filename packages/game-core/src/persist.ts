@@ -2,6 +2,7 @@ import { createGameState } from "./sim";
 import { parsePhone } from "./phone";
 import { parseProfile } from "./profile";
 import { parseKitchen } from "./kitchen";
+import { parseHome } from "./home";
 import { createNeeds } from "./needs";
 import { NEED_IDS, type GameState } from "./types";
 
@@ -42,6 +43,7 @@ export function parseGameState(raw: unknown): GameState | null {
     ledger: { accounts: { ...accounts }, entries, nextId: (r.ledger as GameState["ledger"]).nextId ?? entries.length + 1 },
     inventory,
     kitchen: parseKitchen(r.kitchen, profile?.tier),
+    ...(r.home ? { home: parseHome(r.home) } : {}),
     ...(typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {}),
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
