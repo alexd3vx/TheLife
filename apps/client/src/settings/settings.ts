@@ -56,7 +56,7 @@ type GraphicsKeys = "resolution" | "autoAdjust" | "fpsCap" | "shadows" | "shadow
 
 const GRAPHICS: Record<Exclude<Preset, "recommended" | "custom">, Pick<Settings, GraphicsKeys>> = {
   low: { resolution: 1, autoAdjust: true, fpsCap: 30, shadows: "off", shadowDistance: 0.7, antialias: false, bloom: false, bloomStrength: 0.4, lights: 1, drawDistance: 0.6, crowd: 30 },
-  medium: { resolution: 2, autoAdjust: true, fpsCap: 60, shadows: "low", shadowDistance: 1, antialias: false, bloom: false, bloomStrength: 0.5, lights: 2, drawDistance: 0.85, crowd: 60 },
+  medium: { resolution: 2, autoAdjust: true, fpsCap: 60, shadows: "medium", shadowDistance: 1, antialias: true, bloom: false, bloomStrength: 0.5, lights: 2, drawDistance: 0.85, crowd: 60 },
   high: { resolution: 2.5, autoAdjust: true, fpsCap: 0, shadows: "medium", shadowDistance: 1, antialias: true, bloom: true, bloomStrength: 0.5, lights: 4, drawDistance: 1, crowd: 100 },
   ultra: { resolution: 3, autoAdjust: false, fpsCap: 0, shadows: "high", shadowDistance: 1.3, antialias: true, bloom: true, bloomStrength: 0.7, lights: 8, drawDistance: 1.2, crowd: 100 },
 };

@@ -8,7 +8,7 @@ import { getSettings, shadowMapSize, subscribeSettings } from "../settings/setti
 import { PostFX } from "../settings/postfx";
 import { bodyFor, sexOf } from "../lab/looks";
 import { Avatar } from "../lab/avatar";
-import { loadSavedLook } from "../lab/looks";
+import { loadSavedLook, parseLook } from "../lab/looks";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge, type Status } from "./controller";
 import { GameSession, type HudSnapshot } from "./gameSession";
@@ -115,9 +115,28 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   container.appendChild(renderer.domElement);
 
   const world = await buildWorld(manifest, layout, renderer, small ? 1024 : 2048);
-  const avatar = new Avatar(manifest, loadSavedLook());
+  // the character looks the way it was made in the creator (kept with the life on the server), not like whatever this device last tried on
+  const lookJson = options.session?.sim.state.look;
+  const avatar = new Avatar(manifest, lookJson ? parseLook(lookJson) : loadSavedLook());
   await avatar.load();
   world.scene.add(avatar.root);
+  // a soft contact shadow under the character, so they stand on the floor instead of hovering over it
+  const blob = (() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d")!;
+    const grad = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+    grad.addColorStop(0, "rgba(20,12,6,.55)");
+    grad.addColorStop(0.55, "rgba(20,12,6,.28)");
+    grad.addColorStop(1, "rgba(20,12,6,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 1;
+    return mesh;
+  })();
+  world.scene.add(blob);
 
   const session = showroom ? null : (options.session ?? new GameSession(options.fresh));
   if (session?.awaySummary.length) events.onAway(session.awaySummary);
@@ -372,6 +391,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     }
     controller.update(dt);
     avatar.update(dt);
+    blob.position.set(avatar.root.position.x, 0.012, avatar.root.position.z);
+    blob.visible = avatar.root.position.y < 0.6; // not while lying in bed
     world.updateFurniture(dt, elapsed, usingSet());
     lightBudget.update(controller.position);
     hudClock += dt;

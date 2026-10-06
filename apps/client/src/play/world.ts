@@ -122,6 +122,32 @@ interface WallMesh {
 
 const FLOOR_Y = 0;
 
+/** Painted plaster: a warm base with soft mottling and faint trowel strokes, tileable. */
+function plasterTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#e8e0d2";
+  g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 6 + Math.random() * 26;
+    const l = 205 + Math.random() * 40;
+    g.fillStyle = `rgba(${l},${l - 6},${l - 18},${0.05 + Math.random() * 0.06})`;
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+      g.beginPath();
+      g.ellipse(x + ox, y + oy, r, r * (0.4 + Math.random() * 0.5), Math.random() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 1);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
 export async function buildWorld(manifest: AssetManifest, layout: Layout, renderer: THREE.WebGLRenderer, shadowSize: number): Promise<World> {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#a9c9e8");
@@ -203,7 +229,9 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   const wallMeshes: WallMesh[] = [];
   const wallHeight = house?.wallHeight ?? 2.6;
   const wallThickness = house?.wallThickness ?? 0.2;
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: "#efe6d6", roughness: 0.95 });
+  const plaster = plasterTexture();
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: "#efe6d6", roughness: 0.95, map: plaster, bumpMap: plaster, bumpScale: 0.6 });
+  const trimMaterial = new THREE.MeshStandardMaterial({ color: "#f7f1e6", roughness: 0.7 });
   for (const wall of layout.walls) {
     const dx = wall.b[0] - wall.a[0];
     const dz = wall.b[1] - wall.a[1];
@@ -213,6 +241,18 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     mesh.position.copy(centre);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    // skirting at the foot and a crown at the top, so a wall reads as part of a finished room
+    const alongX = Math.abs(dx) > 0;
+    const trim = (h: number, y: number, over: number) => {
+      const t = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length + 0.002 : wallThickness + over, h, alongX ? wallThickness + over : length + 0.002), trimMaterial.clone());
+      t.position.y = y;
+      t.receiveShadow = true;
+      mesh.add(t);
+    };
+    if (house) {
+      trim(0.14, -wallHeight / 2 + 0.07, 0.03);
+      trim(0.07, wallHeight / 2 - 0.035, 0.04);
+    }
     scene.add(mesh);
     wallMeshes.push({ mesh, centre, outward: wall.outward ? new THREE.Vector3(wall.outward[0], 0, wall.outward[1]) : null, opacity: 1 });
   }
@@ -374,6 +414,13 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
       material.opacity = Math.max(wall.opacity, 0);
       wall.mesh.visible = wall.opacity > 0.03;
       material.depthWrite = wall.opacity > 0.5;
+      for (const child of wall.mesh.children) {
+        const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (!m) continue;
+        m.transparent = material.transparent;
+        m.opacity = material.opacity;
+        m.depthWrite = material.depthWrite;
+      }
     }
   }
 
