@@ -10,7 +10,8 @@ import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
-import { buildGroundDetail, capHideLevel, capHideLot } from "./chunkBuilder";
+import { buildGroundDetail, buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
+import { Pedestrians } from "./pedestrians";
 import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 import { RemotePlayers } from "./remotePlayers";
@@ -42,7 +43,7 @@ export interface MapRuntime {
   resetView(): void;
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
-  goTo(id: string, pace: "walk" | "run"): boolean;
+  goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
   quality(): Quality;
   setQuality(q: Quality): void;
   /** Switches between day and night (street lamps light up). */
@@ -153,6 +154,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(streamer.root);
   const remotes = new RemotePlayers(manifest);
   scene.add(remotes.root);
+  const peds = new Pedestrians(small ? 40 : 70);
+  scene.add(peds.root);
 
   // Walking: a 1 m navigation grid from the same data the server will have.
   const interiorLots = district.lots.filter(hasInterior);
@@ -184,6 +187,38 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     return p;
   };
   const doors = new DoorManager(scene, interiorLots, planOf);
+  // Inside a building the street is switched off: you see the building on its own, like the house. Outside carries on without you.
+  const interiorScenes = new Map<string, { group: THREE.Group; geometries: THREE.BufferGeometry[] }>();
+  let interiorGroup: THREE.Group | null = null;
+  function setInterior(lot: Lot | null) {
+    if (interiorGroup) interiorGroup.visible = false;
+    interiorGroup = null;
+    const inside = lot !== null;
+    streamer.root.visible = !inside;
+    groundDetail.group.visible = !inside;
+    ground.visible = !inside;
+    peds.setVisible(!inside);
+    doors.setVisible(!inside);
+    for (const pin of pinSprites) pin.visible = !inside;
+    if (lot) {
+      let built = interiorScenes.get(lot.id);
+      if (!built) {
+        built = buildInteriorScene(lot);
+        interiorScenes.set(lot.id, built);
+        scene.add(built.group);
+        if (interiorScenes.size > 6) {
+          const [oldId, old] = interiorScenes.entries().next().value as [string, { group: THREE.Group; geometries: THREE.BufferGeometry[] }];
+          if (old !== built) {
+            scene.remove(old.group);
+            for (const g of old.geometries) g.dispose();
+            interiorScenes.delete(oldId);
+          }
+        }
+      }
+      built.group.visible = true;
+      interiorGroup = built.group;
+    }
+  }
   let placeName: string | null = null;
   const levelGrids = new Map<string, NavGrid>();
   const levelGrid = (lot: Lot, level: number): NavGrid => {
@@ -209,6 +244,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       floorLot = inside;
       floorLevel = 0;
       controller.setNav(groundNav);
+      setInterior(inside);
+      remotes.only = inside ? { minX: inside.footprint.minX - 0.5, maxX: inside.footprint.maxX + 0.5, minZ: inside.footprint.minZ - 0.5, maxZ: inside.footprint.maxZ + 0.5 } : null;
     }
     if (!floorLot) {
       capHideLot.value = -1;
@@ -302,7 +339,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const hits = raycaster.intersectObjects(pinSprites, false);
     return hits[0]?.object.userData.landmarkId ?? null;
   }
-  function goTo(id: string, pace: "walk" | "run"): boolean {
+  function goTo(id: string, pace: "walk" | "run" | "auto"): boolean {
     const lm = district.landmarks.find((l) => l.id === id);
     if (!lm) return false;
     const ok = controller.tapGround(lm.entrance.x, lm.entrance.z, pace);
@@ -315,15 +352,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (pinHit) {
       const lm = district.landmarks.find((l) => l.id === pinHit)!;
       showMarker(lm.entrance.x, lm.entrance.z, controller.canReach(lm.entrance.x, lm.entrance.z));
-      events.onMenu({
-        x: clientX - rect.left,
-        y: clientY - rect.top,
-        title: lm.name,
-        options: [
-          { label: "Walk there", icon: "walk", run: () => { events.onMenu(null); goTo(lm.id, "walk"); } },
-          { label: "Run there", icon: "run", run: () => { events.onMenu(null); goTo(lm.id, "run"); } },
-        ],
-      });
+      events.onMenu(null);
+      goTo(lm.id, "auto");
       return;
     }
     plane.constant = -controller.position.y - 0.02; // taps land on the floor the player is on
@@ -331,16 +361,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (!point || Math.abs(point.x) > DISTRICT_HALF || Math.abs(point.z) > DISTRICT_HALF) return events.onMenu(null);
     const stairs = stairTarget(point.x, point.z);
     const { x, z } = stairs ?? point;
-    showMarker(x, z, controller.canReach(x, z));
-    events.onMenu({
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-      title: null,
-      options: [
-        { label: "Walk here", icon: "walk", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
-        { label: "Run here", icon: "run", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "run")); } },
-      ],
-    });
+    // Plain movement has no menu: tap and go.
+    events.onMenu(null);
+    showMarker(x, z, controller.tapGround(x, z, "auto"));
   }
   const down = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
   const canvas = renderer.domElement;
@@ -423,6 +446,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     // Take the roof (and any floors above the player's) off the building they are standing in, and follow the stairs up and down.
     controller.position.y = updateFloor();
     doors.update(controller.position.x, controller.position.z, dt);
+    peds.update(dt, controller.position.x, controller.position.z);
     const here = floorLot?.landmark ? (district.landmarks.find((l) => l.lotId === floorLot!.id)?.name ?? null) : null;
     if (here !== placeName) {
       placeName = here;
@@ -552,6 +576,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     dispose() {
       remotes.dispose();
       doors.dispose();
+      peds.dispose();
+      for (const built of interiorScenes.values()) for (const g of built.geometries) g.dispose();
       stopped = true;
       tourCancel = true;
       cancelAnimationFrame(raf);

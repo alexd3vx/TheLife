@@ -219,8 +219,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         const menu: TapMenu["options"] = [];
         options.slice(0, 3).forEach((interaction, i) => {
           const label = interaction.hint;
-          menu.push({ label, icon: i === 0 ? "hand" : "spot", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "walk")); } });
-          if (i === 0) menu.push({ label: `Run there: ${label.charAt(0).toLowerCase()}${label.slice(1)}`, icon: "run", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "run")); } });
+          menu.push({ label, icon: i === 0 ? "hand" : "spot", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "auto")); } });
         });
         present({ ...at, title: picked.item.catalog.name, options: menu });
         return;
@@ -231,15 +230,9 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     const area = layout.area;
     if (point.x < area.minX || point.x > area.maxX || point.z < area.minZ || point.z > area.maxZ) return close();
     const { x, z } = point;
-    showMarker(x, z, controller.canReach(x, z));
-    present({
-      ...at,
-      title: null,
-      options: [
-        { label: "Walk here", icon: "walk", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
-        { label: "Run here", icon: "run", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "run")); } },
-      ],
-    });
+    // Plain movement has no menu: tap the floor and the character goes (running if it is far). Menus are for using things.
+    close();
+    showMarker(x, z, controller.tapGround(x, z, "auto"));
   }
 
   // Taps are told apart from camera drags by how far and how long the pointer moved.

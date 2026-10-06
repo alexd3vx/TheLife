@@ -194,6 +194,8 @@ export class RemotePlayers {
 
   /** Where the local player is, so far-away characters are not animated. */
   readonly focus = new THREE.Vector3();
+  /** When set, only players standing in this rectangle are shown (you are inside a building: the street is off). */
+  only: { minX: number; maxX: number; minZ: number; maxZ: number } | null = null;
 
   update(dt: number): void {
     const render = performance.now() / 1000 - DELAY;
@@ -212,6 +214,13 @@ export class RemotePlayers {
       const px = r.group.position.x, pz = r.group.position.z;
       r.group.position.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
       r.group.rotation.y = a.yaw + wrap(b.yaw - a.yaw) * k;
+      const o = this.only;
+      const inScene = !o || (r.group.position.x > o.minX && r.group.position.x < o.maxX && r.group.position.z > o.minZ && r.group.position.z < o.maxZ);
+      if (!inScene) {
+        r.group.visible = false;
+        continue;
+      }
+      r.group.visible = true;
       if (r.avatar) {
         const near = Math.hypot(r.group.position.x - this.focus.x, r.group.position.z - this.focus.z) < 70;
         r.group.visible = near;

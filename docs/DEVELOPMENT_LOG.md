@@ -2,6 +2,11 @@
 
 Chronological record of decisions and changes. Newest first.
 
+## 2026-10-06 — Inside a building is its own scene; people on the street; tap to move
+- **Going inside**: when you walk through a door of a house, shop or named place, the street is switched off and you see the building on its own (floors, rooms, stairs, furniture, roof cutaway) in a bare yard, like the house page; walking out brings the street back. Draw calls inside drop from ~60 to ~12. In multiplayer only the people inside the same building are shown while you are in it.
+- **Street life**: up to 70 pedestrians walk round the blocks on the pavements near the player, drawn as instanced meshes (about three extra draw calls); they are re-homed near the player when they are far away and switched off while you are inside.
+- **Movement is just a tap**: tapping the ground (house or map) walks there, running automatically when far; no menu. A menu appears only when you tap something you can use (a bed, a TV, a stove...), listing what you can do; the map's place pins also just walk you to the door.
+
 ## 2026-10-06 — Real interiors for the named places, entrance animation, real characters online, performance, icons
 - **Interiors for the police station, hospital, school, bank, hotel, fire station, church and mosque**: they now use the house plan's walls, doors and stairs (so every room is still reachable, tested) re-dressed per place: lobby with reception counter and benches, cells with bunks, wards with beds and drips, classrooms with desks and boards, vault with safes, engine bay with a fire truck, pews and altar, prayer hall. Floors have per-room colours; the outside keeps the place's colour and its sign/dome lifts off with the roof when you walk in. Map entrances now stand in front of the real door.
 - **Entrance animation**: front doors of nearby buildings swing open as you walk up (at most ten at a time) and close behind you; walking into a named place shows an "Entering ..." banner.

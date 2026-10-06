@@ -78,6 +78,46 @@ function addRoof(b: MeshBuilder, lot: Lot, top: number, lod: Lod) {
   }
 }
 
+/** A real interior: ground floor in the main mesh, upper floors and roof in the hideable cap. */
+function addInteriorBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot) {
+  const lotNo = Number(lot.id.slice(1));
+  addInterior(b, cap, lot, generatePlan(lot), lot.landmark ? LANDMARK_WALL[lot.landmark] : WALLS[lot.colour % WALLS.length]!, lotNo);
+  cap.setLot(lotNo * 8 + lot.floors); // the roof counts as the floor above the top storey
+  addRoof(cap, lot, lot.floors * lot.storey, 0);
+  if (lot.landmark) addLandmark(cap, lot, lot.landmark, true); // signs and domes go with the roof, so they lift off when you walk in
+}
+
+const YARD = C("#8c9a78");
+
+/** The building on its own, with a bare yard around it: what you see when you are inside and the street is switched off. */
+export function buildInteriorScene(lot: Lot): { group: THREE.Group; geometries: THREE.BufferGeometry[] } {
+  const group = new THREE.Group();
+  const geometries: THREE.BufferGeometry[] = [];
+  const b = new MeshBuilder();
+  const cap = new MeshBuilder();
+  const f = lot.footprint;
+  b.flat(f.minX - 90, f.minZ - 90, f.maxX + 90, f.maxZ + 90, -0.03, YARD);
+  addInteriorBuilding(b, cap, lot);
+  const geo = b.build();
+  if (geo) {
+    const mesh = new THREE.Mesh(geo, buildingMaterial);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    geometries.push(geo);
+  }
+  const capGeo = cap.build();
+  if (capGeo) {
+    const mesh = new THREE.Mesh(capGeo, capMaterial);
+    mesh.customDepthMaterial = capDepthMaterial;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    geometries.push(capGeo);
+  }
+  return { group, geometries };
+}
+
 function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
   const f = lot.footprint;
   const height = lot.floors * lot.storey;
@@ -93,12 +133,7 @@ function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
     return;
   }
   if (lod === 0 && hasInterior(lot)) {
-    // A real interior: ground floor in the chunk mesh, upper floors and roof in the hideable cap.
-    const lotNo = Number(lot.id.slice(1));
-    addInterior(b, cap, lot, generatePlan(lot), lot.landmark ? LANDMARK_WALL[lot.landmark] : WALLS[lot.colour % WALLS.length]!, lotNo);
-    cap.setLot(lotNo * 8 + lot.floors); // the roof counts as the floor above the top storey
-    addRoof(cap, lot, height, lod);
-    if (lot.landmark) addLandmark(cap, lot, lot.landmark, true); // signs and domes go with the roof, so they lift off when you walk in
+    addInteriorBuilding(b, cap, lot);
     return;
   }
   const wall = lot.landmark ? LANDMARK_WALL[lot.landmark] : lot.kind === "terminal" ? C("#d9dde0") : lot.kind === "hangar" ? C("#9aa3ab") : WALLS[lot.colour % WALLS.length]!;

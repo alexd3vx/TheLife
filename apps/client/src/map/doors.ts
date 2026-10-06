@@ -100,6 +100,10 @@ export class DoorManager {
     }
   }
 
+  setVisible(v: boolean): void {
+    this.root.visible = v;
+  }
+
   dispose(): void {
     this.root.removeFromParent();
     for (const m of this.materials.values()) m.dispose();
