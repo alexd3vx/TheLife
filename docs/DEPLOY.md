@@ -37,3 +37,6 @@ Everyone opens the same Vercel link, goes to `#/map`, taps **Go online**, picks 
 - **Your own computer, today, free**: `pnpm --filter @thelife/server start`, then `cloudflared tunnel --url http://localhost:8787` prints an `https://....trycloudflare.com` address;
   use `wss://....trycloudflare.com` in "Go online". Works while your computer is on.
 In every case, type the address into **Go online -> Server** (it is remembered), or set `VITE_SERVER_URL` in Vercel and redeploy.
+
+## Supabase tables
+Open Supabase -> **SQL Editor** -> New query, paste `supabase/schema.sql`, Run. It creates `profiles` and `saves` with row-level security (each player can only see and change their own rows). The game does not read these yet; cloud saves and the admin flag are the next steps.
