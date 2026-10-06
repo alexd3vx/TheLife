@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import GameHud from "../play/GameHud";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import DoorCutscene from "../play/DoorCutscene";
+import { useWelcomeBack } from "../arrival/useWelcomeBack";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { layoutForTier } from "../play/layouts";
@@ -19,6 +20,8 @@ export default function IsoPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; options: { label: string; run(): void }[] } | null>(null);
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const session = life.session;
+  const welcome = useWelcomeBack(life);
+  if (import.meta.env.DEV) (window as unknown as { __life: unknown }).__life = { justArrived: life.justArrived, phase: life.phase, has: !!life.session, showing: welcome.showing };
   const tier = (session?.sim.state.profile?.tier ?? "middle") as Tier;
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export default function IsoPage() {
         <KitchenPanel session={session} initialTab={kitchen} onClose={() => setKitchen(null)} runUse={(a) => roomRef.current?.useAction(a === "cook" ? "cook" : a) ?? false} />
       )}
       {!error && <DoorCutscene ready={ready} tier={tier} offline={life.phase === "offline"} detail={life.detail} onRetry={() => world.reconnect()} />}
+      {welcome.node}
       {error && <div className="play-error">{error}</div>}
     </div>
   );
