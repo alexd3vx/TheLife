@@ -183,3 +183,11 @@ Chronological record of decisions and changes. Newest first.
 - Actions: `{t:"do", fn, args}` runs a function from the whitelist in `packages/game-core/src/onlineRules.ts` with every argument checked. Prices come from the server (tickets, grocery scale). The phone (`apps/client/src/phone/remote.ts`) runs the same function locally first so it feels instant; the server's `life` snapshot then wins (`GameSession.applyLife`).
 - Characters are made from a background id; the server rebuilds the profile (`buildProfile`) so nobody can pick their own tier or money.
 - Fixed: the water plane (two huge triangles) was drawn over the land on some screen sizes; the spawn is now open street and the camera starts on the open side.
+
+## Real Lagos Island (OpenStreetMap)
+- `node tools/osm/download.mjs 6.425 3.365 6.480 3.435` downloads the area in small tiles from the OSM map API (works from places where Overpass is blocked); `node tools/osm/build.mjs` turns it into `packages/game-core/src/{lagosData,lagosBuildings,lagosRoads}.ts`. Raw downloads stay out of git (`tools/osm/raw/`).
+- The world is now 4.5 x 3.25 km at 3 m per ground cell: 7,800 real building outlines with heights (from `height` / `building:levels`, a guess where untagged), 1,400 street centre lines with their real widths, parks, markets, and 60 named places (hospitals, police, schools, churches, mosques, banks, stations, museum...).
+- Streets are drawn from an exact distance field (`roadField.ts`), so edges stay sharp, pavements scale with the street, lane lines follow the street direction.
+- Water: moving ripples, sky reflection, foam on the shore. The camera pulls in when a building is in the way.
+- Enterable landmark buildings still use the generated box plans (their real outline is replaced); the other buildings are real outlines without an inside yet.
+- Credit "Map data © OpenStreetMap contributors (ODbL)" is shown in Settings and on the big map.

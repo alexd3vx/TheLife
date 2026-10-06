@@ -165,6 +165,7 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
             </Row>
           </>
         )}
+      <p className="st-note">Map data © OpenStreetMap contributors (ODbL). Lagos Island is drawn from it.</p>
       </div>
     </div>
   );

@@ -363,6 +363,42 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     }
     return best;
   }
+  // Buildings between you and the camera: move the camera in along the line to you until the view is clear.
+  const camWanted = new THREE.Vector3(), camPulledAt = new THREE.Vector3();
+  let camPulled = false;
+  const solidAt = (x: number, z: number, y: number): boolean => {
+    for (const l of lotIndex.near(x, z)) {
+      const f = l.footprint;
+      if (x < f.minX || x > f.maxX || z < f.minZ || z > f.maxZ) continue;
+      if (y > l.floors * l.storey + 0.6) continue;
+      if (!l.poly || nearPolygon(l.poly, x, z)) return true;
+    }
+    return false;
+  };
+  function pullCameraOutOfBuildings() {
+    camWanted.copy(camera.position);
+    camPulled = false;
+    if (floorLot) return;
+    const tx = controls.target.x, ty = controls.target.y, tz = controls.target.z;
+    for (let k = 1; k >= 0.3; k -= 0.1) {
+      let blocked = false;
+      for (let s = 1; s >= 0 && !blocked; s -= 0.125) {
+        const q = k * s;
+        blocked = solidAt(tx + (camWanted.x - tx) * q, tz + (camWanted.z - tz) * q, ty + (camWanted.y - ty) * q);
+      }
+      if (!blocked) {
+        if (k < 1) {
+          camera.position.set(tx + (camWanted.x - tx) * k, ty + (camWanted.y - ty) * k, tz + (camWanted.z - tz) * k);
+          camPulledAt.copy(camera.position);
+          camPulled = true;
+        }
+        return;
+      }
+    }
+    camera.position.set(tx + (camWanted.x - tx) * 0.3, ty + (camWanted.y - ty) * 0.3 + 6, tz + (camWanted.z - tz) * 0.3);
+    camPulledAt.copy(camera.position);
+    camPulled = true;
+  }
   function resetView() {
     const a = openAzimuth();
     controls.target.set(controller.position.x, 0.9, controller.position.z);
@@ -599,8 +635,11 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     followTarget.set(controller.position.x, 0.9 + controller.position.y, controller.position.z);
     const shift = followTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 4));
     controls.target.add(shift);
+    // Undo last frame's "pulled in" nudge so the orbit starts from where it really wants the camera (unless the player moved it).
+    if (camPulled && camera.position.distanceToSquared(camPulledAt) < 1e-6) camera.position.copy(camWanted);
     camera.position.add(shift);
     controls.update();
+    pullCameraOutOfBuildings();
 
     markerAge += dt;
     const m = marker.material as THREE.MeshBasicMaterial;

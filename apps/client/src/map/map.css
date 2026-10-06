@@ -10,6 +10,8 @@
 /* The drawn map: a corner minimap and a big version. */
 .dmap { position: relative; width: 100%; height: 100%; touch-action: none; user-select: none; }
 .dmap svg { width: 100%; height: 100%; display: block; }
+.dmap-credit { position: absolute; left: 6px; bottom: 4px; font-size: .58rem; color: rgba(30, 30, 30, .7); text-shadow: 0 0 3px rgba(255, 255, 255, .9); pointer-events: none; }
+.is-compact .dmap-credit { display: none; }
 .dmap-tools { position: absolute; right: 8px; bottom: 8px; display: grid; gap: 6px; }
 .dmap-tools button { all: unset; cursor: pointer; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: #222; font-size: 1.2rem; font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
 .map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 118px; height: 118px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }

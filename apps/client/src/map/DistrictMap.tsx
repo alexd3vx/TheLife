@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { District } from "@thelife/game-core";
+import { indexLots } from "@thelife/game-core";
 import { PIN_STYLE } from "./pins";
 import { GameIcon, iconPath } from "../ui/icons";
 
@@ -30,7 +31,7 @@ function mapPicture(district: District, dark: boolean): string {
   if (hit) return hit;
   const t = district.terrain!;
   const pal = dark ? DARK : LIGHT;
-  const S = 3;
+  const S = 1; // one pixel per ground cell (3 m); the browser smooths it when it is drawn larger
   const canvas = document.createElement("canvas");
   canvas.width = t.width * S;
   canvas.height = t.height * S;
@@ -38,7 +39,7 @@ function mapPicture(district: District, dark: boolean): string {
   const img = ctx.createImageData(canvas.width, canvas.height);
   for (let y = 0; y < canvas.height; y++) {
     for (let x = 0; x < canvas.width; x++) {
-      const c = t.classAt(((x + 0.5) / S) * t.cell, ((y + 0.5) / S) * t.cell);
+      const c = t.cls[y * t.width + x]!;
       const rgb = c === 0 ? pal.water : c === 1 ? pal.street : c === 2 ? pal.block : c === 3 ? pal.park : pal.market;
       const o = (y * canvas.width + x) * 4;
       img.data[o] = rgb[0];
@@ -62,6 +63,7 @@ export default function DistrictMap({ district, player = null, others = [], home
   const drag = useRef<{ x: number; y: number; cx: number; cz: number; moved: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const picture = useMemo(() => mapPicture(district, dark), [district, dark]);
+  const lotIndex = useMemo(() => indexLots(district.lots, 64), [district]);
   const lotLayer = useMemo(
     () => district.lots.filter((l) => l.landmark).map((l) => <rect key={l.id} x={l.footprint.minX} y={l.footprint.minZ} width={l.footprint.maxX - l.footprint.minX} height={l.footprint.maxZ - l.footprint.minZ} fill={PIN_STYLE[l.landmark!].colour} opacity={0.9} />),
     [district],
@@ -104,6 +106,23 @@ export default function DistrictMap({ district, player = null, others = [], home
         }}
       >
         <image href={picture} x={0} y={0} width={W} height={Hh} preserveAspectRatio="none" />
+        {span <= 1100 && (() => {
+          // Real building outlines, only for what is on screen.
+          const seen = new Set<string>();
+          const out: React.ReactNode[] = [];
+          for (let bz = vz; bz < vz + span + 64 && out.length < 1800; bz += 64) {
+            for (let bx = vx; bx < vx + span + 64; bx += 64) {
+              for (const l of lotIndex.near(bx, bz)) {
+                if (seen.has(l.id) || out.length >= 1800) continue;
+                seen.add(l.id);
+                const f = l.footprint;
+                if (f.maxX < vx || f.minX > vx + span || f.maxZ < vz || f.minZ > vz + span) continue;
+                out.push(l.poly ? <polygon key={l.id} points={l.poly.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")} fill={dark ? "#556079" : "#c9bda6"} stroke={dark ? "#2b3345" : "#a89b82"} strokeWidth={span / 900} /> : <rect key={l.id} x={f.minX} y={f.minZ} width={f.maxX - f.minX} height={f.maxZ - f.minZ} fill={dark ? "#556079" : "#c9bda6"} />);
+              }
+            }
+          }
+          return out;
+        })()}
         {lotLayer}
         {district.landmarks.map((l) => {
           const on = selected === l.id;
@@ -155,6 +174,7 @@ export default function DistrictMap({ district, player = null, others = [], home
           </g>
         )}
       </svg>
+      <span className="dmap-credit">© OpenStreetMap contributors</span>
       {!compact && (
         <div className="dmap-tools">
           <button onClick={() => zoom(0.7)} aria-label="Zoom in">+</button>

@@ -8,3 +8,4 @@ dist
 assets-src/*
 !assets-src/README.md
 dist-artifact
+tools/osm/raw/

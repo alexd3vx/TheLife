@@ -1,8 +1,9 @@
-// Lagos Island: the real layout of the island (water, streets, built-up blocks, parks, the market) traced from a map picture
-// (tools/map/trace.mjs), with buildings, trees and lamps generated on it. Pure data and functions; the same world is built in
-// the browser and on the game server.
+// Lagos Island: the real island from OpenStreetMap (c) OpenStreetMap contributors, ODbL: water, streets, built-up ground, parks, the
+// markets, and every building outline with its height (tools/osm/build.mjs), with trees, lamps and cars placed on it. Pure data and
+// functions; the same world is built in the browser and on the game server.
 
 import { LAGOS_CELL, LAGOS_H, LAGOS_PLACES, LAGOS_RLE, LAGOS_W } from "./lagosData.js";
+import { LAGOS_BUILDINGS } from "./lagosBuildings.js";
 import { generatePlan, hasInterior } from "./buildingPlan.js";
 import type { District, Facing, Lamp, LandmarkKind, Landmark, Lot, LotKind, Prop, Rect, Tree } from "./district.js";
 
@@ -44,11 +45,7 @@ export class LagosTerrain {
   readonly cls: Uint8Array;
   /** For street cells: distance in cells to the nearest non-street cell. */
   readonly edt: Float32Array;
-  /** For block cells: the direction (radians) pointing away from the nearest street, water or park edge. */
-  readonly blockDir: Float32Array;
-  /** For block cells: distance in cells to that edge. */
-  readonly blockEdge: Float32Array;
-  /** For street cells: the widest clearance within two cells (about half the corridor width): small = a street, large = open ground. */
+  /** For street cells: the widest clearance within two cells (about half the corridor width, in cells): small = a street, large = open ground. */
   readonly wide: Float32Array;
 
   constructor() {
@@ -107,73 +104,6 @@ export class LagosTerrain {
     }
     this.wide = wide;
 
-    // Blocks: for every block cell, which way is the nearest edge? (A two-pass nearest-source transform.) Buildings are turned to match.
-    const srcX = new Int16Array(w * h).fill(-1), srcZ = new Int16Array(w * h).fill(-1);
-    const dist = new Float32Array(w * h).fill(1e6);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = y * w + x;
-        if (cls[i] !== BLOCK) {
-          dist[i] = 0;
-          srcX[i] = x;
-          srcZ[i] = y;
-        }
-      }
-    }
-    const relax = (i: number, j: number) => {
-      if (srcX[j]! < 0) return;
-      const d = Math.hypot((i % w) - srcX[j]!, ((i / w) | 0) - srcZ[j]!);
-      if (d < dist[i]!) {
-        dist[i] = d;
-        srcX[i] = srcX[j]!;
-        srcZ[i] = srcZ[j]!;
-      }
-    };
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = y * w + x;
-        if (x > 0) relax(i, i - 1);
-        if (y > 0) {
-          relax(i, i - w);
-          if (x > 0) relax(i, i - w - 1);
-          if (x < w - 1) relax(i, i - w + 1);
-        }
-      }
-    }
-    for (let y = h - 1; y >= 0; y--) {
-      for (let x = w - 1; x >= 0; x--) {
-        const i = y * w + x;
-        if (x < w - 1) relax(i, i + 1);
-        if (y < h - 1) {
-          relax(i, i + w);
-          if (x < w - 1) relax(i, i + w + 1);
-          if (x > 0) relax(i, i + w - 1);
-        }
-      }
-    }
-    const dir = new Float32Array(w * h);
-    for (let i = 0; i < w * h; i++) if (cls[i] === BLOCK && srcX[i]! >= 0) dir[i] = Math.atan2(((i / w) | 0) - srcZ[i]!, (i % w) - srcX[i]!);
-    this.blockDir = dir;
-    this.blockEdge = dist;
-  }
-
-  /** Which way a building at this point should be turned: its sides parallel to the nearest street (radians, a quarter turn is equivalent). */
-  blockAngleAt(x: number, z: number): number {
-    // Average the direction over the neighbouring cells as vectors, so the angle does not jump.
-    const cx = Math.floor(x / this.cell), cz = Math.floor(z / this.cell);
-    let sx = 0, sz = 0;
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const xx = cx + dx, zz = cz + dz;
-        if (xx < 0 || zz < 0 || xx >= this.width || zz >= this.height) continue;
-        const i = zz * this.width + xx;
-        if (this.cls[i] !== BLOCK) continue;
-        const a = this.blockDir[i]! * 4; // times four: angles a quarter turn apart count as the same
-        sx += Math.cos(a);
-        sz += Math.sin(a);
-      }
-    }
-    return Math.atan2(sz, sx) / 4;
   }
 
   private at(cx: number, cz: number): number {
@@ -226,7 +156,7 @@ export class LagosTerrain {
   /** What a street point is: asphalt, a pavement strip along the edges, or open paved ground where the streets open out. */
   streetKind(x: number, z: number): StreetKind {
     const wideHere = this.bilinear(this.wide, x, z);
-    if (wideHere > 3.2) return "plaza";
+    if (wideHere * this.cell > 22) return "plaza";
     return this.edgeDistance(x, z) < 1.7 ? "sidewalk" : "asphalt";
   }
 
@@ -330,113 +260,77 @@ export function generateLagos(seed = 7): District {
   const between = (a: number, b: number) => a + rand() * (b - a);
   const placePx = (name: string) => LAGOS_PLACES.find((p) => p.name === name)!;
   const toWorld = (p: { x: number; y: number }) => ({ x: p.x * t.cell, z: p.y * t.cell });
-  const market = toWorld(placePx("Balogun Market"));
 
-  // ---- buildings on the built-up blocks: turned to follow the nearest street, of different shapes and sizes, packed close
+  // ---- the real buildings of the island (from OpenStreetMap): their own outlines, heights and turns
   const lots: Lot[] = [];
-  let lotNo = 0;
-  const OW = Math.ceil(t.size.x), OH = Math.ceil(t.size.z);
-  const occ = new Uint8Array(OW * OH); // 1 m cells already covered by a building
-  const isBlock = (x: number, z: number) => t.classAt(x, z) === BLOCK;
-  const inRect = (lx: number, lz: number, hw: number, hd: number) => Math.abs(lx) <= hw && Math.abs(lz) <= hd;
-  /** Is the turned rectangle free (no building, 2 m of block all round)? `grow` widens the test. */
-  const rectFree = (cx: number, cz: number, c: number, sn: number, hw: number, hd: number, margin: number): boolean => {
-    const R = Math.hypot(hw, hd) + margin;
-    const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(OW - 1, Math.floor(cx + R));
-    const z0 = Math.max(0, Math.floor(cz - R)), z1 = Math.min(OH - 1, Math.floor(cz + R));
-    for (let z = z0; z <= z1; z++) {
-      for (let x = x0; x <= x1; x++) {
-        if (!occ[z * OW + x]) continue;
-        const dx = x + 0.5 - cx, dz = z + 0.5 - cz;
-        if (inRect(dx * c + dz * sn, -dx * sn + dz * c, hw + 0.8, hd + 0.8)) return false;
+  const DM = 0.1;
+  const streetSide = (x: number, z: number): Facing => {
+    // Which side of the building the nearest street is on: probe outwards in the four directions.
+    for (let r = 4; r <= 40; r += 4) {
+      for (const f of [0, 1, 2, 3] as const) {
+        const [dx, dz] = FACING_STEP[f]!;
+        if (t.classAt(x + dx * r, z + dz * r) === STREET) return f;
       }
     }
-    // The ground round it must all be block: probe the corners and edge middles, 2 m outside.
-    const px = hw + 1.6, pz = hd + 1.6;
-    for (const [lx, lz] of [[-px, -pz], [px, -pz], [-px, pz], [px, pz], [0, -pz], [0, pz], [-px, 0], [px, 0], [0, 0]] as const) {
-      if (!isBlock(cx + lx * c - lz * sn, cz + lx * sn + lz * c)) return false;
-    }
-    return true;
+    return 2;
   };
-  const markRect = (cx: number, cz: number, c: number, sn: number, hw: number, hd: number) => {
-    const R = Math.hypot(hw, hd);
-    for (let z = Math.max(0, Math.floor(cz - R)); z <= Math.min(OH - 1, Math.floor(cz + R)); z++) {
-      for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(OW - 1, Math.floor(cx + R)); x++) {
-        const dx = x + 0.5 - cx, dz = z + 0.5 - cz;
-        if (inRect(dx * c + dz * sn, -dx * sn + dz * c, hw, hd)) occ[z * OW + x] = 1;
-      }
+  for (const row of LAGOS_BUILDINGS) {
+    const [kindCode, floors, yawMilli, roofCode, x0, z0] = row as [number, number, number, number, number, number];
+    const poly: [number, number][] = [[x0 * DM, z0 * DM]];
+    let px = x0, pz = z0;
+    for (let i = 6; i + 1 < row.length; i += 2) {
+      px += row[i]!;
+      pz += row[i + 1]!;
+      poly.push([px * DM, pz * DM]);
     }
-  };
-  const PASSES = [
-    { step: 7, w: [12, 22], d: [9, 16] },
-    { step: 5, w: [8, 13], d: [7, 11] },
-    { step: 3, w: [4, 7], d: [4, 7] },
-  ] as const;
-  for (const pass of PASSES) {
-    for (let gz = pass.step / 2; gz < t.size.z; gz += pass.step) {
-      for (let gx = pass.step / 2; gx < t.size.x; gx += pass.step) {
-        const x = gx + between(-pass.step * 0.45, pass.step * 0.45), z = gz + between(-pass.step * 0.45, pass.step * 0.45);
-        if (!isBlock(x, z) || occ[Math.floor(z) * OW + Math.floor(x)]) continue;
-        if (rand() < 0.04) continue; // a yard or a car park now and then
-        const theta = Math.round(t.blockAngleAt(x, z) / 0.131) * 0.131;
-        const c = Math.cos(theta), sn = Math.sin(theta);
-        const shape = rand();
-        let w = between(pass.w[0], pass.w[1]), dpt = between(pass.d[0], pass.d[1]);
-        if (shape > 0.9 && pass === PASSES[0]) {
-          w = between(22, 32);
-          dpt = between(6, 8); // a long terrace
-        }
-        const hw = w / 2, hd = dpt / 2;
-        if (!rectFree(x, z, c, sn, hw, hd, 3)) continue;
-        // L-shaped: a wing off one end.
-        let wing: { cx: number; cz: number; hw: number; hd: number } | null = null;
-        if (shape > 0.6 && shape <= 0.85 && w > 8) {
-          const w2 = w * between(0.4, 0.55), d2 = dpt * between(0.7, 1);
-          const side = rand() < 0.5 ? -1 : 1;
-          const lx = side * (hw - w2 / 2), lz = hd + d2 / 2;
-          wing = { cx: x + lx * c - lz * sn, cz: z + lx * sn + lz * c, hw: w2 / 2, hd: d2 / 2 };
-          if (!rectFree(wing.cx, wing.cz, c, sn, wing.hw, wing.hd, 1)) wing = null;
-          else if (rectFree(x, z, c, sn, hw, hd, 0) === false) wing = null;
-        }
-        markRect(x, z, c, sn, hw, hd);
-        if (wing) markRect(wing.cx, wing.cz, c, sn, wing.hw, wing.hd);
-        // The outline, turned and moved into place.
-        const local: [number, number][] = wing
-          ? (() => {
-              const side = Math.sign(((wing.cx - x) * c + (wing.cz - z) * sn)) || 1;
-              const w2 = wing.hw * 2, d2 = wing.hd * 2;
-              const a = side * (hw - w2), b2 = side * hw;
-              const lo = Math.min(a, b2), hi = Math.max(a, b2);
-              return side > 0
-                ? [[-hw, -hd], [hw, -hd], [hw, hd + d2], [lo, hd + d2], [lo, hd], [-hw, hd]]
-                : [[-hw, -hd], [hw, -hd], [hw, hd], [hi, hd], [hi, hd + d2], [-hw, hd + d2]];
-            })()
-          : [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
-        const poly = local.map(([lx, lz]) => [x + lx * c - lz * sn, z + lx * sn + lz * c] as [number, number]);
-        const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]);
-        const fp = rect(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs));
-        // Face the nearest street: the way the block's edge lies, as one of the four sides.
-        const away = t.blockAngleAt(x, z);
-        const out = [Math.cos(away + Math.PI), Math.sin(away + Math.PI)] as const;
-        const facing: Facing = Math.abs(out[1]) >= Math.abs(out[0]) ? (out[1] < 0 ? 0 : 2) : out[0] > 0 ? 1 : 3;
-        const dc = Math.hypot(x - market.x, z - market.z);
-        const floors = dc < 350 ? 3 + Math.floor(rand() * 5) : dc < 900 ? 2 + Math.floor(rand() * 4) : 1 + Math.floor(rand() * 3);
-        const kind: LotKind = floors >= 3 ? (rand() < 0.45 ? "shop" : "flats") : rand() < 0.3 ? "shop" : "house";
-        lots.push({ id: `L${lotNo++}`, kind, plot: rect(fp.minX - 1, fp.maxX + 1, fp.minZ - 1, fp.maxZ + 1), footprint: fp, floors, storey: 3.2, roof: "flat", facing, colour: Math.floor(rand() * 8), garage: false, fence: false, poly, yaw: theta });
-      }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, cx = 0, cz = 0;
+    for (const [x, z] of poly) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+      cx += x;
+      cz += z;
     }
+    cx /= poly.length;
+    cz /= poly.length;
+    const fp = rect(minX, maxX, minZ, maxZ);
+    const kind: LotKind = (["house", "flats", "shop", "hangar", "terminal"] as const)[kindCode] ?? "house";
+    lots.push({
+      id: `L${lots.length}`,
+      kind,
+      plot: rect(minX - 1, maxX + 1, minZ - 1, maxZ + 1),
+      footprint: fp,
+      floors,
+      storey: kind === "hangar" ? 6 : 3.2,
+      roof: roofCode === 1 ? "gable" : "flat",
+      facing: streetSide(cx, cz),
+      colour: Math.floor(((Math.abs(Math.sin(cx * 12.9898 + cz * 78.233)) * 43758.5453) % 1) * 8),
+      garage: false,
+      fence: false,
+      poly,
+      yaw: yawMilli / 1000,
+    });
   }
 
-  // ---- the market: rows of stalls with aisles between
+  // ---- the market: rows of stalls on the open market ground, between the real buildings
   const stalls: Lot[] = [];
-  for (let z = Math.floor(market.z - 120); z < market.z + 120; z += 5) {
-    for (let x = Math.floor(market.x - 120); x < market.x + 120; x += 7) {
-      const aisle = Math.floor((x - (market.x - 120)) / 7) % 4 === 3 || Math.floor((z - (market.z - 120)) / 5) % 5 === 4;
-      if (aisle) continue;
-      const fp = rect(x + 0.5, x + 5.5, z + 0.5, z + 3.5);
-      const pts: [number, number][] = [[fp.minX, fp.minZ], [fp.maxX, fp.minZ], [fp.minX, fp.maxZ], [fp.maxX, fp.maxZ]];
-      if (!pts.every(([px, pz]) => t.classAt(px, pz) === MARKET)) continue;
-      stalls.push({ id: `S${stalls.length}`, kind: "stall", plot: fp, footprint: fp, floors: 1, storey: 3, roof: "flat", facing: 2, colour: Math.floor(rand() * 8), garage: false, fence: false });
+  let spotIndex = indexLots(lots);
+  /** Is this spot inside (or hard against) a building? */
+  const taken = (x: number, z: number, pad: number) =>
+    spotIndex.near(x, z).some((l) => (l.poly ? nearPolygon(l.poly, x, z, pad) : x > l.footprint.minX - pad && x < l.footprint.maxX + pad && z > l.footprint.minZ - pad && z < l.footprint.maxZ + pad));
+  for (const place of LAGOS_PLACES) {
+    if (place.kind !== "market") continue;
+    const mx = place.x * t.cell, mz = place.y * t.cell;
+    for (let z = Math.floor(mz - 100); z < mz + 100; z += 5) {
+      for (let x = Math.floor(mx - 100); x < mx + 100; x += 7) {
+        const aisle = Math.floor((x - (mx - 100)) / 7) % 4 === 3 || Math.floor((z - (mz - 100)) / 5) % 5 === 4;
+        if (aisle) continue;
+        const fp = rect(x + 0.5, x + 5.5, z + 0.5, z + 3.5);
+        const pts: [number, number][] = [[fp.minX, fp.minZ], [fp.maxX, fp.minZ], [fp.minX, fp.maxZ], [fp.maxX, fp.maxZ]];
+        if (!pts.every(([qx, qz]) => t.classAt(qx, qz) === MARKET && !taken(qx, qz, 1.5))) continue;
+        stalls.push({ id: `S${stalls.length}`, kind: "stall", plot: fp, footprint: fp, floors: 1, storey: 3, roof: "flat", facing: 2, colour: Math.floor(rand() * 8), garage: false, fence: false });
+      }
     }
   }
 
@@ -454,7 +348,7 @@ export function generateLagos(seed = 7): District {
         best = l;
       }
     }
-    if (!best || bestD > 90) return null;
+    if (!best || bestD > 60) return null;
     const cx = (best.footprint.minX + best.footprint.maxX) / 2, cz = (best.footprint.minZ + best.footprint.maxZ) / 2;
     for (const scale of [1, 0.85, 0.7, 0.55]) {
       const w = spec.w * scale, d = spec.d * scale;
@@ -467,7 +361,8 @@ export function generateLagos(seed = 7): District {
         const o = lots[i]!;
         if (o === best) continue;
         const f = o.footprint;
-        if (f.minX < fp.maxX + 1 && f.maxX > fp.minX - 1 && f.minZ < fp.maxZ + 1 && f.maxZ > fp.minZ - 1) lots.splice(i, 1);
+        const ox = (f.minX + f.maxX) / 2, oz = (f.minZ + f.maxZ) / 2;
+        if (ox > fp.minX - 1 && ox < fp.maxX + 1 && oz > fp.minZ - 1 && oz < fp.maxZ + 1) lots.splice(i, 1); // a neighbour whose middle is inside the new place makes way
       }
       delete best.poly;
       delete best.yaw;
@@ -486,7 +381,7 @@ export function generateLagos(seed = 7): District {
     for (let r = 0; r < 120; r += 3) {
       for (let a = 0; a < 16; a++) {
         const px = x + Math.cos((a / 16) * Math.PI * 2) * r, pz = z + Math.sin((a / 16) * Math.PI * 2) * r;
-        if (t.classAt(px, pz) === STREET && t.streetKind(px, pz) !== "plaza") return { x: px, z: pz };
+        if (t.classAt(px, pz) === STREET && t.streetKind(px, pz) !== "plaza" && !taken(px, pz, 1.2)) return { x: px, z: pz };
       }
     }
     return { x, z };
@@ -513,20 +408,8 @@ export function generateLagos(seed = 7): District {
     }
   }
 
-  // ---- the port: sheds on the open ground at the bottom left
-  const portSheds: Lot[] = [];
-  const port = { x0: 10 * t.cell, x1: 240 * t.cell, z0: 455 * t.cell, z1: 585 * t.cell };
-  for (let z = port.z0; z < port.z1; z += 44) {
-    for (let x = port.x0; x < port.x1; x += 52) {
-      const fp = rect(x, x + 30, z, z + 22);
-      const pts: [number, number][] = [[fp.minX - 4, fp.minZ - 4], [fp.maxX + 4, fp.minZ - 4], [fp.minX - 4, fp.maxZ + 4], [fp.maxX + 4, fp.maxZ + 4], [(fp.minX + fp.maxX) / 2, (fp.minZ + fp.maxZ) / 2]];
-      if (!pts.every(([px, pz]) => t.classAt(px, pz) === STREET)) continue;
-      if (rand() < 0.35) continue;
-      portSheds.push({ id: `H${portSheds.length}`, kind: "hangar", plot: fp, footprint: fp, floors: 1, storey: 7, roof: "flat", facing: 0, colour: 2, garage: false, fence: false });
-    }
-  }
-
-  const allLots = [...lots, ...stalls, ...portSheds];
+  const allLots = [...lots, ...stalls];
+  spotIndex = indexLots(allLots);
 
   // A way in must not end up inside a neighbouring building: if it does, stand on the nearest street instead.
   {
@@ -580,13 +463,13 @@ export function generateLagos(seed = 7): District {
   }
 
   // ---- where a new player starts: the street in front of Independence House
-  const house = toWorld(placePx("Independence House"));
+  const house = toWorld(placePx("Tafawa Balewa Square Bus Terminal"));
   const start = (() => {
-    // Open ground: a street point well away from any building edge, so the first view is a street and not a wall.
-    for (let r = 0; r < 160; r += 2) {
+    // A normal street (not a motorway) near the square: tarmac in the middle, clear of every building.
+    for (let r = 0; r < 200; r += 2) {
       for (let a = 0; a < 24; a++) {
-        const px = house.x + Math.cos((a / 24) * Math.PI * 2) * r, pz = house.z + 10 + Math.sin((a / 24) * Math.PI * 2) * r;
-        if (t.classAt(px, pz) === STREET && t.edgeDistance(px, pz) >= 5) return { x: px, z: pz };
+        const px = house.x + Math.cos((a / 24) * Math.PI * 2) * r, pz = house.z + Math.sin((a / 24) * Math.PI * 2) * r;
+        if (t.classAt(px, pz) === STREET && t.edgeDistance(px, pz) >= 2.2 && t.edgeDistance(px, pz) <= 5 && !taken(px, pz, 3)) return { x: px, z: pz };
       }
     }
     return nearestStreet(house.x, house.z + 10);
