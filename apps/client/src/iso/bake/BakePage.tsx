@@ -62,8 +62,10 @@ export default function BakePage() {
         const out: CharSprite[] = [];
         const all = [0, 1, 2, 3, 4, 5, 6, 7];
         const four = [0, 2, 4, 6];
-        const clips: { name: string; frames: number; dirs: number[] }[] = [
-          { name: "Idle_Loop", frames: 1, dirs: all },
+        const clips: { name: string; frames: number; dirs: number[]; once?: boolean }[] = [
+          { name: "Idle_Loop", frames: 8, dirs: all },
+          { name: "Sitting_Enter", frames: 8, dirs: all, once: true },
+          { name: "Sitting_Exit", frames: 8, dirs: all, once: true },
           { name: "Walk_Loop", frames: 8, dirs: all },
           { name: "Jog_Fwd_Loop", frames: 8, dirs: all },
           { name: "Sitting_Idle_Loop", frames: 6, dirs: all },
@@ -85,7 +87,7 @@ export default function BakePage() {
             for (let f = 0; f < c.frames; f++) {
               avatar.stop();
               avatar.play(c.name, 0);
-              avatar.update(c.frames === 1 ? 0.05 : (f / c.frames) * dur + 0.0001);
+              avatar.update(c.frames === 1 ? 0.05 : ((c.once ? f / (c.frames - 1) : f / c.frames) * dur) + 0.0001);
               const holder = new THREE.Group();
               holder.add(avatar.root);
               const shot = shoot(holder);

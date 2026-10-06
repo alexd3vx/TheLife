@@ -38,7 +38,7 @@ export function App() {
       </Suspense>
     );
   }
-  if (hash.startsWith("#/iso")) {
+  if (import.meta.env.DEV && hash.startsWith("#/iso")) {
     return (
       <Suspense fallback={null}>
         <IsoPage />
@@ -100,10 +100,18 @@ export function App() {
       </Suspense>
     );
   }
-  if (hash.startsWith("#/play")) {
+  // Home is the painted 2.5D room. (The old 3D house stays reachable for developers at #/play3d.)
+  if (hash.startsWith("#/play3d") && admin) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <PlayPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/play")) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <IsoPage />
       </Suspense>
     );
   }

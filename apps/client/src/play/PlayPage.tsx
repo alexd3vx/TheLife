@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import ArrivalFilm from "../arrival/ArrivalFilm";
-import DoorCutscene from "./DoorCutscene";
+import "../iso/iso.css";
 import InventoryPanel from "../inventory/InventoryPanel";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import { useWelcomeBack } from "../arrival/useWelcomeBack";
@@ -315,15 +315,7 @@ export default function PlayPage() {
       {life.justArrived && life.session && !filmDone && (
         <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} onDone={() => setFilmDone(true)} />
       )}
-      {!error && !(life.justArrived && !filmDone) && (
-        <DoorCutscene
-          ready={!loading && !!life.session}
-          tier={(life.session?.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"}
-          offline={life.phase === "offline"}
-          detail={life.detail}
-          onRetry={() => world.reconnect()}
-        />
-      )}
+      {(loading || !life.session) && !error && !(life.justArrived && !filmDone) && <div className="play-loading" role="status"><span className="iso-wait" aria-label="Loading" /></div>}
       {error && <div className="play-error">{error}</div>}
     </div>
   );
