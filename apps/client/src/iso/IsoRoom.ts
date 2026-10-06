@@ -536,15 +536,17 @@ export class IsoRoom {
       }
       return;
     }
-    if (dt > 0.034) {
+    // only a really slow frame counts (under about 20 fps), and never below 70%: a soft picture is worse than a slightly slow one
+    const target = getSettings().fpsCap;
+    if (dt > (target && target <= 30 ? 0.07 : 0.05)) {
       this.slow += dt;
       this.fast = 0;
     } else if (dt < 0.02) {
       this.fast += dt;
       this.slow = Math.max(0, this.slow - dt);
     }
-    if (this.slow > 0.8 && this.quality > 0.55) {
-      this.quality = Math.max(0.55, this.quality - 0.15);
+    if (this.slow > 1.5 && this.quality > 0.7) {
+      this.quality = Math.max(0.7, this.quality - 0.15);
       this.slow = 0;
       this.resize();
     } else if (this.fast > 6 && this.quality < 1) {
