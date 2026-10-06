@@ -208,7 +208,7 @@ export default function MapPage() {
         </div>
       )}
       {placeShown && <div className="map-place" role="status">{placeShown}</div>}
-      {!loading && !error && life.session && intro === "off" && <GameHud session={life.session} onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
+      {!loading && !error && life.session && intro === "off" && <GameHud session={life.session} onHour={(h, day) => { runtimeRef.current?.setClock(h, day); const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; setNight(dark); } }} />}
       {!loading && !error && intro === "off" && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && settings.showStats && (

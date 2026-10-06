@@ -22,6 +22,9 @@ import { ChunkStreamer, type StreamStats } from "./streamer";
 import { RemotePlayers } from "./remotePlayers";
 import { DoorManager } from "./doors";
 import { input } from "../controls/input";
+import { SkySystem } from "./sky";
+import { Traffic } from "./traffic";
+import { weatherFor } from "@thelife/game-core";
 
 export interface MapStats {
   fps: number;
@@ -57,8 +60,10 @@ export interface MapRuntime {
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
-  /** Switches between day and night (street lamps light up). */
+  /** Switches between day and night (street lamps light up). For testing: it overrides the clock. */
   setNight(on: boolean): void;
+  /** The game clock: the sky, the sun, the lamps and the weather follow it. */
+  setClock(hour: number, day: number): void;
   /** Flies over the whole district while measuring the frame rate. */
   tour(onProgress?: (fraction: number) => void): Promise<TourResult>;
   /** Other players in the shared world, and the local player's pose to send to the server. */
@@ -85,6 +90,10 @@ export interface MapRuntime {
     houses(): { id: string; floors: number; garage: boolean; facing: number; inside: { x: number; z: number }; kind: string }[];
     state(): CharacterController["state"];
     night(): boolean;
+    /** Fixes the sky at an hour and a kind of weather (ignores the game clock). */
+    sky(hour: number, kind: import("./sky").SkyKind): void;
+    /** Stops the camera following the player so a test can hold a view. */
+    freeCam(on: boolean): void;
   };
 }
 
@@ -130,6 +139,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   const hemi = new THREE.HemisphereLight("#cfe0ff", "#8a7058", 0.85);
   scene.add(hemi);
   let night = false;
+  let clockOverride: number | null = null;
+  let freeCam = false;
+  let weatherOverride: import("./sky").SkyKind | null = null;
   const sun = new THREE.DirectionalLight("#fff0d6", 2.6);
   const SUN_OFFSET = new THREE.Vector3(-30, 50, 36);
   sun.castShadow = true;
@@ -140,6 +152,11 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.05;
   scene.add(sun, sun.target);
+  const sky = new SkySystem(scene, hemi, sun, SUN_OFFSET, renderer, SKY, small);
+  sky.onNight = (on) => {
+    night = on;
+    terrain.setNight(on);
+  };
 
   // Ground: water, streets, blocks and parks painted into textures that follow the player.
   const terrain = buildTerrain(district);
@@ -167,6 +184,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(remotes.root);
   const peds = new Pedestrians(district.terrain!, small ? 40 : 70);
   scene.add(peds.root);
+  const traffic = new Traffic(small ? 22 : 36);
+  scene.add(traffic.root);
 
   // Walking: a 0.5 m navigation grid for a 180 m window around the player, rebuilt as they move (the island is far too big for one grid).
   const NAV_HALF = 90;
@@ -253,6 +272,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     streamer.root.visible = !inside;
     terrain.setVisible(!inside);
     peds.setVisible(!inside);
+    traffic.setVisible(!inside);
     doors.setVisible(!inside);
     for (const pin of pinSprites) pin.visible = !inside;
     if (lot) {
@@ -630,13 +650,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     controls.rotateSpeed = st.cameraSpeed * (st.invertLook ? -1 : 1);
     controls.zoomSpeed = st.cameraSpeed;
     streamer.setDrawDistance(st.drawDistance);
-    const fogNear = 140 * st.drawDistance, fogFar = 330 * st.drawDistance;
-    if (scene.fog instanceof THREE.Fog) {
-      scene.fog.near = night ? 90 * st.drawDistance : fogNear;
-      scene.fog.far = night ? 360 * st.drawDistance : fogFar;
-    }
     camera.far = FAR;
     peds.setDensity(st.crowd / 100);
+    traffic.setDensity(st.crowd / 100);
     remotes.setNameTags(st.nameTags);
     // Cartoon or realistic characters: the same person, the other body.
     const want = bodyFor(sexOf(avatar.look.body), st.textureStyle === "realistic");
@@ -716,6 +732,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     doors.update(controller.position.x, controller.position.z, dt);
     for (const pin of pinSprites) pin.visible = !floorLot && Math.hypot(pin.position.x - controller.position.x, pin.position.z - controller.position.z) < 150;
     peds.update(dt, controller.position.x, controller.position.z);
+    traffic.update(dt, controller.position.x, controller.position.z);
+    sky.update(dt, camera, controller.position, getSettings().drawDistance);
+    traffic.setLamps(sky.daylight < 0.4 || sky.raining > 0.3);
     const here = floorLot?.landmark ? (district.landmarks.find((l) => l.lotId === floorLot!.id)?.name ?? null) : null;
     if (here !== placeName) {
       placeName = here;
@@ -730,6 +749,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
     if (intro) {
       stepIntro(dt);
+    } else if (freeCam) {
+      controls.update();
     } else {
       followTarget.set(controller.position.x, 0.9 + controller.position.y, controller.position.z);
       const shift = followTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 4));
@@ -825,14 +846,12 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     },
     goTo,
     setNight(on) {
-      night = on;
-      terrain.setNight(on);
-      SKY.set(on ? "#0d1426" : "#a9cbe8");
-      scene.fog = new THREE.Fog(SKY, (on ? 90 : 140) * getSettings().drawDistance, (on ? 360 : 330) * getSettings().drawDistance);
-      hemi.intensity = on ? 0.38 : 0.85;
-      sun.intensity = on ? 0.35 : 2.6;
-      sun.color.set(on ? "#8fa8d8" : "#fff0d6");
-      renderer.toneMappingExposure = on ? 1.25 : 1;
+      clockOverride = on ? 23 : 12;
+      sky.setHour(clockOverride);
+    },
+    setClock(hour, day) {
+      if (!weatherOverride) sky.setWeather(weatherFor(day).sky);
+      if (clockOverride === null) sky.setHour(hour);
     },
     zoomOut() {
       camera.position.set(controls.target.x + 90, 150, controls.target.z + 150);
@@ -862,6 +881,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       remotes.dispose();
       doors.dispose();
       peds.dispose();
+      traffic.dispose();
+      sky.dispose();
       for (const built of interiorScenes.values()) for (const g of built.geometries) g.dispose();
       stopped = true;
       tourCancel = true;
@@ -910,6 +931,15 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       houses: () => district.lots.filter(hasInterior).slice(0, 400).map((l) => ({ id: l.id, floors: l.floors, garage: l.garage, facing: l.facing, inside: generatePlan(l).inside, kind: l.kind })),
       state: () => controller.state,
       night: () => night,
+      freeCam: (on) => {
+        freeCam = on;
+      },
+      sky: (hour, kind) => {
+        clockOverride = hour;
+        weatherOverride = kind;
+        sky.setHour(hour);
+        sky.setWeather(kind);
+      },
     },
   };
 }

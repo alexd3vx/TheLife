@@ -72,7 +72,8 @@ class Input {
   }
 
   running(): boolean {
-    return this.held("run") || this.runButton;
+    // Pushing the stick all the way out breaks into a run.
+    return this.held("run") || this.runButton || Math.hypot(this.stickX, this.stickY) > 0.93;
   }
 
   /** The on-screen stick (-1 to 1 each way; y up is forward). */

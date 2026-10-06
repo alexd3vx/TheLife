@@ -32,7 +32,7 @@ export default function TouchControls({ editing = false, nearLabel, onPhone }: {
   const [selected, setSelected] = useState<TouchId | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  const spotStyle = (spot: TouchSpot): React.CSSProperties => ({ left: `${spot.x * 100}%`, bottom: `${spot.y * 100}%`, ["--s" as string]: spot.s });
+  const spotStyle = (spot: TouchSpot): React.CSSProperties => ({ ["--x" as string]: `${spot.x * 100}%`, ["--y" as string]: `${spot.y * 100}%`, ["--s" as string]: spot.s });
 
   // Moving a control in the editor.
   const dragFor = useCallback(

@@ -18,5 +18,6 @@ export * from "./lagos.js";
 export * from "./roadField.js";
 export * from "./homes.js";
 export { LAGOS_CELL, LAGOS_H, LAGOS_PLACES, LAGOS_W } from "./lagosData.js";
+export { LAGOS_ROADS } from "./lagosRoads.js";
 export * from "./buildingPlan.js";
 export * from "./onlineRules.js";
