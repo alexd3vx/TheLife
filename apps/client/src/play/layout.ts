@@ -121,8 +121,9 @@ export const HOUSE_LAYOUT: Layout = {
     p("nightL", "painted_wooden_nightstand", 2.7, -4.15, { via: "bed" }),
     p("nightR", "painted_wooden_nightstand", 5.1, -4.15, { via: "bed" }),
     p("oilLamp", "vintage_oil_lamp", 5.65, 0.9, { onTopOf: "commode" }),
-    p("wardrobe", "p_wardrobe", 1.95, -2.3, { rot: 90 }),
-    p("bookshelf", "wooden_bookshelf_worn", 5.65, -0.9, { rot: -90 }),
+    // (the wardrobe is tall: it must not stand in front of the desk, where it hid the person working)
+    p("wardrobe", "p_wardrobe", 5.7, -0.9, { rot: -90 }),
+    p("bookshelf", "wooden_bookshelf_worn", 5.65, -2.3, { rot: -90 }),
     p("bedRug", "p_rug", 3.9, -0.7),
     p("commode", "GothicCommode_01", 5.65, 0.9, { rot: -90 }),
     p("bedFan", "ceiling_fan", 3.9, -1.7),

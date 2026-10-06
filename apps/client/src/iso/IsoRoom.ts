@@ -1019,25 +1019,41 @@ export class IsoRoom {
     // the character
     const sprite = this.charSprite();
     const showChar = !this.intro || this.intro.t > 0.9 || this.intro.quick;
+    let ghost: { img: CanvasImageSource; box: { x: number; y: number; w: number; h: number }; self: Drawn } | null = null;
     if (sprite && showChar) {
       const [px, py] = project(this.pos.x, this.lift, this.pos.z);
       const m = sprite.meta;
       const shape = this.char.shape?.() ?? { w: 1, h: 1 };
       const cs = sharpNow.char;
       const box = { x: px - (m.ax / cs) * shape.w, y: py - (m.ay / cs) * shape.h, w: (m.w / cs) * shape.w, h: (m.h / cs) * shape.h };
-      list.push({
+      const self: Drawn = {
         key: this.pos.x + this.pos.z + 0.35,
         draw: (cx) => {
           this.shadow(cx, this.pos.x, this.pos.z, 0, 0.3, 0.3);
           cx.drawImage(sprite.img, box.x, box.y, box.w, box.h);
         },
-      });
+      };
+      list.push(self);
+      ghost = { img: sprite.img, box, self };
     }
     // dust, steam, bubbles
     for (const p of this.puffs) list.push({ key: p.x + p.z + 0.5, draw: (cx) => this.drawPuff(cx, p) });
     list.sort((a, b) => a.key - b.key);
     this.drawn = list;
     for (const d of list) d.draw(c);
+    // standing or sitting behind something tall: show a faint outline of the person through it, so they are never lost
+    if (ghost) {
+      const gi = list.indexOf(ghost.self);
+      const g = ghost.box;
+      const hidden = list.slice(gi + 1).some((d) => d.item && d.box && d.item.def.furniture !== "p_rug" && d.item.def.furniture !== "p_doormat" && d.box.x < g.x + g.w && d.box.x + d.box.w > g.x && d.box.y < g.y + g.h && d.box.y + d.box.h > g.y && d.box.y < g.y + g.h * 0.5);
+      if (hidden) {
+        c.save();
+        c.globalAlpha = 0.38;
+        c.filter = "brightness(1.35) saturate(0.7)";
+        c.drawImage(ghost.img, g.x, g.y, g.w, g.h);
+        c.restore();
+      }
+    }
     this.glows(c);
     for (const r of this.ripples) this.drawRipple(c, r);
 
