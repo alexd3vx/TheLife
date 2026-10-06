@@ -132,3 +132,9 @@ Decided: real Lagos clock; slow real-time needs; social apps are separate apps t
 - Work: a PC or laptop at home that opens a real-looking computer UI (several laptop types, a working desktop with windows and apps) and work on it is a mini-game; also street hustles (trading, okada, food stalls), shifts at buildings, phone gigs, and player-run businesses.
 - Every object is interactable (windows, light bulbs, doors, taps...).
 - Order from the owner: make the Lagos map better first, then these systems; later a deep dive on realistic characters and animation (GTA 6 online beta feel); the installed PWA should feel like a native app.
+
+## Decisions, round 3 (map, characters, app feel, performance)
+- Map first: street life and props (danfo, keke, okada, traffic, vendors, kiosks, generators, billboards, wires, potholes, drainage), nature and ground (trees, palms, grass, mud, puddles, shoreline with boats and jetties), sky, light and weather (real clock, clouds, harmattan haze, rain, wet roads, lightning), and landmarks built properly (Cathedral, Tafawa Balewa Square, CMS, the bridges, Marina).
+- Characters: search the whole web for the best semi-realistic, highly customisable character (free licence), and make customisation much deeper. Houses and buildings get better exteriors that depend on the house kind. On registration the player lands at the airport: the arrival cinematic and animations differ by background (nepo, middle, lapo). Then they walk by tap or by control.
+- PWA: install to the home screen, full screen, own icon and splash; game files cached for fast loading (play still needs internet); joystick + look pad + action buttons the player can move, resize and re-bind; haptics and sound cues.
+- Performance: looks great on mid phones, quality drops automatically on weak ones.
