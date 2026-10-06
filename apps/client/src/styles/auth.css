@@ -130,3 +130,66 @@
 }
 .home-card h1 { font-family: var(--font-display); font-size: 2.2rem; margin: 0; }
 .home-card p { margin: 0; }
+
+/* ---------------------------------------------------------------- the cinematic sign-in */
+.scene { position: fixed; inset: 0; overflow: hidden; background: #16113a; }
+.scene-svg { position: absolute; inset: -3%; width: 106%; height: 106%; animation: scene-dolly 48s ease-in-out infinite alternate; will-change: transform; }
+@keyframes scene-dolly { from { transform: scale(1) translate3d(-1.2%, 0, 0); } to { transform: scale(1.07) translate3d(1.2%, -0.6%, 0); } }
+.scene-layer { will-change: transform; }
+.scene-layer.far { animation: drift-a 90s linear infinite alternate; }
+.scene-layer.mid { animation: drift-b 70s linear infinite alternate; }
+.scene-layer.near { animation: drift-c 55s linear infinite alternate; }
+@keyframes drift-a { to { transform: translate3d(-14px, 0, 0); } }
+@keyframes drift-b { to { transform: translate3d(-26px, 0, 0); } }
+@keyframes drift-c { to { transform: translate3d(-40px, 0, 0); } }
+.scene-sun { transform-origin: 860px 560px; animation: sun-breathe 9s ease-in-out infinite; }
+@keyframes sun-breathe { 50% { transform: scale(1.08); opacity: 0.88; } }
+.scene-stars circle { opacity: 0.2; animation: twinkle 4s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: 0.85; } }
+.scene-cloud.c1 { animation: cloud 120s linear infinite alternate; }
+.scene-cloud.c2 { animation: cloud 160s linear infinite alternate-reverse; }
+.scene-cloud.c3 { animation: cloud 100s linear infinite alternate; }
+@keyframes cloud { from { transform: translate3d(-120px, 0, 0); } to { transform: translate3d(220px, 0, 0); } }
+.scene-win { opacity: 0.7; }
+.scene-win.blink { animation: win-blink 7s steps(1) infinite; }
+@keyframes win-blink { 0%, 60% { opacity: 0.8; } 61%, 100% { opacity: 0.1; } }
+.scene-car { animation: car 18s linear infinite; }
+.scene-car.back { animation-direction: reverse; }
+@keyframes car { from { transform: translate3d(-40px, 0, 0); } to { transform: translate3d(1640px, 0, 0); } }
+.scene-glint { animation: glint 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
+@keyframes glint { 0%, 100% { opacity: 0.75; transform: scaleX(1); } 50% { opacity: 0.4; transform: scaleX(0.7); } }
+.scene-waves line { animation: shimmer 5s ease-in-out infinite; }
+@keyframes shimmer { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(26px, 0, 0); } }
+.scene-boat { animation: boat 70s linear infinite; }
+@keyframes boat { from { transform: translate3d(-200px, 0, 0); } to { transform: translate3d(1750px, 6px, 0); } }
+.scene-palm { transform-box: fill-box; transform-origin: bottom center; animation: sway 7s ease-in-out infinite alternate; }
+.scene-palm.right { animation-duration: 9s; animation-direction: alternate-reverse; }
+@keyframes sway { from { transform: rotate(-1.6deg); } to { transform: rotate(1.8deg); } }
+.scene-bird { animation: bird 26s linear infinite; }
+@keyframes bird { from { translate: -100px 140px; } to { translate: 1700px 60px; } }
+.scene-bars { position: absolute; left: 0; right: 0; height: 6vh; background: #000; z-index: 1; animation: bars 2.4s cubic-bezier(.2,.7,.2,1) both; }
+.scene-bars.top { top: 0; }
+.scene-bars.bottom { bottom: 0; }
+@keyframes bars { from { transform: scaleY(5); } to { transform: scaleY(1); } }
+.scene-bars.top { transform-origin: top; }
+.scene-bars.bottom { transform-origin: bottom; }
+.scene-grain { position: absolute; inset: 0; pointer-events: none; opacity: .09; background-image: repeating-radial-gradient(circle at 17% 32%, #fff 0, #000 1px, transparent 2px, transparent 3px); background-size: 3px 3px; mix-blend-mode: overlay; }
+
+/* The page over the picture */
+.auth.cine { position: relative; min-height: 100%; display: grid; grid-template-columns: 1fr minmax(340px, 480px); align-items: center; gap: 2vw; padding: 0 4vw; background: transparent; }
+.auth.cine .auth-tagline { z-index: 2; color: #fff; text-shadow: 0 2px 28px rgba(0, 0, 0, .55); padding: 0 1vw; animation: rise-in 1.4s .3s cubic-bezier(.2,.7,.2,1) both; }
+.auth.cine .auth-tagline h1 { font-family: var(--font-display); font-size: clamp(2.4rem, 5.4vw, 4.6rem); line-height: 1.02; margin: 0 0 12px; letter-spacing: -.01em; }
+.auth.cine .auth-tagline p { margin: 0; font-size: clamp(1rem, 1.5vw, 1.25rem); max-width: 34ch; color: #ffe9cf; }
+.auth.cine .auth-tagline .brand-line { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; font-size: .8rem; color: #ffd98a; }
+.auth.cine .auth-panel .auth-title, .auth.cine .auth-panel .auth-sub, .auth.cine .auth-panel .brand { display: none; }
+.auth.cine .auth-panel { position: relative; z-index: 2; margin: 5vh 0; border-radius: 22px; padding: 26px 26px 22px; background: rgba(18, 12, 28, .72); backdrop-filter: blur(14px) saturate(1.2); border: 1px solid rgba(255, 217, 138, .22); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); animation: rise-in 1.2s .6s cubic-bezier(.2,.7,.2,1) both; max-height: 84vh; overflow: auto; align-self: center; }
+@keyframes rise-in { from { opacity: 0; transform: translate3d(0, 22px, 0); } to { opacity: 1; transform: none; } }
+@media (max-width: 860px) {
+  .auth.cine { grid-template-columns: 1fr; align-content: end; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); gap: 10px; }
+  .auth.cine .auth-tagline { padding-top: calc(10vh + env(safe-area-inset-top)); }
+  .auth.cine .auth-tagline h1 { font-size: 2.3rem; }
+  .auth.cine .auth-tagline p { display: none; }
+  .auth.cine .auth-panel { margin: 0; max-height: 64vh; border-radius: 20px 20px 16px 16px; padding: 18px 18px 14px; }
+  .auth.cine .auth-panel .auth-title, .auth.cine .auth-panel .auth-sub, .auth.cine .auth-panel .brand { display: none; }
+  .scene-bars { height: 5vh; }
+}

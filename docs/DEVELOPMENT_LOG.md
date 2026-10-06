@@ -191,3 +191,11 @@ Chronological record of decisions and changes. Newest first.
 - Water: moving ripples, sky reflection, foam on the shore. The camera pulls in when a building is in the way.
 - Enterable landmark buildings still use the generated box plans (their real outline is replaced); the other buildings are real outlines without an inside yet.
 - Credit "Map data © OpenStreetMap contributors (ODbL)" is shown in Settings and on the big map.
+
+## Accounts, cinematic sign-in, one-page creator, opening shot
+- Server: `hello` carries the player's Supabase access token. `packages/server/src/accounts.ts` asks Supabase `/auth/v1/user` who it is; the life is then keyed by `acct-<user id>` (same life on every device). With `SUPABASE_URL` + `SUPABASE_ANON_KEY` set, guests are refused unless `ALLOW_GUESTS=1`. The VPS script keeps these in `/opt/thelife/server.env`.
+- Client: dev tools turn on from `profiles.is_admin` (Supabase) instead of `?admin=1` (that now only works on a dev build). To make yourself admin: `update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com');`
+- Sign-in page: `LagosScene` (vector Lagos at golden hour, only transforms/opacity, no 3D) replaces the three.js hero.
+- Creator: after the look step each step is a full page (the person steps aside, sticky buttons).
+- Opening shot: the camera swoops down from above the city, letterbox bars and a title card (once per tab, tap to skip).
+- Roads: the street picture is now 1.5 m texels with a lateral-offset channel so the centre line is exact; medians and narrow lanes no longer wobble.

@@ -33,3 +33,16 @@
 .map-mini-zoom button { width: 24px; height: 24px; border: 0; border-radius: 7px; background: rgba(20, 17, 15, .78); color: #fff; font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
 .map-mini .dmap { pointer-events: none; }
 .map-mini { width: 132px; height: 132px; }
+
+/* The opening shot: black bars slide in, the title fades up and out. */
+.intro { position: absolute; inset: 0; z-index: 6; cursor: pointer; }
+.intro-bar { position: absolute; left: 0; right: 0; height: 12vh; background: #000; animation: intro-bar .9s cubic-bezier(.2,.7,.2,1) both; }
+.intro-bar.top { top: 0; transform-origin: top; }
+.intro-bar.bottom { bottom: 0; transform-origin: bottom; }
+@keyframes intro-bar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.intro-title { position: absolute; left: 6vw; bottom: 16vh; display: grid; gap: 4px; color: #fff; text-shadow: 0 2px 24px rgba(0, 0, 0, .7); animation: intro-title 7.5s ease both; }
+.intro-title span { letter-spacing: .3em; text-transform: uppercase; font-size: .72rem; color: #ffd98a; }
+.intro-title strong { font-family: var(--font-display); font-size: clamp(2rem, 6vw, 4rem); line-height: 1; }
+.intro-title em { font-style: normal; opacity: .85; font-size: .95rem; }
+@keyframes intro-title { 0%, 12% { opacity: 0; transform: translate3d(0, 14px, 0); } 28%, 78% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.intro-skip { position: absolute; right: 18px; bottom: calc(12vh + 14px); color: rgba(255, 255, 255, .7); font-size: .8rem; }

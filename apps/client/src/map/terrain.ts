@@ -34,20 +34,23 @@ export function buildTerrain(d: District): Terrain {
   const roadField = buildRoadField(t);
   // The two small maps.
   const splat = new Uint8Array(new ArrayBuffer(w * h * 4));
-  const field = new Uint8Array(new ArrayBuffer(w * h * 4));
+  const fw = roadField.width, fh = roadField.height;
+  const field = new Uint8Array(new ArrayBuffer(fw * fh * 4));
+  for (let i = 0; i < fw * fh; i++) {
+    field[i * 4] = roadField.edge[i]!;
+    field[i * 4 + 1] = roadField.half[i]!;
+    field[i * 4 + 2] = roadField.angle[i]!;
+    field[i * 4 + 3] = roadField.lateral[i]!;
+  }
   for (let i = 0; i < w * h; i++) {
     const c = t.cls[i]!;
     splat[i * 4] = c === STREET ? 255 : 0;
     splat[i * 4 + 1] = c === BLOCK ? 255 : 0;
     splat[i * 4 + 2] = c === PARK ? 255 : 0;
     splat[i * 4 + 3] = c === MARKET ? 255 : 0;
-    field[i * 4] = roadField.edge[i]!;
-    field[i * 4 + 1] = roadField.half[i]!;
-    field[i * 4 + 2] = roadField.angle[i]!;
-    field[i * 4 + 3] = 255;
   }
-  const mapTex = (data: Uint8Array<ArrayBuffer>) => {
-    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat, THREE.UnsignedByteType);
+  const mapTex = (data: Uint8Array<ArrayBuffer>, tw = w, th = h) => {
+    const tex = new THREE.DataTexture(data, tw, th, THREE.RGBAFormat, THREE.UnsignedByteType);
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearFilter;
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -57,14 +60,14 @@ export function buildTerrain(d: District): Terrain {
     return tex;
   };
   const splatTex = mapTex(splat);
-  const fieldTex = mapTex(field);
+  const fieldTex = mapTex(field, fw, fh);
 
   const uniforms = {
     uSplat: { value: splatTex },
     uField: { value: fieldTex },
     uSize: { value: new THREE.Vector2(t.size.x, t.size.z) },
     uCell: { value: t.cell },
-    uTexel: { value: new THREE.Vector2(1 / w, 1 / h) },
+    uTexel: { value: new THREE.Vector2(1 / fw, 1 / fh) },
     uTime: { value: 0 },
     uNight: { value: 0 },
   };
@@ -103,7 +106,7 @@ float halfW = f.g * 255.0 / 8.0;                       // half the width of this
 if (edge > 0.0) {
   // A street. The edge comes from the real street outline, so it is sharp however close you get.
   float grain = vnoise(p * 18.0) * 0.5 + vnoise(p * 70.0) * 0.5;
-  float pave = clamp(halfW * 0.28, 0.55, 1.7);          // narrow lanes get a thin pavement, avenues a wide one
+  float pave = clamp(halfW - 3.4, 0.35, 1.7);           // alleys get a thin kerb, avenues a wide pavement (never so wide it reaches the street's middle)
   if (edge < pave || halfW < 2.4) {
     // Pavement beside the street: small slabs, and a darker kerb line where it meets the road.
     vec2 cellId = floor(p / 0.6);
@@ -121,7 +124,7 @@ if (edge > 0.0) {
     float crack = smoothstep(0.012, 0.0, abs(vnoise(p * 2.2) - 0.5) - 0.45) * detail;
     col *= 1.0 - crack * 0.25;
     float line = 0.0;
-    if (halfW > 3.0) {
+    if (halfW > 5.0) {
       line = max(line, smoothstep(0.09, 0.05, abs(edge - (pave + 0.45))));      // edge line
       if (halfW > 4.6) {
         // The centre line, dashed along the street. Skipped where streets meet and the direction is not clear.
@@ -131,7 +134,8 @@ if (edge > 0.0) {
         float dR = abs(aR - f.b), dD = abs(aD - f.b);
         float steady = step(min(dR, 1.0 - dR), 0.03) * step(min(dD, 1.0 - dD), 0.03);
         float dash = step(0.45, fract(along / 7.0));
-        float centre = smoothstep(0.1, 0.05, abs(edge - halfW)) * dash * steady;
+        float lateral = f.a * 255.0 / 10.625 - 12.0;
+        float centre = smoothstep(0.16, 0.08, abs(lateral)) * dash * steady;
         line = max(line, centre);
       }
     }

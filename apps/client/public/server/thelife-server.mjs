@@ -12,7 +12,7 @@ var finite = (v, limit = 1e6) => typeof v === "number" && Number.isFinite(v) && 
 function parseClientMessage(raw) {
   let value = raw;
   if (typeof raw === "string") {
-    if (raw.length > 6e3) return null;
+    if (raw.length > 7e3) return null;
     try {
       value = JSON.parse(raw);
     } catch {
@@ -26,7 +26,7 @@ function parseClientMessage(raw) {
       const name = typeof m.name === "string" ? cleanName(m.name) : "";
       if (!name) return null;
       if (typeof m.key !== "string" || !KEY_PATTERN.test(m.key)) return null;
-      return { t: "hello", name, protocol: finite(m.protocol, 1e3) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : void 0, key: m.key };
+      return { t: "hello", name, protocol: finite(m.protocol, 1e3) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : void 0, key: m.key, token: typeof m.token === "string" && m.token.length <= 3e3 && /^[\w.-]+$/.test(m.token) ? m.token : void 0 };
     }
     case "create": {
       const p = m.profile;
@@ -3644,9 +3644,14 @@ async function startGameServer(options = {}) {
   wss.on("connection", (ws) => {
     let me = null;
     const helloTimer = setTimeout(() => ws.close(4001, "hello timeout"), 1e4);
+    let chain = Promise.resolve();
     ws.on("message", (data) => {
+      const text = data.toString();
+      chain = chain.then(() => handle(text)).catch(() => void 0);
+    });
+    const handle = async (text) => {
       const now = Date.now();
-      const message = parseClientMessage(data.toString());
+      const message = parseClientMessage(text);
       if (!message) return send(ws, { t: "error", reason: "That message was not understood." });
       if (!me) {
         if (message.t !== "hello") return;
@@ -3654,13 +3659,23 @@ async function startGameServer(options = {}) {
           send(ws, { t: "error", reason: "Your game is out of date. Reload the page to update." });
           return ws.close(4002, "protocol");
         }
+        let key = message.key;
+        let account = null;
+        if (options.verifyToken) {
+          account = message.token ? await options.verifyToken(message.token).catch(() => null) : null;
+          if (account) key = `acct-${account.id}`;
+          else if (!options.allowGuests) {
+            send(ws, { t: "error", reason: message.token ? "Your login has expired. Log in again." : "Please log in to play." });
+            return ws.close(4005, "login");
+          }
+        }
         for (const other of room.players.values()) {
-          if (other.key !== message.key) continue;
+          if (other.key !== key) continue;
           room.saveLife(other, now);
           other.life = null;
           sockets.get(other.id)?.close(4004, "signed in elsewhere");
         }
-        const joined = room.join(message.name, now, message.look, message.key);
+        const joined = room.join(message.name, now, message.look, key);
         if (!joined.ok) {
           send(ws, { t: "error", reason: joined.reason });
           return ws.close(4003, "full");
@@ -3729,7 +3744,7 @@ async function startGameServer(options = {}) {
         default:
           return;
       }
-    });
+    };
     ws.on("close", () => {
       clearTimeout(helloTimer);
       if (me) {
@@ -3774,9 +3789,31 @@ async function startGameServer(options = {}) {
   };
 }
 
+// packages/server/src/accounts.ts
+function supabaseVerifier(url, anonKey) {
+  if (!url || !anonKey) return void 0;
+  const base = url.replace(/\/$/, "");
+  const cache = /* @__PURE__ */ new Map();
+  return async (token) => {
+    const hit = cache.get(token);
+    if (hit && hit.until > Date.now()) return hit.user;
+    const res = await fetch(`${base}/auth/v1/user`, { headers: { authorization: `Bearer ${token}`, apikey: anonKey } });
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body.id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.id)) return null;
+    const user = { id: body.id, email: typeof body.email === "string" ? body.email : void 0 };
+    cache.set(token, { until: Date.now() + 5 * 6e4, user });
+    if (cache.size > 2e3) for (const k of cache.keys()) {
+      cache.delete(k);
+      break;
+    }
+    return user;
+  };
+}
+
 // packages/server/src/main.ts
 var port = Number(process.env.PORT ?? 8787);
 var origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data" });
+var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1" });
 console.log(`TheLife game server on port ${server.port} (room ${server.room.name}${origins.length ? `, origins ${origins.join(", ")}` : ", any origin"})`);
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => void server.close().then(() => process.exit(0)));

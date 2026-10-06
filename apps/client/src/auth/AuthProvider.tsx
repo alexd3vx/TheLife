@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createSave, deleteSave, loadSave, touchSave, type GameSave } from "../save/localSave";
 import { createAuthService } from "./createAuthService";
-import type { AuthService, AuthUser } from "./types";
+import { setAccountAdmin } from "../ui/admin";
+import { setTokenProvider } from "../net/tokenBridge";
+import type { AccountProfile, AuthService, AuthUser } from "./types";
 
 type AppStatus = "loading" | "inGame" | "signedOut";
 
@@ -10,6 +12,8 @@ interface AuthContextValue {
   /** Signed-in account, if any. Playing offline needs no account. */
   user: AuthUser | null;
   service: AuthService;
+  /** What the account's profile says (admin flag, display name), once loaded. */
+  profile: AccountProfile | null;
   /** The on-device save, if one exists. */
   save: GameSave | null;
   playOffline(): void;
@@ -25,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [save, setSave] = useState<GameSave | null>(() => loadSave());
   const [inGame, setInGame] = useState(false);
+  const [profile, setProfile] = useState<AccountProfile | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +52,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe();
     };
   }, [service]);
+
+  // The game server needs a fresh login token each time it connects; the profile row says whether this account is an admin.
+  useEffect(() => {
+    setTokenProvider(() => service.getAccessToken());
+    return () => setTokenProvider(null);
+  }, [service]);
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setProfile(null);
+      setAccountAdmin(false);
+      return;
+    }
+    service
+      .getProfile()
+      .then((p) => {
+        if (!active) return;
+        setProfile(p);
+        setAccountAdmin(p?.isAdmin === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [service, user]);
 
   // Accounts get a save too, so the same game works with or without a login.
   useEffect(() => {
@@ -72,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const status: AppStatus = !authReady ? "loading" : inGame || user ? "inGame" : "signedOut";
 
   return (
-    <AuthContext.Provider value={{ status, user, service, save, playOffline, startOver, leave }}>
+    <AuthContext.Provider value={{ status, user, service, profile, save, playOffline, startOver, leave }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,7 @@
-import { lazy, Suspense, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { validateLogin, validateSignUp } from "@thelife/shared";
 import { useAuth } from "../auth/AuthProvider";
-import { IsoHero } from "./IsoHero";
-
-// Three.js is large, so it loads after the form is already usable.
-const HeroCanvas = lazy(() => import("../world3d/HeroCanvas"));
+import { LagosScene } from "./LagosScene";
 
 type Tab = "login" | "signup";
 
@@ -69,11 +66,15 @@ export function AuthPage() {
   const isSignUp = tab === "signup";
 
   return (
-    <main className="auth">
-      <section className="auth-hero" aria-hidden="true">
-        <Suspense fallback={<IsoHero />}>
-          <HeroCanvas />
-        </Suspense>
+    <main className="auth cine">
+      <LagosScene />
+      <section className="auth-tagline">
+        <div className="brand-line">
+          <span className="brand-mark" aria-hidden="true" />
+          Alexion Studios presents
+        </div>
+        <h1>TheLife</h1>
+        <p>Lagos, for real. Build a person, find your feet and share one living city with real people.</p>
       </section>
 
       <section className="auth-panel">
@@ -82,27 +83,28 @@ export function AuthPage() {
           <span className="brand-name">TheLife</span>
         </div>
 
-        <h1 className="auth-title">Live a life. See what happens.</h1>
+        <h1 className="auth-title">Your life in Lagos starts here.</h1>
         <p className="auth-sub">
           Build your person, chase your goals, and share a living world with real people. Every choice leaves a mark.
         </p>
 
-        <div className="play-now">
-          <button className="btn btn-primary btn-wide" onClick={playOffline}>
-            {save ? "Continue my life" : "Play now — no account needed"}
-          </button>
-          {save ? (
-            <button className="link-button" onClick={startOver}>
-              Start a new life instead
-            </button>
-          ) : (
-            <p className="play-now-hint">Your life is saved on this device. Add an account any time to sync it.</p>
-          )}
-        </div>
-
-        <p className="divider">
-          <span>or use an account (optional)</span>
-        </p>
+        {service.mode !== "supabase" && (
+          <>
+            <div className="play-now">
+              <button className="btn btn-primary btn-wide" onClick={playOffline}>
+                {save ? "Continue my life" : "Play now (this device only)"}
+              </button>
+              {save && (
+                <button className="link-button" onClick={startOver}>
+                  Start a new life instead
+                </button>
+              )}
+            </div>
+            <p className="divider">
+              <span>or use an account</span>
+            </p>
+          </>
+        )}
 
         <div className="tabs" role="tablist" aria-label="Account">
           <button role="tab" aria-selected={!isSignUp} className="tab" onClick={() => switchTab("login")}>

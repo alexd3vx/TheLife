@@ -138,7 +138,7 @@ export default function CreatorPage() {
   const hairChoices = useMemo(() => HAIR_CHOICES, []);
 
   return (
-    <div className="creator">
+    <div className={`creator${step === "look" ? "" : " is-full"}`}>
       <div className="creator-stage" ref={stageRef}>
         {busy && !error && <div className="creator-busy">Working…</div>}
         {error && <div className="creator-error">{error}</div>}

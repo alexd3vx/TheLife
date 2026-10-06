@@ -40,6 +40,12 @@ export function createDevService(): AuthService {
     async getUser() {
       return readSession();
     },
+    async getAccessToken() {
+      return null;
+    },
+    async getProfile() {
+      return null;
+    },
     onChange(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

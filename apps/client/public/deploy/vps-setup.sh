@@ -30,6 +30,15 @@ curl -fsSL "$SITE/server/thelife-server.mjs" -o thelife-server.mjs
 mkdir -p /opt/thelife/data   # every player's life is saved here, so updates never lose anyone
 npm install --silent --no-audit --no-fund ws
 
+# Settings that survive updates live in server.env. Pass SUPABASE_URL and SUPABASE_ANON_KEY once (they are the public values from your
+# website's settings) and players must then log in with their account; leave them out and anyone can join as a guest.
+ENVF=/opt/thelife/server.env
+touch "$ENVF" && chmod 600 "$ENVF"
+setenv() { grep -q "^$1=" "$ENVF" && sed -i "s|^$1=.*|$1=$2|" "$ENVF" || echo "$1=$2" >> "$ENVF"; }
+[ -n "${SUPABASE_URL:-}" ] && setenv SUPABASE_URL "$SUPABASE_URL"
+[ -n "${SUPABASE_ANON_KEY:-}" ] && setenv SUPABASE_ANON_KEY "$SUPABASE_ANON_KEY"
+[ -n "${ALLOW_GUESTS:-}" ] && setenv ALLOW_GUESTS "$ALLOW_GUESTS"
+
 cat > /etc/systemd/system/thelife.service <<UNIT
 [Unit]
 Description=TheLife game server
@@ -37,6 +46,7 @@ After=network.target
 [Service]
 WorkingDirectory=/opt/thelife
 Environment=PORT=8787 ROOM=lagos-test ALLOWED_ORIGINS=$ORIGIN DATA_DIR=/opt/thelife/data
+EnvironmentFile=-/opt/thelife/server.env
 ExecStart=/usr/bin/node /opt/thelife/thelife-server.mjs
 Restart=always
 [Install]
@@ -52,3 +62,4 @@ echo
 echo "Done."
 echo "Game server address for the game:   wss://$HOST"
 echo "Check it in a browser:              https://$HOST/health"
+grep -q "^SUPABASE_URL=" "$ENVF" && echo "Accounts: required (guests can not join)" || echo "Accounts: NOT set up (anyone can join as a guest)"

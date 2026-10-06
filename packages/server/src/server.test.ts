@@ -250,6 +250,36 @@ describe("game server", () => {
     expect(s.players.some((q) => q.id === wa.id)).toBe(true);
   });
 
+  it("lets an account own its life, and keeps guests out when accounts are required", async () => {
+    const accounts: Record<string, string> = { "good.token.one": "11111111-1111-1111-1111-111111111111" };
+    server = await startGameServer({ port: 0, verifyToken: async (t) => (accounts[t] ? { id: accounts[t]! } : null) });
+    const guest = await connect("Guest");
+    expect((await guest.next("error")).reason).toMatch(/log in/i);
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws);
+    await new Promise((r) => ws.once("open", r));
+    const a = new Client(ws);
+    ws.send(JSON.stringify({ t: "hello", name: "Ada", protocol: PROTOCOL_VERSION, key: newKey(), token: "good.token.one" }));
+    await a.next("welcome");
+    await a.next("needsLife");
+    a.send({ t: "create", profile: CHOICE });
+    await a.next("life");
+    // The same account from another device (a different guest key) gets the same life.
+    const ws2 = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws2);
+    await new Promise((r) => ws2.once("open", r));
+    const b = new Client(ws2);
+    ws2.send(JSON.stringify({ t: "hello", name: "Ada", protocol: PROTOCOL_VERSION, key: newKey(), token: "good.token.one" }));
+    expect(((await b.next("life")).state as { profile: { firstName: string } }).profile.firstName).toBe("Ada");
+    // A made-up token is no better than no token.
+    const ws3 = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws3);
+    await new Promise((r) => ws3.once("open", r));
+    const c = new Client(ws3);
+    ws3.send(JSON.stringify({ t: "hello", name: "Eve", protocol: PROTOCOL_VERSION, key: newKey(), token: "forged.token.abc" }));
+    expect((await c.next("error")).reason).toMatch(/log in/i);
+  });
+
   it("answers the health check", async () => {
     server = await startGameServer({ port: 0 });
     const body = (await (await fetch(`http://127.0.0.1:${server.port}/health`)).json()) as { ok: boolean };

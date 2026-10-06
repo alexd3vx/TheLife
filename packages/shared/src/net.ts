@@ -35,7 +35,7 @@ export interface NewLife {
 export const KEY_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
 export type ClientMessage =
-  | { t: "hello"; name: string; protocol: number; look?: string; /** The player's private key: it is how the server finds their life again. */ key: string }
+  | { t: "hello"; name: string; protocol: number; look?: string; /** The player's private key: it is how the server finds their life again. */ key: string; /** A Supabase access token. When it checks out, the account (not the key) owns the life. */ token?: string }
   /** Starts a new life. The server rebuilds the whole profile from the background id, so only these choices are used. */
   | { t: "create"; profile: NewLife }
   /** Asks the server to run one game action (a whitelisted function) on this player's life. */
@@ -71,7 +71,7 @@ const finite = (v: unknown, limit = 1e6): v is number => typeof v === "number" &
 export function parseClientMessage(raw: unknown): ClientMessage | null {
   let value: unknown = raw;
   if (typeof raw === "string") {
-    if (raw.length > 6_000) return null;
+    if (raw.length > 7_000) return null;
     try {
       value = JSON.parse(raw);
     } catch {
@@ -85,7 +85,7 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       const name = typeof m.name === "string" ? cleanName(m.name) : "";
       if (!name) return null;
       if (typeof m.key !== "string" || !KEY_PATTERN.test(m.key)) return null;
-      return { t: "hello", name, protocol: finite(m.protocol, 1000) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : undefined, key: m.key };
+      return { t: "hello", name, protocol: finite(m.protocol, 1000) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : undefined, key: m.key, token: typeof m.token === "string" && m.token.length <= 3000 && /^[\w.-]+$/.test(m.token) ? m.token : undefined };
     }
     case "create": {
       const p = m.profile as Record<string, unknown> | null;

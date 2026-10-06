@@ -1,6 +1,7 @@
 import { loadSavedLook } from "../lab/looks";
 import { getSettings, updateSettings } from "../settings/settings";
 import { playerKey } from "./identity";
+import { getToken } from "./tokenBridge";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
 
 export type NetStatus = "offline" | "connecting" | "online";
@@ -53,6 +54,12 @@ export class Connection {
 
   private open() {
     this.events.onStatus("connecting");
+    void this.connectNow();
+  }
+
+  private async connectNow() {
+    const token = await getToken(); // a fresh one each time, so reconnecting after a long while still works
+    if (this.closed) return;
     let ws: WebSocket;
     try {
       ws = new WebSocket(this.url);
@@ -63,7 +70,7 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.tries = 0;
-      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()), key: playerKey() } satisfies ClientMessage));
+      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()), key: playerKey(), ...(token ? { token } : {}) } satisfies ClientMessage));
     };
     ws.onmessage = (e) => {
       let message: ServerMessage;

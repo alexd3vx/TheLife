@@ -45,6 +45,9 @@ export interface TourResult {
 export interface MapRuntime {
   dispose(): void;
   resetView(): void;
+  /** The opening shot: the camera swoops down from above the city to behind the character. Resolves when it ends or is skipped. */
+  playIntro(): Promise<void>;
+  skipIntro(): void;
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
@@ -399,6 +402,39 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     camPulledAt.copy(camera.position);
     camPulled = true;
   }
+  // ---- the opening shot
+  let intro: { t: number; duration: number; a0: number; done(): void } | null = null;
+  function playIntro(): Promise<void> {
+    return new Promise((resolve) => {
+      intro?.done();
+      intro = { t: 0, duration: 7.5, a0: Math.random() * Math.PI * 2, done: () => resolve() };
+      controls.enabled = false;
+    });
+  }
+  function skipIntro() {
+    if (!intro) return;
+    const done = intro.done;
+    intro = null;
+    controls.enabled = true;
+    resetView();
+    done();
+  }
+  function stepIntro(dt: number) {
+    if (!intro) return;
+    intro.t += dt;
+    const k = Math.min(1, intro.t / intro.duration);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    const aEnd = openAzimuth();
+    // Turn a half circle on the way down, closing in from far above to the usual view behind the character.
+    const a = intro.a0 + (aEnd - intro.a0 - Math.PI * 2) * e;
+    const r = 150 * (1 - e) + 16 * e;
+    const hgt = 120 * (1 - e) + 11 * e;
+    const tx = controller.position.x, tz = controller.position.z;
+    controls.target.set(tx, 0.9 + 10 * (1 - e), tz);
+    camera.position.set(tx + Math.sin(a) * r, hgt, tz + Math.cos(a) * r);
+    camera.lookAt(controls.target);
+    if (k >= 1) skipIntro();
+  }
   function resetView() {
     const a = openAzimuth();
     controls.target.set(controller.position.x, 0.9, controller.position.z);
@@ -632,14 +668,18 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     sun.target.position.copy(shadowFocus);
     sun.position.copy(shadowFocus).add(SUN_OFFSET);
 
-    followTarget.set(controller.position.x, 0.9 + controller.position.y, controller.position.z);
-    const shift = followTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 4));
-    controls.target.add(shift);
-    // Undo last frame's "pulled in" nudge so the orbit starts from where it really wants the camera (unless the player moved it).
-    if (camPulled && camera.position.distanceToSquared(camPulledAt) < 1e-6) camera.position.copy(camWanted);
-    camera.position.add(shift);
-    controls.update();
-    pullCameraOutOfBuildings();
+    if (intro) {
+      stepIntro(dt);
+    } else {
+      followTarget.set(controller.position.x, 0.9 + controller.position.y, controller.position.z);
+      const shift = followTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 4));
+      controls.target.add(shift);
+      // Undo last frame's "pulled in" nudge so the orbit starts from where it really wants the camera (unless the player moved it).
+      if (camPulled && camera.position.distanceToSquared(camPulledAt) < 1e-6) camera.position.copy(camWanted);
+      camera.position.add(shift);
+      controls.update();
+      pullCameraOutOfBuildings();
+    }
 
     markerAge += dt;
     const m = marker.material as THREE.MeshBasicMaterial;
@@ -717,6 +757,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   return {
     resetView,
+    playIntro,
+    skipIntro,
     goTo,
     setNight(on) {
       night = on;

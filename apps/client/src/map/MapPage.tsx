@@ -38,6 +38,8 @@ export default function MapPage() {
   const admin = isAdmin();
   const district = getDistrict();
   const life = useOnlineLife();
+  const [intro, setIntro] = useState<"off" | "playing">("off");
+  const introPlayed = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -67,6 +69,24 @@ export default function MapPage() {
       runtimeRef.current = null;
     };
   }, []);
+
+  // The opening shot, once the world is drawn and your life has arrived.
+  useEffect(() => {
+    if (loading || error || !life.session || introPlayed.current) return;
+    const rt = runtimeRef.current;
+    if (!rt) return;
+    introPlayed.current = true;
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem("thelife.intro") === "1";
+      sessionStorage.setItem("thelife.intro", "1");
+    } catch {
+      /* ignore */
+    }
+    if (seen || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    setIntro("playing");
+    void rt.playIntro().then(() => setIntro("off"));
+  }, [loading, error, life.session]);
 
   // A banner for a few seconds when you walk into a named place.
   useEffect(() => {
@@ -103,9 +123,21 @@ export default function MapPage() {
         {stats && settings.showFps && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 
+      {intro === "playing" && (
+        <div className="intro" onPointerDown={() => runtimeRef.current?.skipIntro()}>
+          <div className="intro-bar top" />
+          <div className="intro-bar bottom" />
+          <div className="intro-title">
+            <span>Alexion Studios</span>
+            <strong>Lagos Island</strong>
+            <em>{new Date().toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" })} · {new Date().toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Lagos" })}</em>
+          </div>
+          <small className="intro-skip">Tap to skip</small>
+        </div>
+      )}
       {placeShown && <div className="map-place" role="status">{placeShown}</div>}
-      {!loading && !error && life.session && <GameHud session={life.session} onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
-      {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
+      {!loading && !error && life.session && intro === "off" && <GameHud session={life.session} onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
+      {!loading && !error && intro === "off" && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && settings.showStats && (
         <div className="map-stats" aria-label="Map statistics">

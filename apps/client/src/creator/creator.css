@@ -80,3 +80,12 @@
 .creator-trait[aria-pressed="true"] { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
 .creator-trait.is-weak[aria-pressed="true"] { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
 .creator-trait:disabled { opacity: .45; cursor: default; }
+
+/* After the look, each step is a full page: the person steps out of the way so nothing is hidden behind them. */
+.creator.is-full { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.creator.is-full .creator-stage { position: absolute; width: 2px; height: 2px; overflow: hidden; opacity: 0; pointer-events: none; }
+.creator.is-full .creator-panel { border: 0; background: radial-gradient(90% 60% at 50% 0%, #2a1c10 0%, var(--bg) 70%); align-items: center; }
+.creator.is-full .creator-head, .creator.is-full .creator-body { width: min(720px, 100%); }
+.creator.is-full .creator-body { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+.creator.is-full .creator-actions { position: sticky; bottom: 0; margin: 0 -18px; padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, transparent, var(--bg) 28%); }
+.creator.is-full .creator-traitlist { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }

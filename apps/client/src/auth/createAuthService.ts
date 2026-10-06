@@ -9,6 +9,8 @@ const unconfigured: AuthService = {
   signIn: async () => ({ ok: false, message: "Sign-in isn't set up yet." }),
   signUp: async () => ({ ok: false, message: "Sign-up isn't set up yet." }),
   signOut: async () => {},
+  getAccessToken: async () => null,
+  getProfile: async () => null,
 };
 
 export function createAuthService(): AuthService {

@@ -14,6 +14,12 @@ export interface GameServerOptions {
   origins?: string[];
   /** Where lives are saved between visits. Leave out to keep them in memory only (tests). */
   dataDir?: string;
+  /**
+   * Accounts: checks a Supabase access token and says whose it is. When set, a player with a good token owns their life through the
+   * account, and (unless `allowGuests`) nobody without one gets in.
+   */
+  verifyToken?: (token: string) => Promise<{ id: string; email?: string } | null>;
+  allowGuests?: boolean;
 }
 
 export interface GameServer {
@@ -67,9 +73,15 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     let me: Player | null = null;
     const helloTimer = setTimeout(() => ws.close(4001, "hello timeout"), 10_000);
 
+    // Messages are handled one after another (a hello may wait for the account check).
+    let chain: Promise<void> = Promise.resolve();
     ws.on("message", (data) => {
+      const text = data.toString();
+      chain = chain.then(() => handle(text)).catch(() => undefined);
+    });
+    const handle = async (text: string) => {
       const now = Date.now();
-      const message = parseClientMessage(data.toString());
+      const message = parseClientMessage(text);
       if (!message) return send(ws, { t: "error", reason: "That message was not understood." });
       if (!me) {
         if (message.t !== "hello") return;
@@ -77,14 +89,24 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           send(ws, { t: "error", reason: "Your game is out of date. Reload the page to update." });
           return ws.close(4002, "protocol");
         }
+        let key = message.key;
+        let account: { id: string; email?: string } | null = null;
+        if (options.verifyToken) {
+          account = message.token ? await options.verifyToken(message.token).catch(() => null) : null;
+          if (account) key = `acct-${account.id}`;
+          else if (!options.allowGuests) {
+            send(ws, { t: "error", reason: message.token ? "Your login has expired. Log in again." : "Please log in to play." });
+            return ws.close(4005, "login");
+          }
+        }
         // One life, one place: signing in again somewhere else moves the player there.
         for (const other of room.players.values()) {
-          if (other.key !== message.key) continue;
+          if (other.key !== key) continue;
           room.saveLife(other, now); // hand the newest state to the new session, then retire the old one
           other.life = null;
           sockets.get(other.id)?.close(4004, "signed in elsewhere");
         }
-        const joined = room.join(message.name, now, message.look, message.key);
+        const joined = room.join(message.name, now, message.look, key);
         if (!joined.ok) {
           send(ws, { t: "error", reason: joined.reason });
           return ws.close(4003, "full");
@@ -153,7 +175,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         default:
           return;
       }
-    });
+    };
 
     ws.on("close", () => {
       clearTimeout(helloTimer);

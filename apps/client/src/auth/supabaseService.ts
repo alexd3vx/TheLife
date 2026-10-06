@@ -49,5 +49,18 @@ export function createSupabaseService(url: string, anonKey: string): AuthService
     async signOut() {
       await client.auth.signOut();
     },
+
+    async getAccessToken() {
+      const { data } = await client.auth.getSession();
+      return data.session?.access_token ?? null;
+    },
+
+    async getProfile() {
+      const { data: s } = await client.auth.getSession();
+      if (!s.session) return null;
+      const { data, error } = await client.from("profiles").select("display_name, is_admin").eq("id", s.session.user.id).maybeSingle();
+      if (error || !data) return null;
+      return { displayName: String(data.display_name ?? ""), isAdmin: data.is_admin === true };
+    },
   };
 }
