@@ -104,3 +104,8 @@ Needs from the owner: a Fly.io account (or permission for me to prepare the conf
 - **Real-time multiplayer with slow-moving needs:** the real-time clock makes needs and activities slow; balance has to be redone for it (activities are real minutes, not skipped).
 - **Scope:** this is a multi-month project; each stage must be playable on its own and each ships behind a flag.
 - **Advertising:** needs a consent flow and an ad provider; designed in from the start, switched on later.
+
+## 8. Next steps decided on 2026-10-06
+1. **Online only.** The offline single-player page goes away. The server becomes the owner of each player's life (needs, money, phone, inventory), the same `game-core` rules run there, and the client only sends intentions. Order: (a) the server holds a `GameState` per connected player and ticks it in real time; (b) the map world gets the HUD, phone and use-actions of the house page; (c) accounts (Supabase) own a save; (d) the house page and the offline route are deleted.
+2. **The real Lagos map.** `tools/osm/fetch.mjs` downloads OpenStreetMap data for an area (needs internet access to Overpass, which the cloud sandbox cannot reach: run it on a normal computer and commit `assets-src/osm/<area>.json` or upload it). Then a converter turns it into chunk files with polygon buildings (extruded footprints with height from `building:levels`), curved road ribbons, water and parks; the engine's lots, roads and nav become polygon-based (today they are axis-aligned rectangles). Cartoon/realistic is a setting that chooses the material set.
+3. **Settings** (done): presets, resolution, frame cap, shadows, bloom, lights, draw distance, crowd, cartoon/realistic look.
