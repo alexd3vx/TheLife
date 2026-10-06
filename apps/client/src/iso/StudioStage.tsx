@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Look } from "../lab/looks";
 import { PaperDoll } from "./paperdoll";
+import { sharpNow } from "./assets";
 
 const DIRS = 8;
 
@@ -67,7 +68,7 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
       const f = d.frame(clip, state.current.dir, Math.floor(t * (state.current.walking ? 10 : 4)) % n);
       if (!f) return;
       const k = Math.min(h / 300, w / 215); // screen pixels per game pixel (a person is about 140 game pixels tall)
-      const s = k / (doll.current?.sharp ?? 2.25); // the pictures were drawn this many times larger than the screen size
+      const s = k / sharpNow.char; // the pictures were drawn this many times larger than the screen size
       const sx = s * (lookRef.current.build ?? 1), sy = s * (lookRef.current.height ?? 1);
       const ox = w / 2, oy = h * 0.8;
       // a soft shadow, then the person

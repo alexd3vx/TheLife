@@ -1,9 +1,9 @@
 import { blockOutside, blockRect, createNavGrid, findPath, isFree, nearestFree, type NavGrid, type Point } from "@thelife/shared";
 import { ACTIONS, furnitureById } from "@thelife/game-core";
 import type { Layout, Placement } from "../play/layout";
-import { propImage, propsMeta, type PropMeta, type SpriteMeta } from "./assets";
+import { propImage, propsMeta, sharpNow, spriteSharp, type PropMeta, type SpriteMeta } from "./assets";
 import type { CharProvider } from "./charProvider";
-import { CHAR_SPRITE_SHARP, HALF_H, HALF_W, PX_PER_M_UP, SPRITE_SHARP, dirOf, project, unproject } from "./projection";
+import { HALF_H, HALF_W, PX_PER_M_UP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
 const NAV_CELL = 0.125;
@@ -152,6 +152,7 @@ export class IsoRoom {
   // ------------------------------------------------------------------ loading
 
   async load(): Promise<void> {
+    await spriteSharp();
     const props = await propsMeta();
     // (the character is a paper doll of sprite layers; see paperdoll.ts)
     const items: Item[] = [];
@@ -928,8 +929,8 @@ export class IsoRoom {
         if (pop <= 0) continue;
       }
       const [px, py] = project(it.def.x, it.base, it.def.z);
-      const w = m.w / SPRITE_SHARP, h = m.h / SPRITE_SHARP;
-      const box = { x: px - m.ax / SPRITE_SHARP, y: py - m.ay / SPRITE_SHARP, w, h };
+      const w = m.w / sharpNow.props, h = m.h / sharpNow.props;
+      const box = { x: px - m.ax / sharpNow.props, y: py - m.ay / sharpNow.props, w, h };
       const { hx, hz } = this.footprint(it);
       const layer = it.def.furniture === "p_rug" || it.def.furniture === "p_doormat" ? -1000 : it.def.onTopOf ? 0.05 : 0;
       const img = it.image;
@@ -971,7 +972,7 @@ export class IsoRoom {
       const [px, py] = project(this.pos.x, this.lift, this.pos.z);
       const m = sprite.meta;
       const shape = this.char.shape?.() ?? { w: 1, h: 1 };
-      const cs = this.char.sharp ?? CHAR_SPRITE_SHARP;
+      const cs = sharpNow.char;
       const box = { x: px - (m.ax / cs) * shape.w, y: py - (m.ay / cs) * shape.h, w: (m.w / cs) * shape.w, h: (m.h / cs) * shape.h };
       list.push({
         key: this.pos.x + this.pos.z + 0.35,

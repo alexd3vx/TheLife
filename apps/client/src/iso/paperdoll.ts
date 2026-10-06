@@ -1,6 +1,7 @@
 import { CLOTH_COLORS, HAIR_COLORS, SKIN_TONES, sexOf, type Look } from "../lab/looks";
 import { fabricCanvas, type FabricId } from "../lab/procedural/fabrics";
 import type { CharFrame, CharProvider } from "./charProvider";
+import { spriteSharp } from "./assets";
 
 // The character as paper dolls: the body, face, clothes, hair and accessories are separate sheets of pictures, drawn ahead of time
 // (tools/sprites). Here they are coloured and stacked into whole-person frames, in whatever mix the player chose. No 3D, and a new
@@ -123,7 +124,6 @@ export class PaperDoll implements CharProvider {
     this.onChange?.();
   }
 
-  readonly sharp = 2.25;
   shape(): { w: number; h: number } {
     return { w: this.look.build ?? 1, h: this.look.height ?? 1 };
   }
@@ -154,6 +154,7 @@ export class PaperDoll implements CharProvider {
     const body = this.body;
     const layers = layersOf(this.look);
     const job = (async () => {
+      await spriteSharp();
       const parts = await Promise.all(
         layers.map(async (l) => {
           const index = await loadIndex(body, l.key);

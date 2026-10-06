@@ -34,3 +34,18 @@ export function loadImage(path: string): Promise<HTMLImageElement> {
 }
 
 export const propImage = (id: string, rot: number) => loadImage(`props/${id}_${rot}.webp`);
+
+/** How much larger than the screen size the baked pictures are (written by the baker's last step, so code and pictures always agree). */
+export const sharpNow = { props: 1.5, char: 1.5 };
+let sharpLoad: Promise<void> | null = null;
+export function spriteSharp(): Promise<void> {
+  return (sharpLoad ??= fetch(`${BASE}sharp.json`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (j && typeof j.props === "number" && typeof j.char === "number") {
+        sharpNow.props = j.props;
+        sharpNow.char = j.char;
+      }
+    })
+    .catch(() => undefined));
+}
