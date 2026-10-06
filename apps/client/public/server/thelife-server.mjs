@@ -3877,9 +3877,14 @@ var Room = class {
   loadLife(player, now) {
     const saved = this.store.get(player.key);
     if (!saved) return;
-    const state = structuredClone(saved.state);
-    const away = simulateAbsence(state, (now - saved.savedAt) / 6e4);
-    player.away = away.lines.length ? away.lines : null;
+    const state = parseGameState(structuredClone(saved.state)) ?? structuredClone(saved.state);
+    let lines = [];
+    try {
+      lines = simulateAbsence(state, (now - saved.savedAt) / 6e4).lines;
+    } catch (e) {
+      console.error("could not replay the time away", e);
+    }
+    player.away = lines.length ? lines : null;
     player.life = new Sim(state, { realClock: true });
     if (state.look) player.look = state.look;
     player.lastStepAt = now;
@@ -3940,7 +3945,12 @@ var Room = class {
       if (!p.life) continue;
       const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1e3));
       p.lastStepAt = now;
-      p.life.step(dt);
+      try {
+        p.life.step(dt);
+      } catch (e) {
+        console.error(`life of ${p.name} failed to step`, e);
+        continue;
+      }
       if (p.life.state.phone.plugged === "wall" && p.where === "world" && !chargingSpotNear(this.district, p.x, p.z)) {
         p.life.state.phone.plugged = null;
         p.events.push({ kind: "warn", text: "You moved away from the socket and your phone unplugged.", minute: p.life.state.minute });
@@ -4098,7 +4108,7 @@ async function startGameServer(options = {}) {
     let chain = Promise.resolve();
     ws.on("message", (data) => {
       const text = data.toString();
-      chain = chain.then(() => handle(text)).catch(() => void 0);
+      chain = chain.then(() => handle(text)).catch((e) => console.error("message handler failed", e));
     });
     const handle = async (text) => {
       const now = Date.now();
@@ -4230,7 +4240,13 @@ async function startGameServer(options = {}) {
   const lifeInterval = setInterval(() => {
     const now = Date.now();
     room.stepLives(now);
-    for (const p of room.players.values()) sendLife(p);
+    for (const p of room.players.values()) {
+      try {
+        sendLife(p);
+      } catch (e) {
+        console.error(`could not send the life of ${p.name}`, e);
+      }
+    }
     if (++lifeTicks % 15 === 0) {
       for (const p of room.players.values()) room.saveLife(p, now);
       store.flush();
@@ -4284,6 +4300,8 @@ function supabaseVerifier(url, anonKey) {
 }
 
 // packages/server/src/main.ts
+process.on("uncaughtException", (e) => console.error("uncaught", e));
+process.on("unhandledRejection", (e) => console.error("unhandled", e));
 var port = Number(process.env.PORT ?? 8787);
 var origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1" });

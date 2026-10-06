@@ -88,7 +88,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     let chain: Promise<void> = Promise.resolve();
     ws.on("message", (data) => {
       const text = data.toString();
-      chain = chain.then(() => handle(text)).catch(() => undefined);
+      chain = chain.then(() => handle(text)).catch((e) => console.error("message handler failed", e));
     });
     const handle = async (text: string) => {
       const now = Date.now();
@@ -225,7 +225,13 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
   const lifeInterval = setInterval(() => {
     const now = Date.now();
     room.stepLives(now);
-    for (const p of room.players.values()) sendLife(p);
+    for (const p of room.players.values()) {
+      try {
+        sendLife(p);
+      } catch (e) {
+        console.error(`could not send the life of ${p.name}`, e);
+      }
+    }
     if (++lifeTicks % 15 === 0) {
       for (const p of room.players.values()) room.saveLife(p, now);
       store.flush();

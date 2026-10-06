@@ -1,4 +1,4 @@
-import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
+import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
@@ -101,9 +101,15 @@ export class Room {
   private loadLife(player: Player, now: number): void {
     const saved = this.store.get(player.key);
     if (!saved) return;
-    const state = structuredClone(saved.state);
-    const away = simulateAbsence(state, (now - saved.savedAt) / 60000);
-    player.away = away.lines.length ? away.lines : null;
+    // Lives saved by older versions of the game may lack newer parts; reading them through the same checks as a local save fills those in.
+    const state = parseGameState(structuredClone(saved.state)) ?? structuredClone(saved.state);
+    let lines: string[] = [];
+    try {
+      lines = simulateAbsence(state, (now - saved.savedAt) / 60000).lines;
+    } catch (e) {
+      console.error("could not replay the time away", e);
+    }
+    player.away = lines.length ? lines : null;
     player.life = new Sim(state, { realClock: true });
     if (state.look) player.look = state.look;
     player.lastStepAt = now;
@@ -171,7 +177,13 @@ export class Room {
       if (!p.life) continue;
       const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1000));
       p.lastStepAt = now;
-      p.life.step(dt);
+      try {
+        p.life.step(dt);
+      } catch (e) {
+        // One broken life must never take the whole server (and everyone else's connection) down with it.
+        console.error(`life of ${p.name} failed to step`, e);
+        continue;
+      }
       // Walk away from the socket and the phone comes unplugged.
       if (p.life.state.phone.plugged === "wall" && p.where === "world" && !chargingSpotNear(this.district, p.x, p.z)) {
         p.life.state.phone.plugged = null;

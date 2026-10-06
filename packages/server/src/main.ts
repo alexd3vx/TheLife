@@ -1,6 +1,9 @@
 import { startGameServer } from "./index.js";
 import { supabaseVerifier } from "./accounts.js";
 
+// A surprise error in one player's turn is written down and the server keeps running (it used to drop everyone's line).
+process.on("uncaughtException", (e) => console.error("uncaught", e));
+process.on("unhandledRejection", (e) => console.error("unhandled", e));
 const port = Number(process.env.PORT ?? 8787);
 const origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1" });
