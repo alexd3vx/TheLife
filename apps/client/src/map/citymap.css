@@ -1,0 +1,54 @@
+.citymap { position: absolute; inset: 0; z-index: 5; background: #9ab9d6; overflow: hidden; touch-action: none; user-select: none; }
+.cm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.cm-layer { position: absolute; inset: 0; pointer-events: none; }
+.cm-pin { position: absolute; transform: translate(-50%, -100%); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .96); color: #1d2a24; font: 600 12px/1.15 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(20, 30, 40, .28); cursor: pointer; pointer-events: auto; white-space: nowrap; }
+.cm-pin.is-closed { background: rgba(233, 236, 238, .92); color: #66707a; }
+.cm-pin.is-on { background: #1f6f4a; color: #fff; z-index: 3; }
+.cm-pin.is-dot { padding: 3px; }
+.cm-pin-icon { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; }
+.cm-pin-text { display: grid; gap: 1px; text-align: left; }
+.cm-pin-text small { font-weight: 500; font-size: 10.5px; opacity: .8; }
+.cm-pin-text small.here { color: #8a5a00; font-weight: 700; opacity: 1; }
+.cm-pin-stem { position: absolute; left: 50%; top: 100%; width: 2px; height: 10px; background: rgba(255, 255, 255, .9); transform: translateX(-50%); }
+.cm-home { position: absolute; transform: translate(-50%, -100%); width: 26px; height: 26px; border-radius: 50%; background: #14110f; color: #fff; display: grid; place-items: center; border: 2px solid #fff; }
+.cm-other { position: absolute; transform: translate(-50%, -100%); padding: 2px 8px; border-radius: 999px; background: #2fbf71; color: #072b19; font: 600 11px system-ui; }
+.cm-me { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: #2f7bff; border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(47, 123, 255, .25); animation: cm-pulse 1.8s ease-out infinite; }
+@keyframes cm-pulse { 0% { box-shadow: 0 0 0 0 rgba(47, 123, 255, .5); } 100% { box-shadow: 0 0 0 22px rgba(47, 123, 255, 0); } }
+
+.cm-panel { position: absolute; left: 12px; top: 64px; bottom: 90px; width: min(340px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: rgba(255, 255, 255, .97); color: #1d2a24; box-shadow: 0 8px 30px rgba(20, 30, 40, .3); z-index: 4; }
+.cm-panel.is-hidden { display: none; }
+.cm-panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cm-panel h2 { margin: 0; font-size: 1.15rem; }
+.cm-panel header small { color: #5a6770; }
+.cm-panel header button, .cm-show { font: 700 13px system-ui; background: #14221b; color: #fff; border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; }
+.cm-show { position: absolute; left: 12px; top: 64px; z-index: 4; }
+.cm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cm-chips button { font: 600 12.5px system-ui; color: #1d2a24; background: #eef1ee; border: 0; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+.cm-chips button.is-on { background: #14221b; color: #fff; }
+.cm-panel ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 2px; }
+.cm-panel li button { width: 100%; display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 8px 6px; border: 0; background: none; border-radius: 12px; cursor: pointer; color: inherit; font: inherit; }
+.cm-panel li button:hover, .cm-panel li button.is-on { background: #eef3ef; }
+.cm-row-icon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
+.cm-row-text { display: grid; }
+.cm-row-text b { font-size: .92rem; }
+.cm-row-text small { color: #66707a; font-size: .76rem; }
+.cm-row-state { font-size: .72rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #f0e9d4; color: #7a5b10; white-space: nowrap; }
+.cm-row-state.is-open { background: #e0f3e8; color: #1c6b43; }
+
+.cm-tools { position: absolute; right: 12px; bottom: 96px; display: grid; gap: 8px; justify-items: end; z-index: 4; }
+.cm-tools button { font: 700 14px system-ui; color: #1d2a24; background: rgba(255, 255, 255, .97); border: 0; border-radius: 999px; min-width: 46px; height: 46px; padding: 0 16px; box-shadow: 0 4px 14px rgba(20, 30, 40, .25); cursor: pointer; }
+.cm-tools button.wide { padding: 0 20px; }
+.cm-credit { position: absolute; right: 8px; bottom: 4px; font: 10px system-ui; color: rgba(20, 30, 40, .55); z-index: 4; }
+@media (max-width: 700px) { .cm-panel { top: auto; bottom: 90px; height: 42%; width: calc(100% - 24px); } .cm-show { top: auto; bottom: 96px; } }
+
+/* the page around the map: hide the street's own controls and the needs bars; the bottom bar takes over */
+.map-mode .play-needs, .map-mode .play-phone, .map-mode .play-bag, .map-mode .map-mini, .map-mode .map-enter, .map-mode .play-top .play-chip:nth-child(3) { display: none; }
+.cm-nav { position: absolute; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 8; display: flex; gap: 4px; padding: 6px; border-radius: 22px; background: rgba(255, 255, 255, .97); box-shadow: 0 6px 24px rgba(20, 30, 40, .3); }
+.cm-nav a, .cm-nav button { display: grid; justify-items: center; gap: 2px; min-width: 72px; padding: 8px 10px; border: 0; border-radius: 16px; background: none; color: #3a4a44; font: 600 12px system-ui; text-decoration: none; cursor: pointer; }
+.cm-nav .is-on { background: #14221b; color: #fff; }
+.map-mode .map-sheet { z-index: 9; bottom: 100px; background: rgba(255, 255, 255, .98); color: #1d2a24; box-shadow: 0 8px 30px rgba(20, 30, 40, .35); }
+.map-mode .map-sheet span { color: #5a6770; }
+.map-mode .map-sheet-actions button { background: #14221b; color: #fff; }
+.map-mode .map-sheet-actions button.is-ghost { background: #e6ebe8; color: #1d2a24; }
+.map-mode .map-rides button small { opacity: .75; }
+@media (max-width: 700px) { .cm-tools { bottom: calc(100px + 0px); } .cm-panel:not(.is-hidden) ~ .cm-tools { bottom: calc(42% + 104px); } }

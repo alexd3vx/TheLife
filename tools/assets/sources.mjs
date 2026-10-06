@@ -14,6 +14,18 @@ export const CREDITS = {
     licence: "CC0 1.0",
     url: "https://quaternius.com/packs/universalanimationlibrary.html",
   },
+  "quaternius-ual2": {
+    name: "Universal Animation Library 2 (Standard)",
+    author: "Quaternius",
+    licence: "CC0 1.0",
+    url: "https://quaternius.com/packs/universalanimationlibrary2.html",
+  },
+  "kaykit-animations": {
+    name: "Character Animations 1.1",
+    author: "Kay Lousberg (KayKit)",
+    licence: "CC0 1.0",
+    url: "https://kaylousberg.itch.io/kaykit-character-animations",
+  },
   "quaternius-outfits": {
     name: "Modular Character Outfits - Fantasy (Standard)",
     author: "Quaternius",

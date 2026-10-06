@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadManifest } from "../lab/manifest";
 import type { TapMenu } from "../play/runtime";
 import { getDistrict } from "./districtData";
+import CityMap, { lagosNow } from "./CityMap";
 import DistrictMap from "./DistrictMap";
 import { PIN_STYLE } from "./pins";
 import SettingsPanel from "../settings/SettingsPanel";
@@ -36,7 +37,10 @@ export default function MapPage() {
   const nightRef = useRef(false);
   const [place, setPlace] = useState<string | null>(null);
   const [placeShown, setPlaceShown] = useState<string | null>(null);
-  const [bigMap, setBigMap] = useState(false);
+  // Out of the house you start on the map: pick where to go, then walk there or ride. "Out" is the street itself.
+  const [mode, setMode] = useState<"map" | "street">("map");
+  const bigMap = mode === "map";
+  const setBigMap = (on: boolean) => setMode(on ? "map" : "street");
   const [miniSpan, setMiniSpan] = useState(320);
   const [picked, setPicked] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -116,7 +120,7 @@ export default function MapPage() {
   const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlayer ? nearPlayer.name : null;
   const nearRef = useRef({ atHome, nearPlayer });
   nearRef.current = { atHome, nearPlayer };
-  const blocked = phoneOpen || showSettings || bigMap || intro !== "off";
+  const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip;
   useEffect(() => {
     runtimeRef.current?.setInputBlocked(blocked);
   }, [blocked, loading]);
@@ -152,7 +156,7 @@ export default function MapPage() {
 
   // The opening shot, once the world is drawn and your life has arrived.
   useEffect(() => {
-    if (loading || error || !life.session || introPlayed.current || welcome.showing) return;
+    if (loading || error || !life.session || introPlayed.current || welcome.showing || mode === "map") return;
     const rt = runtimeRef.current;
     if (!rt) return;
     introPlayed.current = true;
@@ -166,7 +170,7 @@ export default function MapPage() {
     if (seen || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     setIntro("playing");
     void rt.playIntro().then(() => setIntro("off"));
-  }, [loading, error, life.session, welcome.showing]);
+  }, [loading, error, life.session, welcome.showing, mode]);
 
   // A banner for a few seconds when you walk into a named place.
   useEffect(() => {
@@ -188,7 +192,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className={`play${touchOn ? " has-touch" : ""}`}>
+    <div className={`play${touchOn ? " has-touch" : ""}${mode === "map" ? " map-mode" : ""}`}>
       <div className="play-stage" ref={containerRef} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">
@@ -210,6 +214,7 @@ export default function MapPage() {
           seconds={trip.seconds}
           onDone={() => {
             runtimeRef.current?.placeAt(trip.x, trip.z);
+            setMode("street");
             setPlaceShown(trip.name);
             window.setTimeout(() => setPlaceShown(null), 3200);
             setTrip(null);
@@ -245,7 +250,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {atHome && intro === "off" && (
+      {atHome && intro === "off" && mode === "street" && (
         <a className="map-enter" href="#/play">
           <GameIcon name="home" /> Enter home
         </a>
@@ -262,10 +267,15 @@ export default function MapPage() {
       )}
       {bigMap && (
         <>
-          <div className="map-big">
-            <DistrictMap district={district} player={stats?.position ?? null} others={runtimeRef.current?.online.remotes.list() ?? []} selected={picked} onSelect={setPicked} />
-          </div>
-          <button className="map-close" onClick={() => setBigMap(false)}>Close map</button>
+          <CityMap
+            district={district}
+            player={stats?.position ?? home?.spawn ?? null}
+            home={home ? home.door : null}
+            others={runtimeRef.current?.online.remotes.list() ?? []}
+            {...lagosNow()}
+            selected={picked}
+            onSelect={setPicked}
+          />
           {picked && (() => {
             const lm = district.landmarks.find((l) => l.id === picked)!;
             const dist = stats ? Math.round(Math.hypot(lm.entrance.x - stats.position.x, lm.entrance.z - stats.position.z)) : 0;
@@ -307,6 +317,14 @@ export default function MapPage() {
           })()}
         </>
       )}
+      {bigMap && (
+        <nav className="cm-nav" aria-label="Where to">
+          <a href="#/play"><GameIcon name="home" size={20} /><span>Home</span></a>
+          <button onClick={() => { setMode("street"); setPicked(null); }}><GameIcon name="spot" size={20} /><span>Out</span></button>
+          <button className="is-on" onClick={() => setMode("map")}><GameIcon name="map" size={20} /><span>Map</span></button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: null }))}><GameIcon name="phone" size={20} /><span>Phone</span></button>
+        </nav>
+      )}
 
       {menu && (
         <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (containerRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, menu.y + 10) }}>
@@ -319,7 +337,7 @@ export default function MapPage() {
         </div>
       )}
 
-      <div className="play-controls">
+      {!bigMap && <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
         {admin && <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out (test)</button>}
         <button onClick={() => setBigMap(true)}><GameIcon name="map" /> Map</button>
@@ -330,7 +348,7 @@ export default function MapPage() {
             {touring === null ? "Performance tour (test)" : `Touring… ${touring}%`}
           </button>
         )}
-      </div>
+      </div>}
 
       {result && (
         <div className="play-modal" role="dialog" aria-label="Tour result">

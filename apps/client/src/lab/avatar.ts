@@ -12,6 +12,7 @@ import { buildAccessory } from "./procedural/accessories";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
+import { KAYKIT_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
 type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment" | "proc-acc";
@@ -49,6 +50,33 @@ function eachMaterial(root: THREE.Object3D, fn: (material: THREE.MeshStandardMat
  * body (skin, eyes, brows) + hair + clothing. Parts are bound to the body's skeleton by bone name,
  * so any animation clip made for that skeleton plays on every combination.
  */
+/**
+ * Which real clip plays for each animation name. Nothing here is made in code: the clips come from the free Quaternius and KayKit
+ * libraries and are retargeted onto the body. (UAL's own idle is a fighting crouch, so the everyday stance and walk are KayKit's.)
+ * Activities no free library has a clip for yet (cooking, typing, washing, brushing teeth) use the closest hand movement available.
+ */
+const REAL_FOR_LIFE: Record<string, string> = {
+  Idle_Loop: "KK_Idle_A",
+  Walk_Loop: "KK_Walking_A",
+  Walk_Formal_Loop: "KK_Walking_B",
+  Jog_Fwd_Loop: "KK_Running_A",
+  Sprint_Loop: "KK_Running_B",
+  Sitting_Enter: "KK_Sit_Chair_Down",
+  Sitting_Idle_Loop: "KK_Sit_Chair_Idle",
+  Sitting_Exit: "KK_Sit_Chair_StandUp",
+  Life_Sleep_Loop: "KK_Lie_Idle",
+  Life_Eat_Standing_Loop: "U2_Consume",
+  Life_Eat_Loop: "KK_Sit_Chair_Idle",
+  Life_Drink_Loop: "U2_Consume",
+  Life_Phone_Loop: "U2_Idle_TalkingPhone_Loop",
+  Life_Wave_Loop: "KK_Waving",
+  Life_Cook_Loop: "KK_Work_A",
+  Life_Type_Loop: "KK_Sit_Chair_Idle",
+  Life_Wash_Loop: "KK_Work_C",
+  Life_Brush_Loop: "KK_Use_Item",
+  Life_Read_Loop: "KK_Holding_B",
+};
+
 export class Avatar {
   readonly root = new THREE.Group();
   private bodyScene: THREE.Object3D | null = null;
@@ -79,7 +107,7 @@ export class Avatar {
   }
 
   get clipNames(): string[] {
-    return [...this.clips.keys()];
+    return [...new Set([...this.clips.keys(), ...this.lazy.keys(), ...this.aliases.keys()])];
   }
 
   private find(id: string): AssetRecord | undefined {
@@ -123,6 +151,8 @@ export class Avatar {
     this.mixer = new THREE.AnimationMixer(this.bodyScene);
     this.currentAction = null;
     this.lookBones = null;
+    this.bodyScene.updateMatrixWorld(true);
+    if (this.skeleton) this.restPose = captureRest(this.skeleton.bones, this.bodyScene);
 
     await this.applySkin();
     this.applyEyes();
@@ -136,16 +166,70 @@ export class Avatar {
   private async loadAnimations(): Promise<void> {
     const gltf = await loadGLTF(assetUrl(this.asset("ual1").file));
     this.libraryClips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
-    for (const clip of gltf.animations) this.clips.set(clip.name, clip);
+    // The animation libraries are real, hand-made clips (Quaternius and KayKit, free). They are never played raw: each clip is
+    // retargeted onto this body (measured against both skeletons' rest poses) the first time it is needed, so any body moves right.
+    this.sources = [{ prefix: "", scene: SkeletonUtils.clone(gltf.scene), clips: gltf.animations, restName: "", map: null }];
+    if (this.find("ual2")) {
+      const u2 = await loadGLTF(assetUrl(this.asset("ual2").file));
+      this.sources.push({ prefix: "U2_", scene: SkeletonUtils.clone(u2.scene), clips: u2.animations, restName: "", map: null });
+    }
+    for (const id of ["kaykit_sim", "kaykit_general", "kaykit_tools", "kaykit_move"]) {
+      if (!this.find(id)) continue;
+      const k = await loadGLTF(assetUrl(this.asset(id).file));
+      this.sources.push({ prefix: "KK_", scene: SkeletonUtils.clone(k.scene), clips: k.animations, restName: "T-Pose", map: KAYKIT_BONES });
+    }
     this.addLifeClips();
   }
 
-  /** Everyday-life clips (sleep, eat, type...) are built against this body's bind pose. */
+  private sources: { prefix: string; scene: THREE.Object3D; clips: THREE.AnimationClip[]; restName: string; map: Record<string, string> | null }[] = [];
+  private lazy = new Map<string, { src: Avatar["sources"][number]; clip: THREE.AnimationClip }>();
+  private aliases = new Map<string, string>(Object.entries(REAL_FOR_LIFE));
+  private restPose: RestPose | null = null;
+
+  /** An animation by name, retargeted onto this body the first time it is asked for. */
+  private getClip(name: string): THREE.AnimationClip | undefined {
+    const have = this.clips.get(name);
+    if (have) return have;
+    const target = this.aliases.get(name);
+    if (target) {
+      const real = this.getClip(target);
+      if (real) {
+        const copy = real.clone();
+        copy.name = name;
+        this.clips.set(name, copy);
+        return copy;
+      }
+    }
+    const lz = this.lazy.get(name);
+    if (lz && this.skeleton && this.restPose) {
+      const rest = lz.src.clips.find((c) => c.name === lz.src.restName);
+      let map = lz.src.map;
+      if (!map) {
+        // the same skeleton by name: every bone we both have
+        const names = new Set<string>();
+        lz.src.scene.traverse((o) => names.add(o.name));
+        map = {};
+        for (const bone of this.skeleton.bones) if (names.has(bone.name)) map[bone.name] = bone.name;
+      }
+      const moved = retargetClip(this.skeleton.bones, this.restPose, lz.src.scene, lz.clip, map, 30, rest);
+      moved.name = name;
+      this.clips.set(name, moved);
+      return moved;
+    }
+    return undefined;
+  }
+
+  /** Everyday-life clips are made from real clips; ones with no real stand-in fall back to a clip made in code. */
   private addLifeClips(): void {
     if (!this.bodyScene || !this.skeleton || this.libraryClips.size === 0) return;
     const bones = new Map<string, THREE.Bone>(this.skeleton.bones.map((b) => [b.name, b]));
     const playing = this.currentAction?.getClip().name;
-    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) this.clips.set(clip.name, clip);
+    this.lazy.clear();
+    for (const src of this.sources) {
+      for (const clip of src.clips) if (clip.name !== src.restName) this.lazy.set(`${src.prefix}${clip.name}`, { src, clip });
+    }
+    this.clips.clear();
+    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) if (!this.lazy.has(clip.name) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
     if (playing) this.play(playing, 0);
   }
 
@@ -616,7 +700,7 @@ export class Avatar {
   // ------------------------------------------------------------------ animation
 
   play(name: string, fade = 0.25): boolean {
-    const clip = this.clips.get(name);
+    const clip = this.getClip(name);
     if (!clip || !this.mixer) return false;
     const next = this.mixer.clipAction(clip);
     next.setLoop(THREE.LoopRepeat, Infinity);
@@ -675,12 +759,12 @@ export class Avatar {
 
   /** Length of a clip in seconds (0 if there is none). */
   clipDuration(name: string): number {
-    return this.clips.get(name)?.duration ?? 0;
+    return this.getClip(name)?.duration ?? 0;
   }
 
   /** Plays a clip once and holds its last pose. Returns its length in seconds (0 if the clip doesn't exist). */
   playOnce(name: string, fade = 0.12): number {
-    const clip = this.clips.get(name);
+    const clip = this.getClip(name);
     if (!clip || !this.mixer) return 0;
     const next = this.mixer.clipAction(clip);
     next.setLoop(THREE.LoopOnce, 1);
@@ -696,7 +780,7 @@ export class Avatar {
    * (negative = below). Used to rest a lying body exactly on a mattress without hand-tuned offsets.
    */
   lowestPoint(name: string, time = 0.5): number | null {
-    const clip = this.clips.get(name);
+    const clip = this.getClip(name);
     if (!clip || !this.bodyScene) return null;
     // Start from the bind pose: bones this clip has no tracks for (the sleeping clip drops the legs) must not keep whatever
     // pose the playing clip left them in, or the measurement describes a body that never exists.
