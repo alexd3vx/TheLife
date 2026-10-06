@@ -2,7 +2,7 @@ import { MINT, PLAYER, SINK, balance, transfer } from "./ledger";
 import { skillLevel } from "./actions";
 import { isDead, modelOf, notify, wallPower, type PhoneResult } from "./phone";
 import {
-  COURSES, DIARY_MOODS, FOCUS_XP, GIGS, GIG_GAP_MINUTES, LESSON_GAP_MINUTES, LESSON_XP, STOCKS, WATER_GOAL, WORKOUTS, WORKOUT_GAP_MINUTES, mealById, seeded, stockPrice,
+  COURSES, DIARY_MOODS, FOCUS_XP, GIGS, GIG_GAP_MINUTES, LESSON_GAP_MINUTES, LESSON_XP, STOCKS, WATER_GOAL, WORKOUTS, WORKOUT_GAP_MINUTES, eventsFor, filmsFor, mealById, seeded, stockPrice,
 } from "./phoneContent";
 import { MOBILE_SPEED, STORAGE_MB, homePlanById, storeAppById, tierAtLeast, type StoreAppId } from "./phoneStoreData";
 import type { GameState } from "./types";
@@ -338,6 +338,24 @@ export function buyTicket(state: GameState, label: string, price: number, fun: n
   }
   addFun(state, fun);
   return done(price > 0 ? `Ticket booked: ${label}.` : `You're going: ${label}.`);
+}
+
+/**
+ * Books a film ticket, a film rental (streamed, so it uses data) or an event for today, by title. The price and the mood
+ * lift come from the catalogue here, never from the caller, so the server can run this for any player.
+ */
+export function bookTicket(state: GameState, kind: "film" | "rent" | "event", title: string): PhoneResult {
+  const day = dayOf(state);
+  if (kind === "event") {
+    const e = eventsFor(day).find((x) => x.title === title);
+    return e ? buyTicket(state, e.title, e.price, 12) : fail("That event isn't on today.");
+  }
+  const f = filmsFor(day).find((x) => x.title === title);
+  if (!f) return fail("That film isn't showing today.");
+  if (kind === "film") return buyTicket(state, f.title, f.price, 25);
+  const streamed = streamData(state, 60);
+  if (!streamed.ok) return streamed;
+  return buyTicket(state, f.title, Math.round(f.price / 5 / 100) * 100 + 300, 18);
 }
 
 // --- Reminders, Hydrate, Focus

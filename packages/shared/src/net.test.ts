@@ -14,8 +14,16 @@ describe("net messages", () => {
   });
 
   it("cleans a hello and the name in it", () => {
-    const m = parseClientMessage(JSON.stringify({ t: "hello", name: "  Ada<b> ", protocol: 1, look: JSON.stringify({ body: "realfemale" }) }));
+    const m = parseClientMessage(JSON.stringify({ t: "hello", name: "  Ada<b> ", protocol: 2, key: "abcdefghijklmnop1234", look: JSON.stringify({ body: "realfemale" }) }));
     expect(m).toMatchObject({ t: "hello", name: "Adab", look: JSON.stringify({ body: "realfemale" }) });
+  });
+
+  it("needs a proper key in a hello, and checks create and do messages", () => {
+    expect(parseClientMessage(JSON.stringify({ t: "hello", name: "Ada", protocol: 2, key: "short" }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: "do", id: 1, fn: "deposit", args: [100] }))).toMatchObject({ t: "do", fn: "deposit", args: [100] });
+    expect(parseClientMessage(JSON.stringify({ t: "do", id: 1, fn: "bad name!", args: [] }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: "do", id: 1, fn: "x", args: [{ a: 1 }] }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: "create", profile: { backgroundId: "a", sex: "female", firstName: "Ada<b>", surname: "O", hometown: "Ikeja", startingMoney: 1000.4, traits: ["x", 5] } }))).toMatchObject({ t: "create", profile: { firstName: "Adab", startingMoney: 1000, traits: ["x"] } });
   });
 
   it("rejects numbers that are not finite and unknown messages", () => {

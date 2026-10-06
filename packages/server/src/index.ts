@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@thelife/shared";
+import { join } from "node:path";
+import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
 
 export interface GameServerOptions {
@@ -10,6 +12,8 @@ export interface GameServerOptions {
   tickRate?: number;
   /** Origins allowed to connect (empty = any). */
   origins?: string[];
+  /** Where lives are saved between visits. Leave out to keep them in memory only (tests). */
+  dataDir?: string;
 }
 
 export interface GameServer {
@@ -24,7 +28,8 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 
 /** Starts the game server: an HTTP health check and a WebSocket endpoint for one shared world. */
 export async function startGameServer(options: GameServerOptions = {}): Promise<GameServer> {
-  const room = new Room(options.room ?? "lagos-test");
+  const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
+  const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];
   const http: Server = createServer((req, res) => {
@@ -39,12 +44,23 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
   const wss = new WebSocketServer({
     server: http,
     maxPayload: 8_192,
+    perMessageDeflate: { threshold: 1024, zlibDeflateOptions: { level: 3 } },
     verifyClient: (info: { origin: string; req: IncomingMessage }) => origins.length === 0 || origins.includes(info.origin),
   });
 
   const broadcast = (message: ServerMessage, except?: string) => {
     const text = JSON.stringify(message);
     for (const [id, ws] of sockets) if (id !== except && ws.readyState === ws.OPEN) ws.send(text);
+  };
+
+  /** Sends a player their life as the server has it (and, once, what happened while they were away). */
+  const sendLife = (p: Player) => {
+    const ws = sockets.get(p.id);
+    const snap = room.snapshot(p);
+    if (!ws || !snap) return;
+    const away = p.away ?? undefined;
+    p.away = null;
+    send(ws, { t: "life", state: snap.state, ack: p.ack, active: snap.active, events: p.events.splice(0), away });
   };
 
   wss.on("connection", (ws) => {
@@ -61,7 +77,14 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           send(ws, { t: "error", reason: "Your game is out of date. Reload the page to update." });
           return ws.close(4002, "protocol");
         }
-        const joined = room.join(message.name, now, message.look);
+        // One life, one place: signing in again somewhere else moves the player there.
+        for (const other of room.players.values()) {
+          if (other.key !== message.key) continue;
+          room.saveLife(other, now); // hand the newest state to the new session, then retire the old one
+          other.life = null;
+          sockets.get(other.id)?.close(4004, "signed in elsewhere");
+        }
+        const joined = room.join(message.name, now, message.look, message.key);
         if (!joined.ok) {
           send(ws, { t: "error", reason: joined.reason });
           return ws.close(4003, "full");
@@ -71,9 +94,26 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         sockets.set(me.id, ws);
         send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: [...room.players.values()].filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
         broadcast({ t: "join", player: room.view(me) }, me.id);
+        if (me.life) sendLife(me);
+        else send(ws, { t: "needsLife" });
         return;
       }
       switch (message.t) {
+        case "create": {
+          const made = room.createLife(me, message.profile, now);
+          if (!made.ok) return send(ws, { t: "error", reason: made.reason });
+          broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
+          send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
+          sendLife(me);
+          return;
+        }
+        case "do": {
+          if (!room.allow(me, "rpc", now)) return send(ws, { t: "done", id: message.id, ok: false, reason: "Slow down a little." });
+          const result = room.act(me, message.id, message.fn, message.args, now);
+          send(ws, result.ok ? { t: "done", id: message.id, ok: true, text: result.text } : { t: "done", id: message.id, ok: false, reason: result.reason });
+          sendLife(me);
+          return;
+        }
         case "move": {
           if (!room.allow(me, "move", now)) return;
           const result = room.move(me, message, now);
@@ -87,11 +127,15 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         }
         case "pay": {
           if (!room.allow(me, "pay", now)) return send(ws, { t: "error", reason: "Slow down: too many payments." });
-          const result = room.pay(me, message.to, message.amount);
+          const result = room.pay(me, message.to, message.amount, now);
           if (!result.ok) return send(ws, { t: "error", reason: result.reason });
           send(ws, { t: "money", balance: room.money(me), note: `You sent ₦${message.amount.toLocaleString()} to ${result.to.name}.` });
+          sendLife(me);
           const target = sockets.get(result.to.id);
-          if (target) send(target, { t: "money", balance: room.money(result.to), note: `${me.name} sent you ₦${message.amount.toLocaleString()}.` });
+          if (target) {
+            send(target, { t: "money", balance: room.money(result.to), note: `${me.name} sent you ₦${message.amount.toLocaleString()}.` });
+            sendLife(result.to);
+          }
           return;
         }
         case "ping":
@@ -111,12 +155,24 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       clearTimeout(helloTimer);
       if (me) {
         room.leave(me.id);
-        sockets.delete(me.id);
+        if (sockets.get(me.id) === ws) sockets.delete(me.id);
         broadcast({ t: "leave", id: me.id });
       }
     });
     ws.on("error", () => ws.close());
   });
+
+  // Every second each life lives a second, is sent to its player, and every so often is written to disk.
+  let lifeTicks = 0;
+  const lifeInterval = setInterval(() => {
+    const now = Date.now();
+    room.stepLives(now);
+    for (const p of room.players.values()) sendLife(p);
+    if (++lifeTicks % 15 === 0) {
+      for (const p of room.players.values()) room.saveLife(p, now);
+      store.flush();
+    }
+  }, 1000);
 
   let tick = 0;
   const interval = setInterval(() => {
@@ -134,6 +190,10 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     close: () =>
       new Promise<void>((resolve) => {
         clearInterval(interval);
+        clearInterval(lifeInterval);
+        const now = Date.now();
+        for (const p of room.players.values()) room.saveLife(p, now);
+        store.flush();
         for (const ws of sockets.values()) ws.terminate();
         wss.close(() => http.close(() => resolve()));
       }),

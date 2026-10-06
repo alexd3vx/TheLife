@@ -1,21 +1,30 @@
-import { MINT, balance, createLedger, generateLagos, transfer, walkableAt, type District, type Ledger } from "@thelife/game-core";
+import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView } from "@thelife/shared";
+import { LifeStore } from "./lives.js";
 
-/** Money a player starts with in the prototype world. */
-export const START_MONEY = 20_000;
 /** Fastest a character may move (running is about 3.3 m/s); the rest is tolerance for network jitter. */
 export const MAX_SPEED = 7;
 const MAX_STEP_SLACK = 1.2;
 
 export interface Player extends PlayerView {
-  /** The ledger account that holds this player's money. */
-  account: string;
+  /** The secret that unlocks this player's life (kept on the server only). */
+  key: string;
+  /** The player's life, run here. Null until they have made a character. */
+  life: Sim | null;
+  /** The newest `do` the server has handled, so the client can tell whether a snapshot already includes its actions. */
+  ack: number;
+  /** Events from the life that the player has not been sent yet. */
+  events: SimEvent[];
+  /** "While you were away" lines, sent once with the first snapshot. */
+  away: string[] | null;
+  lastStepAt: number;
+  lastRpcAt: Record<string, number>;
   lastMoveAt: number;
   /** Token buckets for rate limits. */
-  buckets: Record<"chat" | "pay" | "move" | "rtc", { tokens: number; at: number }>;
+  buckets: Record<"chat" | "pay" | "move" | "rtc" | "rpc", { tokens: number; at: number }>;
 }
 
-const LIMITS = { chat: { rate: 1, burst: 4 }, pay: { rate: 1, burst: 3 }, move: { rate: 40, burst: 60 }, rtc: { rate: 20, burst: 40 } } as const;
+const LIMITS = { chat: { rate: 1, burst: 4 }, pay: { rate: 1, burst: 3 }, move: { rate: 40, burst: 60 }, rtc: { rate: 20, burst: 40 }, rpc: { rate: 10, burst: 30 } } as const;
 
 export type JoinResult = { ok: true; player: Player } | { ok: false; reason: string };
 export type MoveResult = { ok: true } | { ok: false; correct: { x: number; y: number; z: number; level: number } };
@@ -26,12 +35,10 @@ export type MoveResult = { ok: true } | { ok: false; correct: { x: number; y: nu
  */
 export class Room {
   readonly players = new Map<string, Player>();
-  readonly ledger: Ledger = createLedger();
   readonly district: District;
   private nextId = 1;
-  private minute = 0;
 
-  constructor(readonly name: string, district = generateLagos()) {
+  constructor(readonly name: string, district = generateLagos(), readonly store = new LifeStore(null)) {
     this.district = district;
   }
 
@@ -39,7 +46,7 @@ export class Room {
     return this.players.size;
   }
 
-  join(rawName: string, now: number, look?: string): JoinResult {
+  join(rawName: string, now: number, look: string | undefined, key: string): JoinResult {
     if (this.players.size >= MAX_ROOM_PLAYERS) return { ok: false, reason: "This world is full. Try again in a moment." };
     const id = `p${this.nextId++}`;
     const spawn = this.district.spawn;
@@ -55,21 +62,104 @@ export class Room {
       clip: "Idle_Loop",
       level: 0,
       look,
-      account: `acct:${id}`,
+      key,
+      life: null,
+      ack: 0,
+      events: [],
+      away: null,
+      lastStepAt: now,
+      lastRpcAt: {},
       lastMoveAt: now,
-      buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now } },
+      buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now }, rpc: { tokens: LIMITS.rpc.burst, at: now } },
     };
     if (!walkableAt(this.district, player.x, player.z)) {
       player.x = spawn.x;
       player.z = spawn.z;
     }
-    transfer(this.ledger, MINT, player.account, START_MONEY, "Starting money", this.minute);
     this.players.set(id, player);
+    this.loadLife(player, now);
     return { ok: true, player };
   }
 
-  leave(id: string): void {
+  leave(id: string, now = Date.now()): void {
+    const p = this.players.get(id);
+    if (p) this.saveLife(p, now);
     this.players.delete(id);
+    this.store.flush();
+  }
+
+  // ---------------------------------------------------------------- lives
+
+  /** Picks the player's saved life up where it was left, letting the time they were away pass. */
+  private loadLife(player: Player, now: number): void {
+    const saved = this.store.get(player.key);
+    if (!saved) return;
+    const state = structuredClone(saved.state);
+    const away = simulateAbsence(state, (now - saved.savedAt) / 60000);
+    player.away = away.lines.length ? away.lines : null;
+    player.life = new Sim(state);
+    player.lastStepAt = now;
+    this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
+  }
+
+  /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
+  createLife(player: Player, choice: NewLifeChoices, now: number): { ok: true } | { ok: false; reason: string } {
+    if (player.life) return { ok: false, reason: "You already have a life." };
+    const profile = buildProfile(choice);
+    if (!profile) return { ok: false, reason: "That character isn't valid." };
+    player.life = new Sim(createGameState(profile));
+    player.lastStepAt = now;
+    player.away = null;
+    this.rename(player, `${profile.firstName} ${profile.surname}`.trim());
+    this.saveLife(player, now);
+    return { ok: true };
+  }
+
+  private rename(player: Player, name: string): void {
+    const clean = name.slice(0, 20) || player.name;
+    const taken = new Set([...this.players.values()].filter((p) => p !== player).map((p) => p.name.toLowerCase()));
+    player.name = taken.has(clean.toLowerCase()) ? `${clean.slice(0, 16)} ${player.id.slice(1)}` : clean;
+  }
+
+  saveLife(player: Player, now: number): void {
+    if (player.life) this.store.set(player.key, { state: structuredClone(player.life.state), savedAt: now });
+  }
+
+  /** Lets every online life run for the real time that has passed. */
+  stepLives(now: number): void {
+    for (const p of this.players.values()) {
+      if (!p.life) continue;
+      const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1000));
+      p.lastStepAt = now;
+      p.life.step(dt);
+      p.events.push(...p.life.drainEvents());
+    }
+  }
+
+  /** Runs one whitelisted action on a player's life. */
+  act(player: Player, id: number, fn: string, args: RpcArg[], now: number): { ok: true; text?: string } | { ok: false; reason: string } {
+    player.ack = id;
+    if (!player.life) return { ok: false, reason: "Make your character first." };
+    const wait = rpcCooldown(fn);
+    if (wait > 0) {
+      if (now - (player.lastRpcAt[fn] ?? 0) < wait * 1000) return { ok: true };
+      player.lastRpcAt[fn] = now;
+    }
+    const result = runRpc(player.life, fn, args);
+    player.events.push(...player.life.drainEvents());
+    return result;
+  }
+
+  /** The state sent to a player's own page: their life, with only the latest few ledger lines. */
+  snapshot(player: Player): { state: GameState; active: { id: string; done: number; forced: boolean } | null } | null {
+    const life = player.life;
+    if (!life) return null;
+    const s = life.state;
+    const act = life.active;
+    return {
+      state: { ...s, ledger: { ...s.ledger, entries: s.ledger.entries.slice(-40) } },
+      active: act ? { id: act.def.id, done: act.done, forced: act.forced } : null,
+    };
   }
 
   private uniqueName(name: string): string {
@@ -118,19 +208,26 @@ export class Room {
     return { ok: true };
   }
 
-  /** Moves money between two players. The ledger always balances; nobody can go below zero. */
-  pay(from: Player, toId: string, amount: number): { ok: true; to: Player } | { ok: false; reason: string } {
+  /** Moves money from one player's life to another's, both ledgers staying balanced. Nobody can go below zero. */
+  pay(from: Player, toId: string, amount: number, now: number): { ok: true; to: Player } | { ok: false; reason: string } {
     const to = this.players.get(toId);
     if (!to) return { ok: false, reason: "That player isn't here any more." };
     if (to.id === from.id) return { ok: false, reason: "You can't pay yourself." };
+    if (!from.life || !to.life) return { ok: false, reason: "That player hasn't made their character yet." };
     if (!Number.isInteger(amount) || amount <= 0) return { ok: false, reason: "Enter a whole amount above zero." };
     if (amount > 1_000_000) return { ok: false, reason: "That is more than one payment can carry." };
-    const r = transfer(this.ledger, from.account, to.account, amount, `${from.name} to ${to.name}`, this.minute);
-    return r.ok ? { ok: true, to } : { ok: false, reason: "You don't have enough money." };
+    const out = transfer(from.life.state.ledger, PLAYER, SINK, amount, `Sent to ${to.name}`, from.life.state.minute);
+    if (!out.ok) return { ok: false, reason: "You don't have enough money." };
+    from.life.state.stats.totalSpent += amount;
+    transfer(to.life.state.ledger, MINT, PLAYER, amount, `From ${from.name}`, to.life.state.minute);
+    to.life.state.stats.totalEarned += amount;
+    this.saveLife(from, now);
+    this.saveLife(to, now);
+    return { ok: true, to };
   }
 
   money(player: Player): number {
-    return balance(this.ledger, player.account);
+    return player.life?.money ?? 0;
   }
 
   view(p: Player): PlayerView {

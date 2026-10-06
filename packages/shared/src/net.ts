@@ -1,7 +1,7 @@
 // The wire protocol between the game client and the game server. Plain JSON messages; every message from a client is
 // validated here before the server looks at it (the server never trusts a client number or string).
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MAX_NAME = 20;
 export const MAX_CHAT = 200;
 export const MAX_ROOM_PLAYERS = 50;
@@ -19,8 +19,27 @@ export interface PlayerView {
   look?: string;
 }
 
+export type RpcArg = string | number | boolean | null;
+
+/** What a player chooses when making a character; everything else comes from the background on the server. */
+export interface NewLife {
+  backgroundId: string;
+  sex: "male" | "female";
+  firstName: string;
+  surname: string;
+  hometown: string;
+  startingMoney: number;
+  traits: string[];
+}
+
+export const KEY_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
 export type ClientMessage =
-  | { t: "hello"; name: string; protocol: number; look?: string }
+  | { t: "hello"; name: string; protocol: number; look?: string; /** The player's private key: it is how the server finds their life again. */ key: string }
+  /** Starts a new life. The server rebuilds the whole profile from the background id, so only these choices are used. */
+  | { t: "create"; profile: NewLife }
+  /** Asks the server to run one game action (a whitelisted function) on this player's life. */
+  | { t: "do"; id: number; fn: string; args: RpcArg[] }
   | { t: "move"; x: number; y: number; z: number; yaw: number; clip: string; level: number }
   | { t: "chat"; text: string }
   | { t: "pay"; to: string; amount: number }
@@ -35,6 +54,12 @@ export type ServerMessage =
   | { t: "state"; tick: number; serverTime: number; players: Pick<PlayerView, "id" | "x" | "y" | "z" | "yaw" | "clip" | "level">[] }
   | { t: "chat"; from: string; name: string; text: string; at: number }
   | { t: "money"; balance: number; note: string }
+  /** The authoritative state of your life. `ack` is the last `do` id the server has handled; `active` is the action in progress. */
+  | { t: "life"; state: unknown; ack: number; active: { id: string; done: number; forced: boolean } | null; events: { kind: "info" | "good" | "warn" | "bad"; text: string; minute: number }[]; away?: string[] }
+  /** The answer to one `do`. */
+  | { t: "done"; id: number; ok: boolean; text?: string; reason?: string }
+  /** You have no life on this server yet: send `create`. */
+  | { t: "needsLife" }
   | { t: "correct"; x: number; y: number; z: number; level: number }
   | { t: "pong"; ts: number; serverTime: number }
   | { t: "rtc"; from: string; data: unknown }
@@ -46,7 +71,7 @@ const finite = (v: unknown, limit = 1e6): v is number => typeof v === "number" &
 export function parseClientMessage(raw: unknown): ClientMessage | null {
   let value: unknown = raw;
   if (typeof raw === "string") {
-    if (raw.length > 4_000) return null;
+    if (raw.length > 6_000) return null;
     try {
       value = JSON.parse(raw);
     } catch {
@@ -59,7 +84,31 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     case "hello": {
       const name = typeof m.name === "string" ? cleanName(m.name) : "";
       if (!name) return null;
-      return { t: "hello", name, protocol: finite(m.protocol, 1000) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : undefined };
+      if (typeof m.key !== "string" || !KEY_PATTERN.test(m.key)) return null;
+      return { t: "hello", name, protocol: finite(m.protocol, 1000) ? m.protocol : 0, look: typeof m.look === "string" ? cleanLook(m.look) : undefined, key: m.key };
+    }
+    case "create": {
+      const p = m.profile as Record<string, unknown> | null;
+      if (!p || typeof p !== "object") return null;
+      const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+      const traits = Array.isArray(p.traits) ? p.traits.filter((t): t is string => typeof t === "string" && t.length <= 30).slice(0, 12) : [];
+      const firstName = cleanName(text(p.firstName, 40));
+      if (!firstName || !finite(p.startingMoney, 1e9)) return null;
+      return {
+        t: "create",
+        profile: { backgroundId: text(p.backgroundId, 40), sex: p.sex === "female" ? "female" : "male", firstName: firstName.slice(0, 14), surname: cleanName(text(p.surname, 40)).slice(0, 14), hometown: text(p.hometown, 40), startingMoney: Math.round(p.startingMoney), traits },
+      };
+    }
+    case "do": {
+      if (!finite(m.id, 1e9) || typeof m.fn !== "string" || !/^[A-Za-z]{1,30}$/.test(m.fn) || !Array.isArray(m.args) || m.args.length > 6) return null;
+      const args: RpcArg[] = [];
+      for (const a of m.args) {
+        if (typeof a === "string") args.push(a.slice(0, 400));
+        else if (typeof a === "number" && Number.isFinite(a)) args.push(a);
+        else if (typeof a === "boolean" || a === null) args.push(a);
+        else return null;
+      }
+      return { t: "do", id: Math.floor(m.id), fn: m.fn, args };
     }
     case "move":
       if (!finite(m.x) || !finite(m.y, 500) || !finite(m.z) || !finite(m.yaw, 100) || !finite(m.level, 20)) return null;

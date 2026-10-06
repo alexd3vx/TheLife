@@ -17,3 +17,4 @@ export * from "./district.js";
 export * from "./lagos.js";
 export { LAGOS_CELL, LAGOS_H, LAGOS_PLACES, LAGOS_W } from "./lagosData.js";
 export * from "./buildingPlan.js";
+export * from "./onlineRules.js";
