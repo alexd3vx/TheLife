@@ -1,0 +1,125 @@
+// Turns the Lagos Island map picture into game data: node tools/map/trace.mjs
+// Reads tools/map/source/lagos-island.png, classifies it (water, streets/open ground, built-up blocks, parks, market), finds the
+// marked places, and writes packages/game-core/src/lagosData.ts (the class grid, run-length encoded, and the place list).
+import { writeFileSync } from "node:fs";
+import { readPng } from "./png.mjs";
+import { CLS, classify } from "./classify.mjs";
+
+const SRC = new URL("./source/lagos-island.png", import.meta.url).pathname;
+const OUT = new URL("../../packages/game-core/src/lagosData.ts", import.meta.url).pathname;
+const MARKET = 5;
+
+const im = readPng(SRC);
+const { width: w, height: h } = im;
+const cls = classify(im);
+
+/** Connected components of the pixels where `is` is true. */
+function components(is, minSize = 1) {
+  const seen = new Uint8Array(w * h);
+  const out = [];
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s] || !is(cls[s])) continue;
+    const stack = [s];
+    seen[s] = 1;
+    const pixels = [];
+    while (stack.length) {
+      const i = stack.pop();
+      pixels.push(i);
+      const x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (!seen[j] && is(cls[j])) {
+          seen[j] = 1;
+          stack.push(j);
+        }
+      }
+    }
+    if (pixels.length >= minSize) out.push(pixels);
+  }
+  return out;
+}
+const centroid = (pixels) => ({ x: pixels.reduce((a, i) => a + (i % w), 0) / pixels.length, y: pixels.reduce((a, i) => a + ((i / w) | 0), 0) / pixels.length, size: pixels.length });
+
+// Specks: tiny blocks become street, tiny islands of "street" in the water become water.
+for (const comp of components((c) => c === CLS.BLOCK, 1)) if (comp.length < 4) for (const i of comp) cls[i] = CLS.LIGHT;
+for (const comp of components((c) => c === CLS.LIGHT, 1)) if (comp.length < 12) { const c0 = centroid(comp); void c0; for (const i of comp) cls[i] = CLS.WATER; }
+for (const comp of components((c) => c === CLS.WATER, 1)) if (comp.length < 6) for (const i of comp) cls[i] = CLS.LIGHT;
+
+// The picture has a thin white frame; it is not land.
+for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < 3 || y < 3 || x >= w - 3 || y >= h - 3) cls[y * w + x] = CLS.WATER;
+
+// Marked places: the red shapes and the green areas.
+const reds = components((c) => c === CLS.RED, 2).map(centroid);
+const greens = components((c) => c === CLS.PARK, 30).map(centroid).sort((a, b) => b.size - a.size);
+const nearest = (list, x, y) => list.reduce((best, p) => (!best || Math.hypot(p.x - x, p.y - y) < Math.hypot(best.x - x, best.y - y) ? p : best), null);
+const pin = (name, kind, list, ax, ay) => {
+  const p = nearest(list, ax, ay);
+  return { name, kind, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, size: p.size };
+};
+const places = [
+  pin("Lagos Train Station Terminus", "station", reds, 55, 11),
+  pin("Balogun Market", "market", reds, 190, 170),
+  pin("Lagos Island General Hospital", "hospital", reds, 208, 147),
+  pin("Independence House", "government", reds, 302, 395),
+  pin("National Museum", "museum", reds, 357, 432),
+  pin("Marina Bus Station", "station", reds, 428, 343),
+  pin("Tafawa Balewa Square", "park", greens, 340, 380),
+  pin("Onikan Cricket Stadium", "stadium", greens, 365, 455),
+];
+// Places that are on the real island but not drawn on this picture; positions are approximate (checked against the street pattern).
+const extra = [
+  { name: "Lagos Central Mosque", kind: "mosque", x: 208, y: 212 },
+  { name: "Cathedral Church of Christ", kind: "church", x: 255, y: 330 },
+  { name: "Lagos Island Police Station", kind: "police", x: 150, y: 270 },
+  { name: "CMS Grammar School", kind: "school", x: 120, y: 205 },
+  { name: "Marina Commercial Bank", kind: "bank", x: 270, y: 300 },
+  { name: "Lagos Island Fire Station", kind: "fire", x: 330, y: 260 },
+  { name: "Marina Palm Hotel", kind: "hotel", x: 380, y: 300 },
+  { name: "Island Fuel Station", kind: "fuel", x: 90, y: 250 },
+  { name: "Port of Lagos", kind: "port", x: 170, y: 530 },
+];
+for (const e of extra) places.push({ ...e, size: 0 });
+
+// The market shape becomes its own class; the other red shapes are buildings.
+const marketBlob = components((c) => c === CLS.RED, 2).sort((a, b) => b.length - a.length)[0];
+for (let i = 0; i < w * h; i++) if (cls[i] === CLS.RED) cls[i] = CLS.BLOCK;
+for (const i of marketBlob) cls[i] = MARKET;
+
+// Run-length encode: bytes of [class, run length low, run length high], as base64.
+const bytes = [];
+for (let i = 0; i < cls.length; ) {
+  let j = i;
+  while (j < cls.length && cls[j] === cls[i] && j - i < 65535) j++;
+  bytes.push(cls[i], (j - i) & 255, (j - i) >> 8);
+  i = j;
+}
+const b64 = Buffer.from(bytes).toString("base64");
+const lines = b64.match(/.{1,100}/g).map((l) => `  "${l}",`).join("\n");
+writeFileSync(
+  OUT,
+  `// GENERATED by tools/map/trace.mjs from tools/map/source/lagos-island.png. Do not edit by hand.
+// A coarse map of Lagos Island: one cell per picture pixel.
+
+/** Classes: 0 water, 1 street or open ground, 2 built-up block, 3 park, 5 market. */
+export const LAGOS_W = ${w};
+export const LAGOS_H = ${h};
+/** Metres per picture pixel (the island is drawn compressed to about this scale). */
+export const LAGOS_CELL = 7;
+export const LAGOS_RLE = [
+${lines}
+].join("");
+
+export interface LagosPlace {
+  name: string;
+  kind: string;
+  /** Picture pixels. */
+  x: number;
+  y: number;
+}
+
+export const LAGOS_PLACES: LagosPlace[] = ${JSON.stringify(places.map(({ name, kind, x, y }) => ({ name, kind, x, y })), null, 2)};
+`,
+);
+console.log({ w, h, runs: bytes.length / 3, kb: Math.round(b64.length / 1024), places: places.map((p) => `${p.name} (${p.x},${p.y}) size ${p.size}`) });

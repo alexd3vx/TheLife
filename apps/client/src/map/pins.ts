@@ -15,6 +15,12 @@ export const PIN_STYLE: Record<LandmarkKind, { colour: string; icon: FaName; lab
   fuel: { colour: "#e0a82e", icon: "fuel", label: "Fuel" },
   hotel: { colour: "#c0507a", icon: "hotel", label: "Hotel" },
   market: { colour: "#d97b2f", icon: "market", label: "Market" },
+  station: { colour: "#4a56c4", icon: "station", label: "Station" },
+  museum: { colour: "#a0522d", icon: "museum", label: "Museum" },
+  government: { colour: "#2d6a8a", icon: "government", label: "Government" },
+  stadium: { colour: "#3a9a4a", icon: "stadium", label: "Stadium" },
+  park: { colour: "#4f9a3a", icon: "park", label: "Park" },
+  port: { colour: "#2a6f9a", icon: "port", label: "Port" },
 };
 
 const cache = new Map<string, THREE.CanvasTexture>();

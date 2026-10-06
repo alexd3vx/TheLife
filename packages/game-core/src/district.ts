@@ -21,7 +21,9 @@ export interface Rect {
 export type LotKind = "house" | "flats" | "shop" | "stall" | "terminal" | "hangar";
 
 /** Places that get their own look, a name and a pin on the map. */
-export type LandmarkKind = "airport" | "police" | "hospital" | "school" | "church" | "mosque" | "fire" | "bank" | "fuel" | "hotel" | "market";
+export type LandmarkKind =
+  | "airport" | "police" | "hospital" | "school" | "church" | "mosque" | "fire" | "bank" | "fuel" | "hotel" | "market"
+  | "station" | "museum" | "government" | "stadium" | "park" | "port";
 
 export interface Landmark {
   id: string;
@@ -116,6 +118,8 @@ export interface District {
   fields: Rect[];
   /** Where a new player starts. */
   spawn: { x: number; z: number; yaw: number };
+  /** Set for the real-map world: the ground (water, streets, blocks, parks) is read from this instead of the lists above. */
+  terrain?: import("./lagos.js").LagosTerrain;
 }
 
 function rng(seed: number): () => number {

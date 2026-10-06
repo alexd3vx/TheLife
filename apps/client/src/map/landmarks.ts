@@ -9,6 +9,7 @@ const C = (hex: string) => new THREE.Color(hex);
 export const LANDMARK_WALL: Record<LandmarkKind, THREE.Color> = {
   airport: C("#d9dde0"), police: C("#cfd9e8"), hospital: C("#f2f4f5"), school: C("#f0d98c"), church: C("#efe6d2"), mosque: C("#f4f1ea"),
   fire: C("#b53a2f"), bank: C("#cfc8b8"), fuel: C("#e8e4da"), hotel: C("#e8d5b5"), market: C("#d9d3c5"),
+  station: C("#cfd3e6"), museum: C("#d9c2a4"), government: C("#e9e4d6"), stadium: C("#d6d6d0"), park: C("#d6d6d0"), port: C("#c8ccd0"),
 };
 
 const WHITE = C("#f6f6f4");
@@ -138,7 +139,22 @@ export function addLandmark(b: MeshBuilder, lot: Lot, kind: LandmarkKind, full: 
       boxFront(b, fr, fr.width * 0.36, -2, 6.6, 6.6, 24, 24.4, C("#4a5058"));
       b.box(f.minX - 1, h, f.minZ - 1, f.maxX + 1, h + 0.3, f.maxZ + 1, C("#6a7077"), 1); // overhanging roof
       return;
+    case "station":
+      band(C("#4a56c4"), h - 1.2, h - 0.3);
+      boxFront(b, fr, 0, 2.2, fr.width * 0.7, 3.6, 3.4, 3.7, C("#4a56c4")); // platform canopy
+      return;
+    case "museum":
+      for (let k = -2; k <= 2; k++) boxFront(b, fr, k * fr.width * 0.16, 1.2, 0.6, 0.6, 0, h - 0.4, C("#efe8da"));
+      boxFront(b, fr, 0, 1.2, fr.width * 0.8, 1.6, h - 0.4, h + 0.4, C("#efe8da"));
+      return;
+    case "government":
+      boxFront(b, fr, 0, 1.0, fr.width * 0.5, 2.2, 0, 0.6, C("#8b8f95")); // steps
+      boxFront(b, fr, 0, -1, 3, 3, h, h + 4, C("#e9e4d6")); // clock tower
+      return;
     case "market":
+    case "stadium":
+    case "park":
+    case "port":
       return;
   }
 }
