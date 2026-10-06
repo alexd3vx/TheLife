@@ -32,6 +32,15 @@ export default function GameHud({ onHour, children }: { onHour?(hour: number): v
   const session = sessionRef.current;
   const [hud, setHud] = useState<HudSnapshot>(() => session.snapshot());
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneApp, setPhoneApp] = useState<string | null>(null);
+  useEffect(() => {
+    const open = (e: Event) => {
+      setPhoneApp((e as CustomEvent<string>).detail ?? null);
+      setPhoneOpen(true);
+    };
+    window.addEventListener("thelife-open-phone", open);
+    return () => window.removeEventListener("thelife-open-phone", open);
+  }, []);
   const [buzz, setBuzz] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [away, setAway] = useState<string[] | null>(session.awaySummary.length ? session.awaySummary : null);
@@ -133,7 +142,7 @@ export default function GameHud({ onHour, children }: { onHour?(hour: number): v
       </div>
 
       {!phoneOpen && (
-        <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => setPhoneOpen(true)} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
+        <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => { setPhoneApp(null); setPhoneOpen(true); }} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
           <span className="play-phone-body">
             <GameIcon name="phone" size={22} />
             {hud.phone.unread > 0 && <span className="phone-dot">{hud.phone.unread}</span>}
@@ -143,7 +152,7 @@ export default function GameHud({ onHour, children }: { onHour?(hour: number): v
           </span>
         </button>
       )}
-      {phoneOpen && <PhoneUI session={session} onClose={() => setPhoneOpen(false)} />}
+      {phoneOpen && <PhoneUI session={session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />}
 
       {away && (
         <div className="play-modal" role="dialog" aria-label="While you were away">

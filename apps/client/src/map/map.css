@@ -25,3 +25,9 @@
 .map-place { position: absolute; z-index: 6; left: 50%; top: 18%; transform: translateX(-50%); padding: 12px 26px; border-radius: 999px; background: rgba(20, 17, 15, .86); color: #fff; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: place-in 3.2s both; }
 .map-place::before { content: "Entering "; font-weight: 500; opacity: .75; }
 @keyframes place-in { 0% { opacity: 0; transform: translate(-50%, -10px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+.map-mini { cursor: default; }
+.map-mini-open { position: absolute; inset: 0; border: 0; background: transparent; cursor: pointer; }
+.map-mini-zoom { position: absolute; z-index: 2; right: 4px; bottom: 4px; display: grid; gap: 3px; }
+.map-mini-zoom button { width: 24px; height: 24px; border: 0; border-radius: 7px; background: rgba(20, 17, 15, .78); color: #fff; font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
+.map-mini .dmap { pointer-events: none; }
+.map-mini { width: 132px; height: 132px; }

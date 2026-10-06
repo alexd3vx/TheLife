@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { blockOutside, blockRectCentres, createNavGrid, isFree, type NavGrid } from "@thelife/shared";
-import { hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotIndexOf, coarseRoute, type BuildingPlan, type Lot, type PlanStairs, type Rect } from "@thelife/game-core";
+import { hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotIndexOf, coarseRoute, nearPolygon, type BuildingPlan, type Lot, type PlanStairs, type Rect } from "@thelife/game-core";
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
@@ -180,6 +180,14 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       }
     }
     for (const l of lotsWithin(cx, cz, NAV_HALF + 24)) {
+      if (l.poly) {
+        // A turned building: block the cells whose centre is inside its outline (or touching it).
+        const f = l.footprint;
+        const x0 = Math.max(0, Math.floor((f.minX - 0.3 - g.minX) / g.cell)), x1 = Math.min(g.width - 1, Math.floor((f.maxX + 0.3 - g.minX) / g.cell));
+        const z0 = Math.max(0, Math.floor((f.minZ - 0.3 - g.minZ) / g.cell)), z1 = Math.min(g.height - 1, Math.floor((f.maxZ + 0.3 - g.minZ) / g.cell));
+        for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) if (nearPolygon(l.poly, g.minX + (ix + 0.5) * g.cell, g.minZ + (iz + 0.5) * g.cell, 0.25)) g.blocked[iz * g.width + ix] = 1;
+        continue;
+      }
       for (const r of hasInterior(l) ? planBlockers(generatePlan(l)) : [l.footprint]) blockRectCentres(g, r, 0.25);
     }
     for (const t of district.trees) if (Math.abs(t.x - cx) < NAV_HALF && Math.abs(t.z - cz) < NAV_HALF) blockRectCentres(g, { minX: t.x - 0.35, maxX: t.x + 0.35, minZ: t.z - 0.35, maxZ: t.z + 0.35 }, 0.25);
@@ -330,7 +338,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   controls.enableDamping = true;
   controls.dampingFactor = 0.09;
   controls.minDistance = 4;
-  controls.maxDistance = 900;
+  controls.maxDistance = 38;
   controls.minPolarAngle = 0.15;
   controls.maxPolarAngle = 1.42;
   controls.screenSpacePanning = false;
@@ -553,6 +561,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     // Take the roof (and any floors above the player's) off the building they are standing in, and follow the stairs up and down.
     controller.position.y = updateFloor();
     doors.update(controller.position.x, controller.position.z, dt);
+    for (const pin of pinSprites) pin.visible = !floorLot && Math.hypot(pin.position.x - controller.position.x, pin.position.z - controller.position.z) < 150;
     peds.update(dt, controller.position.x, controller.position.z);
     const here = floorLot?.landmark ? (district.landmarks.find((l) => l.lotId === floorLot!.id)?.name ?? null) : null;
     if (here !== placeName) {
@@ -699,7 +708,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     },
     debug: {
       stats: currentStats,
-      teleport: (x, z) => controller.place(x, z, 0),
+      teleport: (x, z) => {
+        controller.place(x, z, 0);
+        resetView();
+      },
       lookAt: (x, z, height = 40, back = 60) => {
         controls.target.set(x, 0, z);
         camera.position.set(x + back * 0.4, height, z + back);

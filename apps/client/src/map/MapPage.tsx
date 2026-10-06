@@ -29,6 +29,7 @@ export default function MapPage() {
   const [place, setPlace] = useState<string | null>(null);
   const [placeShown, setPlaceShown] = useState<string | null>(null);
   const [bigMap, setBigMap] = useState(false);
+  const [miniSpan, setMiniSpan] = useState(320);
   const [picked, setPicked] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSettings();
@@ -117,9 +118,14 @@ export default function MapPage() {
       )}
 
       {stats && !bigMap && (
-        <button className="map-mini" onClick={() => setBigMap(true)} aria-label="Open the map">
-          <DistrictMap district={district} player={stats.position} others={runtimeRef.current?.online.remotes.list() ?? []} compact />
-        </button>
+        <div className="map-mini">
+          <DistrictMap district={district} player={stats.position} others={runtimeRef.current?.online.remotes.list() ?? []} compact span={miniSpan} />
+          <div className="map-mini-zoom">
+            <button onClick={() => setMiniSpan((s) => Math.max(160, s * 0.7))} aria-label="Zoom the minimap in">+</button>
+            <button onClick={() => setMiniSpan((s) => Math.min(900, s / 0.7))} aria-label="Zoom the minimap out">−</button>
+          </div>
+          <button className="map-mini-open" onClick={() => window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "maps" }))} aria-label="Open LifeMaps on your phone" />
+        </div>
       )}
       {bigMap && (
         <>
@@ -158,8 +164,8 @@ export default function MapPage() {
 
       <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
-        <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out</button>
-        <button onClick={() => setBigMap(true)}>Map</button>
+        {admin && <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out (test)</button>}
+        {admin && <button onClick={() => setBigMap(true)}>Map (test)</button>}
         <button onClick={() => setShowSettings(true)}><GameIcon name="settings" /> Settings</button>
         {admin && <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day (test)" : "Night (test)"}</button>}
         {admin && (

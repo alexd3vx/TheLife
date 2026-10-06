@@ -351,6 +351,7 @@ var DOOR_WIDTH = 1.2;
 var rect = (minX, maxX, minZ, maxZ) => ({ minX, maxX, minZ, maxZ });
 var HOLLOW_LANDMARKS = /* @__PURE__ */ new Set(["police", "hospital", "school", "church", "mosque", "fire", "bank", "hotel"]);
 function hasInterior(lot) {
+  if (lot.poly) return false;
   if (lot.landmark) return HOLLOW_LANDMARKS.has(lot.landmark);
   return lot.kind === "house" || lot.kind === "flats" || lot.kind === "shop";
 }
@@ -1144,6 +1145,10 @@ var LagosTerrain = class {
   cls;
   /** For street cells: distance in cells to the nearest non-street cell. */
   edt;
+  /** For block cells: the direction (radians) pointing away from the nearest street, water or park edge. */
+  blockDir;
+  /** For block cells: distance in cells to that edge. */
+  blockEdge;
   /** For street cells: the widest clearance within two cells (about half the corridor width): small = a street, large = open ground. */
   wide;
   constructor() {
@@ -1201,6 +1206,70 @@ var LagosTerrain = class {
       }
     }
     this.wide = wide;
+    const srcX = new Int16Array(w * h).fill(-1), srcZ = new Int16Array(w * h).fill(-1);
+    const dist = new Float32Array(w * h).fill(1e6);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (cls[i] !== BLOCK) {
+          dist[i] = 0;
+          srcX[i] = x;
+          srcZ[i] = y;
+        }
+      }
+    }
+    const relax = (i, j) => {
+      if (srcX[j] < 0) return;
+      const d = Math.hypot(i % w - srcX[j], (i / w | 0) - srcZ[j]);
+      if (d < dist[i]) {
+        dist[i] = d;
+        srcX[i] = srcX[j];
+        srcZ[i] = srcZ[j];
+      }
+    };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (x > 0) relax(i, i - 1);
+        if (y > 0) {
+          relax(i, i - w);
+          if (x > 0) relax(i, i - w - 1);
+          if (x < w - 1) relax(i, i - w + 1);
+        }
+      }
+    }
+    for (let y = h - 1; y >= 0; y--) {
+      for (let x = w - 1; x >= 0; x--) {
+        const i = y * w + x;
+        if (x < w - 1) relax(i, i + 1);
+        if (y < h - 1) {
+          relax(i, i + w);
+          if (x < w - 1) relax(i, i + w + 1);
+          if (x > 0) relax(i, i + w - 1);
+        }
+      }
+    }
+    const dir = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) if (cls[i] === BLOCK && srcX[i] >= 0) dir[i] = Math.atan2((i / w | 0) - srcZ[i], i % w - srcX[i]);
+    this.blockDir = dir;
+    this.blockEdge = dist;
+  }
+  /** Which way a building at this point should be turned: its sides parallel to the nearest street (radians, a quarter turn is equivalent). */
+  blockAngleAt(x, z) {
+    const cx = Math.floor(x / this.cell), cz = Math.floor(z / this.cell);
+    let sx = 0, sz = 0;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = cx + dx, zz = cz + dz;
+        if (xx < 0 || zz < 0 || xx >= this.width || zz >= this.height) continue;
+        const i = zz * this.width + xx;
+        if (this.cls[i] !== BLOCK) continue;
+        const a = this.blockDir[i] * 4;
+        sx += Math.cos(a);
+        sz += Math.sin(a);
+      }
+    }
+    return Math.atan2(sz, sx) / 4;
   }
   at(cx, cz) {
     if (cx < 0 || cz < 0 || cx >= this.width || cz >= this.height) return WATER;
@@ -1273,7 +1342,6 @@ var PLACE_BUILDING = {
   museum: { w: 24, d: 18, floors: 2, lotKind: "terminal" },
   government: { w: 22, d: 16, floors: 3, lotKind: "terminal" }
 };
-var CELL = 12;
 var FACING_STEP = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 function indexLots(lots, bucket = 24) {
   const map = /* @__PURE__ */ new Map();
@@ -1297,12 +1365,30 @@ function lotIndexOf(d) {
   if (!i) indexCache.set(d, i = indexLots(d.lots));
   return i;
 }
+function nearPolygon(poly, x, z, pad = 0) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if (zi > z !== zj > z && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+    if (pad > 0) {
+      const dx = xj - xi, dz = zj - zi;
+      const len2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - xi) * dx + (z - zi) * dz) / len2));
+      if (Math.hypot(x - (xi + t * dx), z - (zi + t * dz)) <= pad) return true;
+    }
+  }
+  return inside;
+}
 function walkableAt(d, x, z, pad = 0.3) {
   if (d.terrain && !d.terrain.walkable(x, z)) return false;
   if (x < d.bounds.minX || x > d.bounds.maxX || z < d.bounds.minZ || z > d.bounds.maxZ) return false;
   for (const l of lotIndexOf(d).near(x, z)) {
     const f = l.footprint;
     if (x > f.minX - pad && x < f.maxX + pad && z > f.minZ - pad && z < f.maxZ + pad) {
+      if (l.poly) {
+        if (nearPolygon(l.poly, x, z, pad)) return false;
+        continue;
+      }
       if (!hasInterior(l)) return false;
       continue;
     }
@@ -1318,37 +1404,86 @@ function generateLagos(seed = 7) {
   const market = toWorld(placePx("Balogun Market"));
   const lots = [];
   let lotNo = 0;
-  const gridW = Math.ceil(t.size.x / CELL), gridH = Math.ceil(t.size.z / CELL);
+  const OW = Math.ceil(t.size.x), OH = Math.ceil(t.size.z);
+  const occ = new Uint8Array(OW * OH);
   const isBlock = (x, z) => t.classAt(x, z) === BLOCK;
-  for (let gz = 0; gz < gridH; gz++) {
-    for (let gx = 0; gx < gridW; gx++) {
-      const cx0 = gx * CELL, cz0 = gz * CELL;
-      const mx = cx0 + CELL / 2, mz = cz0 + CELL / 2;
-      if (!isBlock(mx, mz)) continue;
-      const m = 2.5;
-      const probes = [[cx0 + m, cz0 + m], [cx0 + CELL - m, cz0 + m], [cx0 + m, cz0 + CELL - m], [cx0 + CELL - m, cz0 + CELL - m], [mx, cz0 + m], [mx, cz0 + CELL - m], [cx0 + m, mz], [cx0 + CELL - m, mz]];
-      if (!probes.every(([x, z]) => isBlock(x, z))) continue;
-      if (rand() < 0.07) continue;
-      const w = between(6.5, 9), d = between(6.5, 9);
-      const ox = between(-0.6, 0.6), oz = between(-0.6, 0.6);
-      const fp = rect2(mx + ox - w / 2, mx + ox + w / 2, mz + oz - d / 2, mz + oz + d / 2);
-      let facing = 0, bestD = 1e9;
-      for (let f = 0; f < 4; f++) {
-        for (let step = 4; step <= 24; step += 4) {
-          const sx = mx + FACING_STEP[f][0] * step, sz = mz + FACING_STEP[f][1] * step;
-          if (t.classAt(sx, sz) === STREET) {
-            if (step < bestD) {
-              bestD = step;
-              facing = f;
-            }
-            break;
-          }
-        }
+  const inRect = (lx, lz, hw, hd) => Math.abs(lx) <= hw && Math.abs(lz) <= hd;
+  const rectFree = (cx, cz, c, sn, hw, hd, margin) => {
+    const R = Math.hypot(hw, hd) + margin;
+    const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(OW - 1, Math.floor(cx + R));
+    const z0 = Math.max(0, Math.floor(cz - R)), z1 = Math.min(OH - 1, Math.floor(cz + R));
+    for (let z = z0; z <= z1; z++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!occ[z * OW + x]) continue;
+        const dx = x + 0.5 - cx, dz = z + 0.5 - cz;
+        if (inRect(dx * c + dz * sn, -dx * sn + dz * c, hw + 0.8, hd + 0.8)) return false;
       }
-      const dc = Math.hypot(mx - market.x, mz - market.z);
-      const floors = dc < 350 ? 3 + Math.floor(rand() * 4) : dc < 900 ? 2 + Math.floor(rand() * 3) : 1 + Math.floor(rand() * 3);
-      const kind = floors >= 3 ? rand() < 0.45 ? "shop" : "flats" : rand() < 0.3 ? "shop" : "house";
-      lots.push({ id: `L${lotNo++}`, kind, plot: rect2(cx0, cx0 + CELL, cz0, cz0 + CELL), footprint: fp, floors, storey: 3.2, roof: "flat", facing, colour: Math.floor(rand() * 8), garage: false, fence: false });
+    }
+    const px = hw + 1.6, pz = hd + 1.6;
+    for (const [lx, lz] of [[-px, -pz], [px, -pz], [-px, pz], [px, pz], [0, -pz], [0, pz], [-px, 0], [px, 0], [0, 0]]) {
+      if (!isBlock(cx + lx * c - lz * sn, cz + lx * sn + lz * c)) return false;
+    }
+    return true;
+  };
+  const markRect = (cx, cz, c, sn, hw, hd) => {
+    const R = Math.hypot(hw, hd);
+    for (let z = Math.max(0, Math.floor(cz - R)); z <= Math.min(OH - 1, Math.floor(cz + R)); z++) {
+      for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(OW - 1, Math.floor(cx + R)); x++) {
+        const dx = x + 0.5 - cx, dz = z + 0.5 - cz;
+        if (inRect(dx * c + dz * sn, -dx * sn + dz * c, hw, hd)) occ[z * OW + x] = 1;
+      }
+    }
+  };
+  const PASSES = [
+    { step: 7, w: [12, 22], d: [9, 16] },
+    { step: 5, w: [8, 13], d: [7, 11] },
+    { step: 3, w: [4, 7], d: [4, 7] }
+  ];
+  for (const pass of PASSES) {
+    for (let gz = pass.step / 2; gz < t.size.z; gz += pass.step) {
+      for (let gx = pass.step / 2; gx < t.size.x; gx += pass.step) {
+        const x = gx + between(-pass.step * 0.45, pass.step * 0.45), z = gz + between(-pass.step * 0.45, pass.step * 0.45);
+        if (!isBlock(x, z) || occ[Math.floor(z) * OW + Math.floor(x)]) continue;
+        if (rand() < 0.04) continue;
+        const theta = Math.round(t.blockAngleAt(x, z) / 0.131) * 0.131;
+        const c = Math.cos(theta), sn = Math.sin(theta);
+        const shape = rand();
+        let w = between(pass.w[0], pass.w[1]), dpt = between(pass.d[0], pass.d[1]);
+        if (shape > 0.9 && pass === PASSES[0]) {
+          w = between(22, 32);
+          dpt = between(6, 8);
+        }
+        const hw = w / 2, hd = dpt / 2;
+        if (!rectFree(x, z, c, sn, hw, hd, 3)) continue;
+        let wing = null;
+        if (shape > 0.6 && shape <= 0.85 && w > 8) {
+          const w2 = w * between(0.4, 0.55), d2 = dpt * between(0.7, 1);
+          const side = rand() < 0.5 ? -1 : 1;
+          const lx = side * (hw - w2 / 2), lz = hd + d2 / 2;
+          wing = { cx: x + lx * c - lz * sn, cz: z + lx * sn + lz * c, hw: w2 / 2, hd: d2 / 2 };
+          if (!rectFree(wing.cx, wing.cz, c, sn, wing.hw, wing.hd, 1)) wing = null;
+          else if (rectFree(x, z, c, sn, hw, hd, 0) === false) wing = null;
+        }
+        markRect(x, z, c, sn, hw, hd);
+        if (wing) markRect(wing.cx, wing.cz, c, sn, wing.hw, wing.hd);
+        const local = wing ? (() => {
+          const side = Math.sign((wing.cx - x) * c + (wing.cz - z) * sn) || 1;
+          const w2 = wing.hw * 2, d2 = wing.hd * 2;
+          const a = side * (hw - w2), b2 = side * hw;
+          const lo = Math.min(a, b2), hi = Math.max(a, b2);
+          return side > 0 ? [[-hw, -hd], [hw, -hd], [hw, hd + d2], [lo, hd + d2], [lo, hd], [-hw, hd]] : [[-hw, -hd], [hw, -hd], [hw, hd], [hi, hd], [hi, hd + d2], [-hw, hd + d2]];
+        })() : [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+        const poly = local.map(([lx, lz]) => [x + lx * c - lz * sn, z + lx * sn + lz * c]);
+        const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]);
+        const fp = rect2(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs));
+        const away = t.blockAngleAt(x, z);
+        const out = [Math.cos(away + Math.PI), Math.sin(away + Math.PI)];
+        const facing = Math.abs(out[1]) >= Math.abs(out[0]) ? out[1] < 0 ? 0 : 2 : out[0] > 0 ? 1 : 3;
+        const dc = Math.hypot(x - market.x, z - market.z);
+        const floors = dc < 350 ? 3 + Math.floor(rand() * 5) : dc < 900 ? 2 + Math.floor(rand() * 4) : 1 + Math.floor(rand() * 3);
+        const kind = floors >= 3 ? rand() < 0.45 ? "shop" : "flats" : rand() < 0.3 ? "shop" : "house";
+        lots.push({ id: `L${lotNo++}`, kind, plot: rect2(fp.minX - 1, fp.maxX + 1, fp.minZ - 1, fp.maxZ + 1), footprint: fp, floors, storey: 3.2, roof: "flat", facing, colour: Math.floor(rand() * 8), garage: false, fence: false, poly, yaw: theta });
+      }
     }
   }
   const stalls = [];
@@ -1390,6 +1525,8 @@ function generateLagos(seed = 7) {
         const f = o.footprint;
         if (f.minX < fp.maxX + 1 && f.maxX > fp.minX - 1 && f.minZ < fp.maxZ + 1 && f.maxZ > fp.minZ - 1) lots.splice(i, 1);
       }
+      delete best.poly;
+      delete best.yaw;
       best.footprint = fp;
       best.plot = rect2(fp.minX - 1, fp.maxX + 1, fp.minZ - 1, fp.maxZ + 1);
       best.floors = spec.floors;
@@ -1442,6 +1579,14 @@ function generateLagos(seed = 7) {
     }
   }
   const allLots = [...lots, ...stalls, ...portSheds];
+  {
+    const index = indexLots(allLots);
+    for (const lm of landmarks) {
+      const e = lm.entrance;
+      const blocked = !t.walkable(e.x, e.z) || index.near(e.x, e.z).some((l) => l.poly ? nearPolygon(l.poly, e.x, e.z, 0.5) : !hasInterior(l) && e.x > l.footprint.minX - 0.5 && e.x < l.footprint.maxX + 0.5 && e.z > l.footprint.minZ - 0.5 && e.z < l.footprint.maxZ + 0.5);
+      if (blocked) lm.entrance = nearestStreet(e.x, e.z);
+    }
+  }
   const trees = [];
   const lamps = [];
   const props = [];

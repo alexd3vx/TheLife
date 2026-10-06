@@ -57,6 +57,10 @@ export interface Lot {
   fence: boolean;
   /** Set when this lot is one of the named places. */
   landmark?: LandmarkKind;
+  /** For buildings that are not straight rectangles: the outline, in order, in world metres (the footprint is then its bounding box). */
+  poly?: [number, number][];
+  /** The direction the building is turned, in radians (set with `poly`). */
+  yaw?: number;
 }
 
 export interface Tree {

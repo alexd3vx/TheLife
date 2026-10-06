@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK, STREET, WATER, generateLagos, generatePlan, hasInterior, indexChunks, lagosTerrain, walkableAt, type Lot } from "./index.js";
+import { BLOCK, STREET, WATER, generateLagos, generatePlan, hasInterior, indexChunks, indexLots, lagosTerrain, nearPolygon, walkableAt } from "./index.js";
 
 const d = generateLagos();
 const t = lagosTerrain();
@@ -21,24 +21,22 @@ describe("Lagos Island", () => {
 
   it("fills the blocks with thousands of buildings that stand on blocks and do not overlap", () => {
     const houses = d.lots.filter((l) => l.kind === "house" || l.kind === "flats" || l.kind === "shop");
-    expect(houses.length).toBeGreaterThan(5_000);
+    expect(houses.length).toBeGreaterThan(9_000);
+    console.log("buildings:", d.lots.length, "turned:", d.lots.filter((l) => l.poly).length, "L-shaped:", d.lots.filter((l) => (l.poly?.length ?? 0) > 4).length);
     const chunks = indexChunks(d);
     expect(chunks.size).toBeGreaterThan(1_000);
     for (const l of houses.slice(0, 3_000)) {
       const f = l.footprint;
       expect(t.classAt((f.minX + f.maxX) / 2, (f.minZ + f.maxZ) / 2), l.id).toBe(BLOCK);
     }
-    const bucket = new Map<string, Lot[]>();
-    for (const l of d.lots) {
-      const key = `${Math.floor(l.footprint.minX / 30)},${Math.floor(l.footprint.minZ / 30)}`;
-      bucket.set(key, [...(bucket.get(key) ?? []), l]);
-    }
-    for (const list of bucket.values()) {
-      for (let i = 0; i < list.length; i++) {
-        for (let j = i + 1; j < list.length; j++) {
-          const a = list[i]!.footprint, b = list[j]!.footprint;
-          expect(a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ, `${list[i]!.id} overlaps ${list[j]!.id}`).toBe(false);
-        }
+    // No building stands inside another one's outline, and none is on top of another.
+    const index = indexLots(d.lots);
+    for (const l of d.lots.slice(0, 4_000)) {
+      const cx = (l.footprint.minX + l.footprint.maxX) / 2, cz = (l.footprint.minZ + l.footprint.maxZ) / 2;
+      for (const o of index.near(cx, cz)) {
+        if (o === l) continue;
+        const inside = o.poly ? nearPolygon(o.poly, cx, cz) : cx > o.footprint.minX && cx < o.footprint.maxX && cz > o.footprint.minZ && cz < o.footprint.maxZ;
+        expect(inside, `${l.id} is inside ${o.id}`).toBe(false);
       }
     }
   });

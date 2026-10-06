@@ -74,6 +74,7 @@ const HOLLOW_LANDMARKS = new Set(["police", "hospital", "school", "church", "mos
 
 /** Which lots get a real interior. */
 export function hasInterior(lot: Lot): boolean {
+  if (lot.poly) return false; // turned and L-shaped buildings are solid for now; their insides come later
   if (lot.landmark) return HOLLOW_LANDMARKS.has(lot.landmark);
   return lot.kind === "house" || lot.kind === "flats" || lot.kind === "shop";
 }

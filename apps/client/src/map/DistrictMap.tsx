@@ -15,6 +15,8 @@ interface Props {
   dark?: boolean;
   /** Small corner map: no zoom buttons, labels hidden. */
   compact?: boolean;
+  /** For a compact map: how many metres across it shows. */
+  span?: number;
 }
 
 const LIGHT = { water: [185, 216, 238], street: [255, 255, 255], block: [232, 214, 190], park: [176, 208, 140], market: [236, 170, 120], text: "#2a2a2a" } as const;
@@ -28,7 +30,7 @@ function mapPicture(district: District, dark: boolean): string {
   if (hit) return hit;
   const t = district.terrain!;
   const pal = dark ? DARK : LIGHT;
-  const S = 2;
+  const S = 3;
   const canvas = document.createElement("canvas");
   canvas.width = t.width * S;
   canvas.height = t.height * S;
@@ -52,7 +54,7 @@ function mapPicture(district: District, dark: boolean): string {
 }
 
 /** A drawn map of the island from the same data the 3D world is built from, with a pin on every named place. */
-export default function DistrictMap({ district, player = null, others = [], home = null, selected = null, onSelect, dark = false, compact = false }: Props) {
+export default function DistrictMap({ district, player = null, others = [], home = null, selected = null, onSelect, dark = false, compact = false, span: fixedSpan }: Props) {
   const col = dark ? DARK : LIGHT;
   const W = district.bounds.maxX;
   const Hh = district.bounds.maxZ;
@@ -67,7 +69,7 @@ export default function DistrictMap({ district, player = null, others = [], home
 
   // A compact map follows the player.
   const centre = compact && player ? player : { x: view.cx, z: view.cz };
-  const span = view.span;
+  const span = compact && fixedSpan ? fixedSpan : view.span;
   const vx = Math.max(Math.min(0, W - span), Math.min(W - span, centre.x - span / 2));
   const vz = Math.max(Math.min(0, Hh - span), Math.min(Hh - span, centre.z - span / 2));
   const pin = (span / 432) * (compact ? 22 : 15);

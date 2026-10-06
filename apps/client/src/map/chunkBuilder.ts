@@ -3,6 +3,7 @@ import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, generatePlan, hasInterior, type Chu
 import { MeshBuilder } from "./meshBuilder";
 import { addProp } from "./props";
 import { addInterior } from "./interior";
+import { addPrism } from "./prism";
 import { LANDMARK_WALL, addHangar, addLandmark } from "./landmarks";
 import { asphaltTexture, concreteTexture, glowTexture, pavingTexture } from "./groundTextures";
 
@@ -130,6 +131,10 @@ function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
     b.box(f.minX + 0.2, 0, f.minZ + 0.2, f.maxX - 0.2, 1.0, f.maxZ - 0.2, C("#a57a52")); // counter
     for (const [x, z] of [[f.minX, f.minZ], [f.maxX - 0.15, f.minZ], [f.minX, f.maxZ - 0.15], [f.maxX - 0.15, f.maxZ - 0.15]] as const) b.box(x, 0, z, x + 0.15, 2.4, z + 0.15, POLE);
     b.box(f.minX - 0.2, 2.4, f.minZ - 0.2, f.maxX + 0.2, 2.6, f.maxZ + 0.2, canopy);
+    return;
+  }
+  if (lot.poly) {
+    addPrism(b, lot, lod);
     return;
   }
   if (lod === 0 && hasInterior(lot)) {
