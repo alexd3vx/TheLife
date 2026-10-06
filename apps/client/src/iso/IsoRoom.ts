@@ -3,7 +3,7 @@ import { ACTIONS, furnitureById } from "@thelife/game-core";
 import type { Layout, Placement } from "../play/layout";
 import { propImage, propsMeta, type PropMeta, type SpriteMeta } from "./assets";
 import type { CharProvider } from "./charProvider";
-import { HALF_H, HALF_W, PX_PER_M_UP, SPRITE_SHARP, dirOf, project, unproject } from "./projection";
+import { CHAR_SPRITE_SHARP, HALF_H, HALF_W, PX_PER_M_UP, SPRITE_SHARP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
 const NAV_CELL = 0.125;
@@ -274,7 +274,7 @@ export class IsoRoom {
   }
 
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 3);
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (!w || !h) return;
     this.canvas.width = Math.round(w * this.dpr);
@@ -864,6 +864,8 @@ export class IsoRoom {
   }
 
   private paint(c: CanvasRenderingContext2D) {
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = "high";
     const s = this.zoom * this.dpr;
     c.setTransform(1, 0, 0, 1, 0, 0);
     // outside the house: painted ground
@@ -969,7 +971,8 @@ export class IsoRoom {
       const [px, py] = project(this.pos.x, this.lift, this.pos.z);
       const m = sprite.meta;
       const shape = this.char.shape?.() ?? { w: 1, h: 1 };
-      const box = { x: px - (m.ax / SPRITE_SHARP) * shape.w, y: py - (m.ay / SPRITE_SHARP) * shape.h, w: (m.w / SPRITE_SHARP) * shape.w, h: (m.h / SPRITE_SHARP) * shape.h };
+      const cs = this.char.sharp ?? CHAR_SPRITE_SHARP;
+      const box = { x: px - (m.ax / cs) * shape.w, y: py - (m.ay / cs) * shape.h, w: (m.w / cs) * shape.w, h: (m.h / cs) * shape.h };
       list.push({
         key: this.pos.x + this.pos.z + 0.35,
         draw: (cx) => {

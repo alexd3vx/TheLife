@@ -6,8 +6,10 @@ import * as THREE from "three";
 
 /** Screen pixels per metre along the ground's diagonal (a 1 m square is a 128 x 64 diamond), times the extra sharpness. */
 export const TILE_W = 128;
-export const BAKE_SHARP = 1.5;
-const K = (TILE_W / Math.SQRT2) * BAKE_SHARP; // pixels per world metre on screen
+/** How much bigger than the screen size the pictures are drawn, so they stay crisp on sharp phone screens. */
+export const BAKE_SHARP = 2;
+export const CHAR_SHARP = 2.25;
+const kFor = (sharp: number) => (TILE_W / Math.SQRT2) * sharp; // pixels per world metre on screen
 const ELEVATION = (30 * Math.PI) / 180;
 const SS = 2; // draw twice as big, then shrink, so edges are smooth
 
@@ -25,6 +27,8 @@ export interface Sprite {
 
 /** The drawing area (in final pixels), and where the model's origin lands in it. */
 export interface Area {
+  /** Pictures are drawn this many times larger than they appear at normal zoom. */
+  sharp?: number;
   /** Strength of the light, 1 by default. People are drawn dimmer so the shading survives being coloured afterwards. */
   light?: number;
   w: number;
@@ -32,9 +36,9 @@ export interface Area {
   ox: number;
   oy: number;
 }
-export const PROP_AREA: Area = { w: 640, h: 720, ox: 320, oy: 560 };
+export const PROP_AREA: Area = { w: 853, h: 960, ox: 427, oy: 747, sharp: BAKE_SHARP };
 /** People are smaller than furniture, so a smaller area makes baking a whole character fast. */
-export const CHAR_AREA: Area = { w: 340, h: 400, ox: 170, oy: 320, light: 0.62 };
+export const CHAR_AREA: Area = { w: 510, h: 600, ox: 255, oy: 480, light: 0.62, sharp: CHAR_SHARP };
 
 let renderer: THREE.WebGLRenderer | null = null;
 
@@ -49,7 +53,7 @@ function gl(area: Area): THREE.WebGLRenderer {
 }
 
 function camera(area: Area): THREE.OrthographicCamera {
-  const s = K * SS;
+  const s = kFor(area.sharp ?? BAKE_SHARP) * SS;
   const w = area.w * SS, h = area.h * SS;
   const cam = new THREE.OrthographicCamera(-(area.ox * SS) / s, (w - area.ox * SS) / s, (area.oy * SS) / s, -(h - area.oy * SS) / s, 0.1, 100);
   const d = 30;
@@ -150,7 +154,7 @@ function finish(src: HTMLCanvasElement, A: Area): { canvas: HTMLCanvasElement; a
   ic.globalCompositeOperation = "source-in";
   ic.fillStyle = OUTLINE;
   ic.fillRect(0, 0, w, h);
-  const r = 2.2;
+  const r = 2.2 * ((A.sharp ?? BAKE_SHARP) / 1.5);
   for (let a = 0; a < 16; a++) oc.drawImage(sil, Math.cos((a / 16) * Math.PI * 2) * r, Math.sin((a / 16) * Math.PI * 2) * r);
   oc.filter = "saturate(1.18) contrast(1.06) brightness(1.04)";
   oc.drawImage(small, minX, minY, w, h, 0, 0, w, h);
@@ -194,4 +198,3 @@ export function toSprite(id: string, rot: number, shot: { canvas: HTMLCanvasElem
   return { id, rot, image: shot.canvas.toDataURL("image/png"), w: shot.canvas.width, h: shot.canvas.height, ax: shot.ax, ay: shot.ay };
 }
 
-export { K as PIXELS_PER_METRE };

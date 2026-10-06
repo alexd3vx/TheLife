@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import GameHud from "../play/GameHud";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import ArrivalFilm from "../arrival/ArrivalFilm";
+import WelcomeBack from "../arrival/WelcomeBack";
 import { useWelcomeBack } from "../arrival/useWelcomeBack";
+import { getPending } from "../play/pendingLife";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { layoutForTier } from "../play/layouts";
@@ -64,10 +66,14 @@ export default function IsoPage() {
   }, [session, tier]);
 
   // The arrival: once the room's pictures are loaded, and any film or welcome-back scene has finished, the room paints itself in.
-  const filmShowing = life.justArrived && !!session && !filmDone;
+  // A new person's arrival film starts the moment they come through the creator, over the connecting and loading (not after).
+  const pendingLife = getPending();
+  const arriving = life.justArrived || !!pendingLife;
+  const filmShowing = arriving && !filmDone;
+  const filmTier = (session?.sim.state.profile?.tier ?? pendingLife?.profile.tier ?? "middle") as Tier;
   const offline = life.phase === "offline" && !session;
   useEffect(() => {
-    if (!ready || filmShowing || welcome.showing || introStarted.current) return;
+    if (!ready || !session || filmShowing || welcome.showing || introStarted.current) return;
     introStarted.current = true;
     roomRef.current?.playIntro(!life.justArrived);
   }, [ready, filmShowing, welcome.showing, life.justArrived]);
@@ -91,7 +97,9 @@ export default function IsoPage() {
       {kitchen && session && (
         <KitchenPanel session={session} initialTab={kitchen} onClose={() => setKitchen(null)} runUse={(a) => roomRef.current?.useAction(a === "cook" ? "cook" : a) ?? false} />
       )}
-      {filmShowing && <ArrivalFilm tier={tier} onDone={() => setFilmDone(true)} />}
+      {filmShowing && <ArrivalFilm tier={filmTier} onDone={() => setFilmDone(true)} />}
+      {/* the film ended before the room was ready: the opening scene holds the screen until it is */}
+      {arriving && filmDone && !ready && <WelcomeBack tier={filmTier} hour={new Date().getUTCHours() + 1} awayCount={0} ready={false} onDone={() => undefined} />}
       {welcome.node}
       {offline && (
         <div className="play-loading" role="status" style={{ zIndex: 60 }}>

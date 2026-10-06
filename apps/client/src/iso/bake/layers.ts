@@ -81,7 +81,7 @@ export interface Sheet {
 /** Packs small pictures into one sheet, in rows. */
 function pack(items: { dir: number; frame: number; canvas: HTMLCanvasElement; ax: number; ay: number }[]): Sheet | null {
   if (!items.length) return null;
-  const maxW = 1800;
+  const maxW = 2600;
   const sorted = [...items].sort((a, b) => b.canvas.height - a.canvas.height);
   let x = 0, y = 0, rowH = 0, width = 0;
   const cells: Cell[] = [];

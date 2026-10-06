@@ -44,8 +44,8 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, r
       <div className="film-bars top" />
       <div className="film-bars bottom" />
       <div className="welcome-text">
-        <small>{hello(hour)}</small>
-        <h2>{name ? `Welcome back, ${name}` : "Welcome back"}</h2>
+        <small>{name ? hello(hour) : "Alexion Studios"}</small>
+        <h2>{name ? `Welcome back, ${name}` : "TheLife"}</h2>
         <p>{date && time ? `${date} · ${time} in Lagos` : "Lagos is waking up"}</p>
         {awayCount > 0 && <em>{awayCount} thing{awayCount === 1 ? "" : "s"} happened while you were away.</em>}
       </div>

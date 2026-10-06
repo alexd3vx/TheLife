@@ -5,7 +5,9 @@ export const HALF_W = 64;
 export const HALF_H = 32;
 export const PX_PER_M_UP = 78.4;
 /** Sprites were drawn this much larger than the screen size, for sharpness. */
-export const SPRITE_SHARP = 1.5;
+export const SPRITE_SHARP = 2;
+/** The character's pictures are drawn a little sharper still. */
+export const CHAR_SPRITE_SHARP = 2.25;
 
 export const project = (x: number, y: number, z: number): [number, number] => [(x - z) * HALF_W, (x + z) * HALF_H - y * PX_PER_M_UP];
 

@@ -123,6 +123,7 @@ export class PaperDoll implements CharProvider {
     this.onChange?.();
   }
 
+  readonly sharp = 2.25;
   shape(): { w: number; h: number } {
     return { w: this.look.build ?? 1, h: this.look.height ?? 1 };
   }

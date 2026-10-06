@@ -17,6 +17,8 @@ export interface CharProvider {
   frame(clip: string, dir: number, idx: number): CharFrame | null;
   /** Ask for an animation to be made ready (a no-op if it already is). */
   ensure(clip: string): void;
+  /** How many times larger than the screen size these pictures are drawn. */
+  sharp?: number;
   /** Height and width of this person compared with the average (1 = average). */
   shape?(): { w: number; h: number };
   /** Resolves when these animations are ready. */

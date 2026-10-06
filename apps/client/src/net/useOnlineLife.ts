@@ -24,6 +24,7 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
 
   useEffect(() => {
     let session: GameSession | null = null;
+    let replaceSent = false;
     const set = (patch: Partial<OnlineLife>) => setState((s) => ({ ...s, ...patch }));
     const offMessage = world.onMessage((m) => {
       if (m.t === "needsLife") {
@@ -36,8 +37,18 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
         world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true, ...(pending?.look ? { look: pending.look } : {}) });
         set({ phase: "creating", justArrived: true });
       } else if (m.t === "life") {
-        clearPending();
         const snap = m as unknown as LifeSnapshot;
+        // "New game" on an account that already has a life: the character just made replaces it. The server answers with the new
+        // life, and that is the one this page starts from.
+        const waiting = getPending();
+        if (!session && waiting?.replace && !replaceSent) {
+          replaceSent = true;
+          const p = waiting.profile;
+          world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: true, ...(waiting.look ? { look: waiting.look } : {}) });
+          set({ phase: "creating", justArrived: true });
+          return;
+        }
+        clearPending();
         if (!session) {
           session = new GameSession(false, snap);
           setTransport((fn, args) => world.rpc(fn, args));

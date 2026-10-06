@@ -15,7 +15,7 @@ async function walk(dir) {
     if (!f.endsWith(".png")) continue;
     const dst = p.replace(/\.png$/, ".webp");
     before += statSync(p).size;
-    await sharp(p).webp({ quality: 84, alphaQuality: 92, effort: 4 }).toFile(dst);
+    await sharp(p).webp({ quality: 88, alphaQuality: 94, effort: 4 }).toFile(dst);
     after += statSync(dst).size;
     unlinkSync(p);
     n++;
