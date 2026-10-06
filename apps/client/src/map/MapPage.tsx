@@ -16,6 +16,7 @@ import { setChargeChecker } from "../phone/remote";
 import { chargingSpotNear } from "@thelife/game-core";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
 import { input } from "../controls/input";
+import { useWelcomeBack } from "../arrival/useWelcomeBack";
 import { startMap, type MapRuntime, type MapStats, type TourResult } from "./runtime";
 import "../play/play.css";
 import "./map.css";
@@ -43,6 +44,7 @@ export default function MapPage() {
   const district = getDistrict();
   const life = useOnlineLife();
   const [intro, setIntro] = useState<"off" | "playing">("off");
+  const welcome = useWelcomeBack(life);
   const introPlayed = useRef(false);
 
   useEffect(() => {
@@ -147,7 +149,7 @@ export default function MapPage() {
 
   // The opening shot, once the world is drawn and your life has arrived.
   useEffect(() => {
-    if (loading || error || !life.session || introPlayed.current) return;
+    if (loading || error || !life.session || introPlayed.current || welcome.showing) return;
     const rt = runtimeRef.current;
     if (!rt) return;
     introPlayed.current = true;
@@ -161,7 +163,7 @@ export default function MapPage() {
     if (seen || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     setIntro("playing");
     void rt.playIntro().then(() => setIntro("off"));
-  }, [loading, error, life.session]);
+  }, [loading, error, life.session, welcome.showing]);
 
   // A banner for a few seconds when you walk into a named place.
   useEffect(() => {
@@ -196,6 +198,7 @@ export default function MapPage() {
         {stats && settings.showFps && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 
+      {welcome.node}
       {intro === "playing" && (
         <div className="intro" onPointerDown={() => runtimeRef.current?.skipIntro()}>
           <div className="intro-bar top" />

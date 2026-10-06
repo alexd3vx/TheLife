@@ -7,6 +7,7 @@ import ArrivalFilm from "../arrival/ArrivalFilm";
 import DoorCutscene from "./DoorCutscene";
 import InventoryPanel from "../inventory/InventoryPanel";
 import KitchenPanel from "../kitchen/KitchenPanel";
+import { useWelcomeBack } from "../arrival/useWelcomeBack";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
@@ -62,6 +63,7 @@ export default function PlayPage() {
   const settings = useSettings();
   const life = useOnlineLife("home");
   const [filmDone, setFilmDone] = useState(false);
+  const welcome = useWelcomeBack(life);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [buzz, setBuzz] = useState(false);
   const lastNote = useRef<number | null>(null);
@@ -309,6 +311,7 @@ export default function PlayPage() {
         </div>
       )}
 
+      {welcome.node}
       {life.justArrived && life.session && !filmDone && (
         <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} onDone={() => setFilmDone(true)} />
       )}

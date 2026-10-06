@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { PRESET_LABEL, applyPreset, getSettings, recommendedPreset, updateSettings, useSettings, type Preset, type Settings, type ShadowQuality } from "./settings";
 import { GameIcon } from "../ui/icons";
+import { isAdmin } from "../ui/admin";
+import { PUBLIC_SERVER } from "../net/connection";
 import { canFullscreen, toggleFullscreen, useInstall } from "../pwa/pwa";
 import { ACTIONS, DEFAULT_KEYS, DEFAULT_TOUCH, keyName, type GameAction } from "../controls/bindings";
 import TouchControls, { isTouchDevice } from "../controls/TouchControls";
@@ -238,9 +240,13 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
         )}
         {tab === "online" && (
           <>
-            <Row title="Server address" hint="Where the online world runs, for example wss://46-105-53-216.sslip.io">
-              <input className="st-text" value={s.serverUrl} onChange={(e) => set({ serverUrl: e.target.value.trim() })} placeholder="wss://..." spellCheck={false} autoCapitalize="off" aria-label="Server address" />
-            </Row>
+            {isAdmin() ? (
+              <Row title="Server address (admin)" hint="Where the online world runs. Players always use the built-in address; only admins can change it.">
+                <input className="st-text" value={s.serverUrl} onChange={(e) => set({ serverUrl: e.target.value.trim() })} placeholder={PUBLIC_SERVER} spellCheck={false} autoCapitalize="off" aria-label="Server address" />
+              </Row>
+            ) : (
+              <p className="st-note">You are connected to the TheLife world server. Nothing to set up.</p>
+            )}
           </>
         )}
       <p className="st-note">Map data © OpenStreetMap contributors (ODbL). Lagos Island is drawn from it.</p>

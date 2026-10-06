@@ -2,6 +2,7 @@ import { loadSavedLook } from "../lab/looks";
 import { getSettings, updateSettings } from "../settings/settings";
 import { playerKey } from "./identity";
 import { getToken } from "./tokenBridge";
+import { isAdmin } from "../ui/admin";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
 
 export type NetStatus = "offline" | "connecting" | "online";
@@ -15,15 +16,20 @@ const SERVER_KEY = "thelife.server";
 /** The game server everyone plays on (used when nothing else is set). */
 export const PUBLIC_SERVER = "wss://46-105-53-216.sslip.io";
 
-/** Where the game server lives: the build-time setting, what the player last typed, or this computer on the local port. */
+/**
+ * Where the game server lives. Players always use the built-in address (set at build time with VITE_SERVER_URL, or the public one), so
+ * nobody can end up stuck on a wrong address. Only an admin (or a dev build) can point the game at another server, in Settings.
+ */
 export function defaultServerUrl(): string {
-  const chosen = getSettings().serverUrl;
-  if (chosen) return chosen;
-  try {
-    const saved = localStorage.getItem(SERVER_KEY);
-    if (saved) return saved;
-  } catch {
-    /* storage can be blocked */
+  if (import.meta.env.DEV || isAdmin()) {
+    const chosen = getSettings().serverUrl;
+    if (chosen) return chosen;
+    try {
+      const saved = localStorage.getItem(SERVER_KEY);
+      if (saved) return saved;
+    } catch {
+      /* storage can be blocked */
+    }
   }
   const built = import.meta.env.VITE_SERVER_URL as string | undefined;
   if (built) return built;

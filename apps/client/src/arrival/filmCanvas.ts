@@ -3,7 +3,7 @@
 // clouds are painted once into small off-screen images and then only moved, so it stays smooth on weak phones.
 
 export type Tier = "lapo" | "middle" | "nepo";
-export type FilmBeat = "flight" | "landing" | "taxi" | "ride" | "home";
+export type FilmBeat = "flight" | "landing" | "taxi" | "ride" | "home" | "welcome";
 
 const H = 900;
 
@@ -46,6 +46,10 @@ export class FilmRenderer {
   private readonly glow: HTMLCanvasElement;
   private readonly clouds: HTMLCanvasElement[] = [];
   private readonly sky: HTMLCanvasElement;
+  private readonly skies: Record<"day" | "night" | "dawn", HTMLCanvasElement>;
+  private readonly farDay: HTMLCanvasElement;
+  private readonly midDay: HTMLCanvasElement;
+  private hour = 12;
   private readonly farTile: HTMLCanvasElement;
   private readonly midTile: HTMLCanvasElement;
   private readonly nearTile: HTMLCanvasElement;
@@ -86,6 +90,19 @@ export class FilmRenderer {
     sc.fillStyle = sg;
     sc.fillRect(0, 0, 4, 256);
     this.sky = s;
+    const gradient = (stops: [number, string][]) => {
+      const [c, cc] = makeCanvas(4, 256);
+      const g = cc.createLinearGradient(0, 0, 0, 256);
+      for (const [o, col] of stops) g.addColorStop(o, col);
+      cc.fillStyle = g;
+      cc.fillRect(0, 0, 4, 256);
+      return c;
+    };
+    this.skies = {
+      day: gradient([[0, "#2f74c8"], [0.55, "#6fa8e0"], [1, "#cfe4f4"]]),
+      night: gradient([[0, "#050818"], [0.6, "#101a3a"], [1, "#27345e"]]),
+      dawn: gradient([[0, "#243a78"], [0.45, "#8a6aa8"], [0.75, "#f0a077"], [1, "#ffd9a0"]]),
+    };
     const r = rng(7);
     this.stars = Array.from({ length: 60 }, () => ({ x: r(), y: r() * 0.4, r: 0.6 + r() * 1.2 }));
 
@@ -110,6 +127,8 @@ export class FilmRenderer {
     this.farTile = this.skylineTile(11, 100, 250, "#4b2a62", "#ffcf80", 0.05);
     this.midTile = this.skylineTile(23, 140, 360, "#2c1a40", "#ffd27a", 0.12);
     this.nearTile = this.skylineTile(5, 60, 170, "#170d27", "#ffbf5a", 0.16);
+    this.farDay = this.skylineTile(11, 100, 250, "#8d9cbc", "#ffffff", 0.03);
+    this.midDay = this.skylineTile(23, 140, 360, "#566a92", "#e8f0ff", 0.05);
   }
 
   /** A strip of towers, a mosque and a church spire, that repeats seamlessly every 1600 px. */
@@ -147,6 +166,11 @@ export class FilmRenderer {
     return c;
   }
 
+  /** The Lagos hour of day, for the welcome-back scene's sky. */
+  setHour(hour: number): void {
+    this.hour = hour;
+  }
+
   setBeat(beat: FilmBeat): void {
     this.beat = beat;
     this.t = 0;
@@ -180,6 +204,7 @@ export class FilmRenderer {
     if (this.beat === "flight") this.flight(c, dt);
     else if (this.beat === "landing" || this.beat === "taxi") this.landing(c, dt);
     else if (this.beat === "ride") this.ride(c, dt);
+    else if (this.beat === "welcome") this.welcome(c, dt);
     else this.home(c, dt);
     c.fillStyle = TINT[this.tier];
     c.fillRect(0, 0, this.w, H);
@@ -338,6 +363,57 @@ export class FilmRenderer {
     c.drawImage(this.glow, x - r * 2, y - r * 2, r * 4, r * 4);
     c.globalAlpha = 1;
     c.globalCompositeOperation = prev;
+  }
+
+  // ---------------------------------------------------------------- welcome back
+
+  /** Lagos at the real time of day, slowly drifting past: the skyline, the sun or moon, a few lights coming on. */
+  private welcome(c: CanvasRenderingContext2D, dt: number) {
+    void dt;
+    const h = this.hour;
+    const night = h < 5 || h >= 19.5;
+    const dawn = (h >= 5 && h < 7.2) || (h >= 17.3 && h < 19.5);
+    const day = !night && !dawn;
+    const sky = night ? this.skies.night : dawn ? (h < 12 ? this.skies.dawn : this.sky) : this.skies.day;
+    c.drawImage(sky, 0, 0, 4, 256, 0, 0, this.w, H);
+    if (night) {
+      c.fillStyle = "rgba(255,255,255,.85)";
+      for (const s of this.stars) c.fillRect(s.x * this.w, s.y * H * 1.4, s.r, s.r);
+    }
+    // sun or moon on its way across the sky
+    const t = night ? (((h + 24 - 19.5) % 24) / 9.5) : clamp01((h - 6) / 12);
+    const sx = lerp(this.w * 0.12, this.w * 0.88, t), sy = 520 - Math.sin(t * Math.PI) * 330;
+    if (night) {
+      c.fillStyle = "#f2f0e2";
+      c.beginPath();
+      c.arc(sx, sy, 30, 0, Math.PI * 2);
+      c.fill();
+      this.light(c, sx, sy, 400, "rgba(180,200,255,.35)");
+    } else {
+      this.light(c, sx, sy, 800, dawn ? "rgba(255,200,140,.55)" : "rgba(255,246,214,.6)");
+      c.fillStyle = "#fffbe8";
+      c.beginPath();
+      c.arc(sx, sy, 40, 0, Math.PI * 2);
+      c.fill();
+    }
+    this.cloudLayer(c, 14, 150, 0, day ? 0.35 : 0.5);
+    const drift = this.t * 18;
+    this.tile(c, day ? this.farDay : this.farTile, drift * 0.3, 700);
+    this.tile(c, day ? this.midDay : this.midTile, drift * 0.7, 720);
+    this.tile(c, this.nearTile, drift * 1.4, 760);
+    // street level
+    const ground = c.createLinearGradient(0, 700, 0, H);
+    ground.addColorStop(0, night ? "#10101a" : "#2a2733");
+    ground.addColorStop(1, "#08070c");
+    c.fillStyle = ground;
+    c.fillRect(0, 740, this.w, H - 740);
+    if (night || dawn) {
+      for (let x = -((drift * 2.2) % 320) + 60; x < this.w; x += 320) {
+        c.fillStyle = "#120b20";
+        c.fillRect(x, 520, 8, 230);
+        this.lightPoint(c, x + 4, 520, "#ffd58a", 150);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- the flight

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+
+phoneConfig.scriptedPeople = true; // these tests cover the scripted chat itself
 import {
-  BEATS, JOBS, MINT, PLAYER, SAVINGS, Sim, balance, bestCharger, borrow, createGameState, deposit, isPowerCut, ledgerTotal, newsFor, openApp,
+  BEATS, phoneConfig, JOBS, MINT, PLAYER, SAVINGS, Sim, balance, bestCharger, borrow, createGameState, deposit, isPowerCut, ledgerTotal, newsFor, openApp,
   parseGameState, payBill, payRent, placeOrder, plug, powerCutOn, profileFrom, repay, replyToThread, applyForJob, sendMoney, setAutoPay, setBankCharging,
   topUp, withdraw, BACKGROUNDS, transfer, call, wallPower, markThreadRead, unreadChats, PHONE_MODELS, SHOP_ITEMS,
   type GameState, dismissNotification, clearNotifications,

@@ -171,6 +171,7 @@ export function parsePhone(raw: unknown, profile: Profile | null): PhoneState {
   const threads: Record<string, Thread> = {};
   if (r.threads && typeof r.threads === "object") {
     for (const [id, t] of Object.entries(r.threads).slice(0, 12)) {
+      if (!phoneConfig.scriptedPeople && !SYSTEM_SENDERS.has(id)) continue; // old scripted chats from made-up people are dropped
       const th = t as Partial<Thread>;
       threads[id.slice(0, 20)] = {
         messages: Array.isArray(th.messages)
@@ -566,6 +567,12 @@ export function jobPayBoost(phone: PhoneState): number {
 // ---------------------------------------------------------------- time
 
 /** Advances the phone by game minutes: battery, charging, mail that arrives, deliveries, weekly money. */
+/** Scripted messages from made-up people. Off in the game (tests of the old behaviour switch it on). */
+export const phoneConfig = { scriptedPeople: false };
+
+/** Only the phone's own services may send scripted messages while that is off. */
+const SYSTEM_SENDERS = new Set(["lifepay", "lifejobs"]);
+
 export function tickPhone(state: GameState, minutes: number): void {
   const p = state.phone;
   const model = modelOf(p);
@@ -610,6 +617,8 @@ export function tickPhone(state: GameState, minutes: number): void {
   const tier = state.profile?.tier;
   for (const beat of BEATS) {
     if (p.beatsDone.includes(beat.id)) continue;
+    // Scripted messages from made-up people (family, friends, the landlord) are switched off until real player-to-player chat exists.
+    if (!phoneConfig.scriptedPeople && !SYSTEM_SENDERS.has(beat.contact)) continue;
     if (beat.tiers && (!tier || !beat.tiers.includes(tier))) continue;
     if (!contactsFor(state.profile).some((c) => c.id === beat.contact)) continue;
     if (day > beat.day || (day === beat.day && hour >= beat.hour)) {

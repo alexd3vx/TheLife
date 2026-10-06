@@ -31,3 +31,10 @@
 
 .beat-ride .film-caption { bottom: auto; top: 13vh; }
 .beat-home .film-landed { place-content: start center; padding-top: 14vh; }
+
+.welcome-text { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; z-index: 4; padding: 0 8vw; text-shadow: 0 2px 28px rgba(0, 0, 0, .7); animation: welcome-in 4.2s ease both; }
+.welcome-text small { color: #ffd98a; letter-spacing: .4em; text-transform: uppercase; }
+.welcome-text h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 3.4rem); margin: 0; }
+.welcome-text p { margin: 0; opacity: .92; font-size: 1.05rem; }
+.welcome-text em { font-style: normal; opacity: .75; }
+@keyframes welcome-in { 0% { opacity: 0; transform: translate3d(0, 14px, 0); } 18%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }

@@ -1118,6 +1118,7 @@ function parsePhone(raw, profile) {
   const threads = {};
   if (r.threads && typeof r.threads === "object") {
     for (const [id, t] of Object.entries(r.threads).slice(0, 12)) {
+      if (!phoneConfig.scriptedPeople && !SYSTEM_SENDERS.has(id)) continue;
       const th = t;
       threads[id.slice(0, 20)] = {
         messages: Array.isArray(th.messages) ? th.messages.slice(-60).map((m) => ({ from: m?.from === "me" ? "me" : "them", text: str2(m?.text), minute: num(m?.minute, 0, 1e9, 0) })) : [],
@@ -1437,6 +1438,8 @@ function quitJob(state) {
 function jobPayBoost(phone) {
   return JOBS.find((j) => j.id === phone.job)?.payBoost ?? 1;
 }
+var phoneConfig = { scriptedPeople: false };
+var SYSTEM_SENDERS = /* @__PURE__ */ new Set(["lifepay", "lifejobs"]);
 function tickPhone(state, minutes) {
   const p = state.phone;
   const model = modelOf(p);
@@ -1476,6 +1479,7 @@ function tickPhone(state, minutes) {
   const tier = state.profile?.tier;
   for (const beat of BEATS) {
     if (p.beatsDone.includes(beat.id)) continue;
+    if (!phoneConfig.scriptedPeople && !SYSTEM_SENDERS.has(beat.contact)) continue;
     if (beat.tiers && (!tier || !beat.tiers.includes(tier))) continue;
     if (!contactsFor(state.profile).some((c) => c.id === beat.contact)) continue;
     if (day > beat.day || day === beat.day && hour >= beat.hour) {
