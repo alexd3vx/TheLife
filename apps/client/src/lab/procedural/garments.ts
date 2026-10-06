@@ -28,6 +28,8 @@ interface Spec {
   /** Applies the cuts (hems, sleeve ends, neckline). */
   cut(triangles: Triangle[], rest: BodyRest): Triangle[];
   adjust?: (p: THREE.Vector3, n: THREE.Vector3) => void;
+  /** Rounds of smoothing so the cloth hangs rather than copying the muscles under it (default 6 for tops, 4 for trousers). */
+  smooth?: number;
 }
 
 const both = (name: string) => [`${name}_l`, `${name}_r`];
@@ -154,9 +156,9 @@ const SPECS: Record<string, Spec> = {
     offset: 0.026,
     covers: ["spine_01", "spine_02", "spine_03", "pelvis", ...both("clavicle")],
     cut(tris, rest) {
-      const thigh = jointPos(rest, "thigh_l").y;
       const calf = jointPos(rest, "calf_l").y;
-      const hem = thigh + (calf - thigh) * 0.8;
+      const foot = jointPos(rest, "foot_l").y;
+      const hem = calf + (foot - calf) * 0.3;
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.11, 0.08);
       return cutSleeves(out, rest, "upperarm", "lowerarm", 0.1);
@@ -349,6 +351,6 @@ export function buildGarment(rest: BodyRest, id: string): GarmentResult | null {
     const id = order.get(tri);
     if (id !== undefined) coveredTriangles.add(id);
   }
-  const geometry = buildGeometry(triangles, { offset: spec.offset, uvScale: 3.2, ...(spec.adjust ? { adjust: spec.adjust } : {}) });
+  const geometry = buildGeometry(triangles, { offset: spec.offset, uvScale: 3.2, smooth: spec.smooth ?? (spec.slot === "top" ? 6 : spec.slot === "bottom" ? 4 : 0), ...(spec.adjust ? { adjust: spec.adjust } : {}) });
   return { geometry, covers: [], coveredTriangles, slot: spec.slot };
 }

@@ -98,10 +98,82 @@ export interface BuildOptions {
   adjust?: (p: THREE.Vector3, n: THREE.Vector3) => void;
   /** UV projection scale for tileable fabric textures. */
   uvScale: number;
+  /** Rounds of smoothing over the garment's surface (0 = follow the body exactly). Cloth hangs smoothly; it doesn't copy every muscle. */
+  smooth?: number;
+  /** How far the smoothing pulls inward at most, so a smoothed garment never sinks into the body. */
 }
 
 /** Builds a skinned-ready BufferGeometry. UVs are re-projected (box projection) so fabric textures tile. */
+/** Smooths the corners of the triangles in place (shared corners are found by position), keeping the surface outside the original. */
+function smoothTriangles(triangles: Triangle[], rounds: number): void {
+  const key = (p: number[]) => `${Math.round(p[0]! * 2000)},${Math.round(p[1]! * 2000)},${Math.round(p[2]! * 2000)}`;
+  const ids = new Map<string, number>();
+  const pos: THREE.Vector3[] = [];
+  const nor: THREE.Vector3[] = [];
+  const nbr: Set<number>[] = [];
+  const idOf = (v: Vertex) => {
+    const k = key(v.p);
+    let id = ids.get(k);
+    if (id === undefined) {
+      id = pos.length;
+      ids.set(k, id);
+      pos.push(new THREE.Vector3(...v.p));
+      nor.push(new THREE.Vector3(...v.n));
+      nbr.push(new Set());
+    } else nor[id]!.add(new THREE.Vector3(...v.n));
+    return id;
+  };
+  const tri = triangles.map((t) => t.map(idOf) as [number, number, number]);
+  for (const [a, b, c] of tri) {
+    nbr[a]!.add(b).add(c);
+    nbr[b]!.add(a).add(c);
+    nbr[c]!.add(a).add(b);
+  }
+  nor.forEach((n) => n.normalize());
+  // vertices on the cut edges (hems, sleeve ends, neckline) have fewer neighbours: keep them where they are so the cuts stay clean
+  const edgeCount = new Map<string, number>();
+  for (const [a, b, c] of tri) for (const [x, y] of [[a, b], [b, c], [c, a]] as const) {
+    const e = x < y ? `${x}_${y}` : `${y}_${x}`;
+    edgeCount.set(e, (edgeCount.get(e) ?? 0) + 1);
+  }
+  const border = new Set<number>();
+  for (const [e, n] of edgeCount) if (n === 1) for (const part of e.split("_")) border.add(Number(part));
+  let cur = pos.map((p) => p.clone());
+  for (let r = 0; r < rounds; r++) {
+    const next = cur.map((p, i) => {
+      if (border.has(i)) return p;
+      const avg = new THREE.Vector3();
+      for (const j of nbr[i]!) avg.add(cur[j]!);
+      avg.divideScalar(Math.max(1, nbr[i]!.size));
+      return p.clone().lerp(avg, 0.6);
+    });
+    cur = next;
+  }
+  // write back, and smooth the normals the same way (lighting reads the shape, so muscles stop showing through the cloth)
+  let nn = nor.map((n) => n.clone());
+  for (let r = 0; r < rounds; r++) nn = nn.map((n, i) => {
+    const avg = n.clone();
+    for (const j of nbr[i]!) avg.add(nn[j]!);
+    return avg.normalize();
+  });
+  triangles.forEach((t, ti) => t.forEach((v, k) => {
+    const id = tri[ti]![k]!;
+    // never move inward past the body: only keep a point if it is at or outside where the body was along its normal
+    const moved = cur[id]!.clone();
+    const orig = pos[id]!;
+    const out = moved.clone().sub(orig).dot(nor[id]!);
+    if (out < 0) moved.addScaledVector(nor[id]!, -out);
+    v.p = [moved.x, moved.y, moved.z];
+    v.n = [nn[id]!.x, nn[id]!.y, nn[id]!.z];
+  }));
+}
+
 export function buildGeometry(triangles: Triangle[], options: BuildOptions): THREE.BufferGeometry {
+  if (options.smooth) {
+    // work on copies: the same triangles also decide which skin to hide
+    triangles = triangles.map((t) => t.map((v) => ({ ...v, p: [...v.p], n: [...v.n] })) as unknown as Triangle);
+    smoothTriangles(triangles, options.smooth);
+  }
   const count = triangles.length * 3;
   const position = new Float32Array(count * 3);
   const normal = new Float32Array(count * 3);

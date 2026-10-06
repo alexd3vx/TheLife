@@ -16,6 +16,7 @@ const BakePage = lazy(() => import("./iso/bake/BakePage"));
 const IsoPage = lazy(() => import("./iso/IsoPage"));
 const CharTestPage = lazy(() => import("./iso/CharTestPage"));
 const NetTestPage = lazy(() => import("./net/NetTestPage"));
+const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -44,6 +45,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <IsoPage />
+      </Suspense>
+    );
+  }
+  if (import.meta.env.DEV && hash.startsWith("#/livetest")) {
+    return (
+      <Suspense fallback={null}>
+        <LiveTestPage />
       </Suspense>
     );
   }
