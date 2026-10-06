@@ -54,6 +54,11 @@ class World {
     this.seq = 0;
   }
 
+  /** What the line is doing right now, in words. */
+  get trace(): string {
+    return this.conn?.trace ?? "not started";
+  }
+
   /** Lets the player try again after the line dropped for good. */
   reconnect(): void {
     this.disconnect();

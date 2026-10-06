@@ -111,7 +111,7 @@ export default function IsoPage() {
         <div className="play-loading" role="status" style={{ zIndex: 60 }}>
           <span>
             {error || life.detail || (session ? "Your home's pictures are taking too long to load." : life.phase === "connecting" ? "Can't reach the game server." : "The game server isn't answering.")}
-            <small style={{ display: "block", opacity: 0.6, marginTop: 6 }}>({life.phase}{session ? ", life loaded" : ", no life yet"})</small>
+            <small style={{ display: "block", opacity: 0.6, marginTop: 6 }}>({life.phase}{session ? ", life loaded" : ", no life yet"}; {world.trace})</small>
           </span>
           <button className="btn btn-primary" onClick={() => window.location.reload()}>Try again</button>
         </div>

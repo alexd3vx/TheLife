@@ -64,8 +64,10 @@ export class Connection {
   }
 
   private async connectNow() {
+    this.trace = "asking for your login…";
     const token = await getToken(); // a fresh one each time, so reconnecting after a long while still works
     if (this.closed) return;
+    this.trace = `login ${token ? "found" : "MISSING"}, opening the line…`;
     let ws: WebSocket;
     try {
       ws = new WebSocket(this.url);
@@ -79,6 +81,7 @@ export class Connection {
     ws.addEventListener("close", () => clearTimeout(stall));
     ws.onopen = () => {
       this.tries = 0;
+      this.trace = `login ${token ? "found" : "MISSING"}, line open, waiting for the server…`;
       ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(DEFAULT_LOOK), key: playerKey(), where: this.where(), ...(token ? { token } : {}) } satisfies ClientMessage));
     };
     ws.onmessage = (e) => {
@@ -96,6 +99,7 @@ export class Connection {
       this.events.onMessage(message);
     };
     ws.onclose = (e) => {
+      this.trace = `login ${token ? "found" : "MISSING"}, line closed (code ${e.code}${this.lastReason ? `, "${this.lastReason}"` : ""})`;
       if (this.closed) return;
       if (e.code === 4004) this.fatal = true;
       if (this.fatal) {
@@ -114,6 +118,8 @@ export class Connection {
     ws.onerror = () => ws.close();
   }
 
+  /** What the connection is doing, in words, for the screen that shows when it can't finish. */
+  trace = "";
   private fatal = false;
   private lastReason = "";
 
