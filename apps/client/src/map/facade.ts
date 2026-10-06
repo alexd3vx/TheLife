@@ -143,8 +143,8 @@ vec3 fGlow = vec3(0.0);
     float shutter = 0.0, signZone = 0.0, doorZone = 0.0;
     if (frontGround > 0.5) {
       if (shop > 0.5 && len > 4.0) {
-        shutter = step(u0, u) * step(u, u1) * step(v, 2.45);
-        signZone = step(u0 - 0.2, u) * step(u, u1 + 0.2) * step(2.5, v) * step(v, 3.1);
+        shutter = step(u0, u) * step(u, u1) * step(v, 2.4);
+        signZone = step(u0 - 0.2, u) * step(u, u1 + 0.2) * step(2.45, v) * step(v, 3.3);
       } else {
         doorZone = step(abs(u - len * 0.5), 0.55) * step(v, 2.2);
       }
@@ -202,20 +202,20 @@ vec3 fGlow = vec3(0.0);
       shutterCol = mix(shutterCol, vec3(0.2, 0.45, 0.28), step(0.66, h21(vec2(seed, 11.0))));
       float open = step(0.7, h21(vec2(seed, 21.0))); // open for business: dark inside, goods
       float rise = open * smoothstep(0.0, 0.05, v - (0.9 + 1.55 * h21(vec2(seed, 22.0))));
-      vec3 inside = vec3(0.12, 0.1, 0.09) + 0.5 * vec3(h21(vec2(floor(u * 3.0), floor(v * 4.0))), h21(vec2(floor(u * 3.0) + 5.0, floor(v * 4.0))), 0.3) * step(0.6, fbm(vec2(u, v) * 4.0)) * step(v, 1.9);
+      vec3 inside = vec3(0.2, 0.17, 0.14) + 0.55 * vec3(h21(vec2(floor(u * 1.7), floor(v * 2.4))), h21(vec2(floor(u * 1.7) + 5.0, floor(v * 2.4))), 0.35) * step(0.45, fbm(vec2(u, v) * 1.6)) * step(v, 1.9);
       col = mix(shutterCol * (0.75 + 0.3 * ribs), inside, open * (1.0 - rise));
       float sx = step(0.05, min(u - u0, u1 - u)) * 1.0;
       col = mix(vec3(0.15), col, sx);
       fRough = 0.5;
     }
     if (signZone > 0.5) {
-      float width = min(len * 0.86, 4.8);
+      float width = min(len * 0.9, 6.0);
       float sa = (u - (len * 0.5 - width * 0.5)) / width;
-      float sv = (v - 2.5) / 0.6;
+      float sv = (v - 2.45) / 0.85;
       if (sa > 0.0 && sa < 1.0 && sv > 0.0 && sv < 1.0) {
         float cell = floor(h21(vec2(seed * 31.0, 4.0)) * 32.0);
         float cx = mod(cell, 2.0), cy = floor(cell / 2.0);
-        vec3 s = texture2D(uSigns, vec2((cx + sa) / 2.0, (cy + sv) / 16.0)).rgb;
+        vec3 s = texture2D(uSigns, vec2((cx + sa) / 2.0, (15.0 - cy + sv) / 16.0)).rgb;
         col = s;
         fGlow += s * uNight * 0.9;
         fRough = 0.45;
@@ -234,9 +234,10 @@ vec3 fGlow = vec3(0.0);
     float streaks = smoothstep(0.55, 0.9, streak) * smoothstep(0.0, -3.0, -(fv - sill + 0.2)) * 0.18;
     float mould = smoothstep(height - 1.2, height, v) * smoothstep(0.45, 0.8, fbm(vec2(u * 0.8, v * 0.6) + seed * 13.0)) * 0.35;
     float peel = smoothstep(0.62, 0.7, fbm(vec2(u, v) * 1.4 + seed * 9.0));
-    col *= 1.0 - (dirt * 0.5 + streaks + mould) * detail * 1.0 - (dirt * 0.25) * (1.0 - detail);
+    col *= 1.0 - (dirt * 0.32 + streaks * 0.8 + mould * 0.8) * detail - (dirt * 0.16) * (1.0 - detail);
     col = mix(col, col * vec3(0.78, 0.74, 0.68) + 0.04, peel * 0.45 * detail * (1.0 - rawBlock));
-    col = mix(col, col * vec3(0.55, 0.62, 0.45), mould * 0.6 * detail);
+    col = mix(col, col * vec3(0.55, 0.62, 0.45), mould * 0.5 * detail);
+    col *= 1.14;
   } else if (surf < 1.5) {
     // ------------------------------------------------------------ a flat concrete roof
     vec2 p = vUv;
