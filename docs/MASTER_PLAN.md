@@ -146,3 +146,9 @@ Decided: real Lagos clock; slow real-time needs; social apps are separate apps t
   - How: each player's interior is a private instance (like GTA online apartments); the door is on a real home building in a zone that fits the tier (nepo east/Ikoyi, middle central, lapo dense old Lagos); exiting puts you at that door.
 - More cinematic everywhere.
 - Scale: about 100 players for testing, after the features are done; more engineering later if feedback is good.
+
+## Decisions, round 5 (order, roleplay, voice, launch)
+- Build order: 1) homes in the city + the airport arrival film, 2) GTA-style controls + installable app, 3) street life (props, traffic, weather).
+- Roleplay: police, courts and jail as real roles; crimes and consequences; safe zones and fair-play rules (rules screen at login). Not peaceful-only.
+- Voice (server to plan for): phone calls between two players, proximity voice, push-to-talk radio channels.
+- Launch: free test with friends (accounts, 100 players max); money decided later.
