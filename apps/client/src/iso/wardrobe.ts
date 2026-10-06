@@ -38,6 +38,9 @@ export const TOPS: Option[] = [
   { id: "p_dress", label: "Dress" },
   { id: "p_kaftan", label: "Kaftan" },
   { id: "p_agbada", label: "Agbada" },
+  { id: "p_shirt", label: "Shirt" },
+  { id: "p_blazer", label: "Blazer" },
+  { id: "p_sweater", label: "Sweater" },
 ];
 
 export const BOTTOMS: Option[] = [
@@ -45,6 +48,7 @@ export const BOTTOMS: Option[] = [
   { id: "p_capri", label: "Capri" },
   { id: "p_trousers", label: "Trousers" },
   { id: "p_jeans", label: "Jeans" },
+  { id: "p_slacks", label: "Suit trousers" },
   { id: "p_palazzo", label: "Wide trousers" },
 ];
 
@@ -65,4 +69,5 @@ export const ACCESSORY_OPTIONS: Option[] = [
   { id: "a_headband", label: "Headband" },
   { id: "a_hoops", label: "Hoop earrings" },
   { id: "a_chain", label: "Chain" },
+  { id: "a_tie", label: "Tie" },
 ];

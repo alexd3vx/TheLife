@@ -5,7 +5,8 @@ import { loadGLTF, loadGltfTexture } from "./loaders";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, sexOf, type Look } from "./looks";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import { fabricTexture, type FabricId } from "./procedural/fabrics";
-import { buildGarment, isProceduralGarment } from "./procedural/garments";
+import { buildGarment, isProceduralGarment, tieTriangles } from "./procedural/garments";
+import { buildGeometry } from "./procedural/geometryClip";
 import { buildHair } from "./procedural/hair";
 import { buildAccessory } from "./procedural/accessories";
 import { hairTexture } from "./procedural/hairTextures";
@@ -476,6 +477,7 @@ export class Avatar {
   private buildProceduralAccessory(id: string): THREE.Object3D | null {
     const rest = this.bodyRest;
     if (!rest || !this.skeleton) return null;
+    if (id === "a_tie") return this.buildTie();
     const result = buildAccessory(rest, id);
     if (!result) return null;
     const boneName = id === "a_chain" ? "neck_01" : "Head";
@@ -491,6 +493,25 @@ export class Avatar {
     group.userData.fixedColour = result.fixedColour ?? null;
     group.add(mesh);
     bone.add(group);
+    return group;
+  }
+
+  /** A necktie: a strip cut from the chest, so it moves with the body like the clothes do. */
+  private buildTie(): THREE.Object3D | null {
+    if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
+    const geometry = buildGeometry(tieTriangles(this.bodyRest), { offset: 0.034, uvScale: 3.2, smooth: 2 });
+    if (!geometry.getAttribute("position").count) return null;
+    const material = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+    const skinned = new THREE.SkinnedMesh(geometry, material);
+    skinned.frustumCulled = false;
+    skinned.castShadow = true;
+    skinned.bind(this.skeleton, this.bodyMesh.bindMatrix);
+    const group = new THREE.Group();
+    group.userData.assetId = "a_tie";
+    group.userData.kind = "proc-acc";
+    group.userData.fixedColour = null;
+    group.add(skinned);
+    this.bodyScene.add(group);
     return group;
   }
 
@@ -515,7 +536,9 @@ export class Avatar {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
     const result = buildGarment(this.bodyRest, id);
     if (!result) return null;
-    const material = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+    const material = result.layers.length > 1
+      ? result.layers.map(() => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide }))
+      : new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
     const skinned = new THREE.SkinnedMesh(result.geometry, material);
     skinned.frustumCulled = false;
     skinned.castShadow = true;
@@ -525,6 +548,7 @@ export class Avatar {
     group.userData.assetId = id;
     group.userData.kind = "proc-garment";
     group.userData.slot = result.slot;
+    group.userData.layers = result.layers;
     group.userData.covers = result.covers;
     group.userData.coveredTriangles = result.coveredTriangles;
     group.add(skinned);
@@ -540,10 +564,17 @@ export class Avatar {
       const fabric = (slot === "bottom" ? this.look.bottomFabric : slot === "top" ? this.look.topFabric : "plain") as FabricId;
       const colour = CLOTH_COLORS.find((c) => c.id === this.colourFor(slot));
       const texture = fabricTexture(fabric);
-      eachMaterial(part, (material) => {
-        material.map = texture;
-        material.color.set(colour?.color ?? "#ffffff");
-        material.needsUpdate = true;
+      const layers = (part.userData.layers as (string | null)[] | undefined) ?? [null];
+      part.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        materialsOf(mesh).forEach((material, i) => {
+          const m = material as THREE.MeshStandardMaterial;
+          const fixed = layers[i] ?? null;
+          m.map = fixed ? null : texture;
+          m.color.set(fixed ?? colour?.color ?? "#ffffff");
+          m.needsUpdate = true;
+        });
       });
     }
   }

@@ -19,6 +19,7 @@ export const ACCESSORIES: AccessoryChoice[] = [
   { id: "a_headband", label: "Headband", bone: "Head" },
   { id: "a_hoops", label: "Hoop earrings", bone: "Head" },
   { id: "a_chain", label: "Chain", bone: "neck_01" },
+  { id: "a_tie", label: "Tie", bone: "neck_01" },
 ];
 
 export const accessoryById = (id: string | null): AccessoryChoice | undefined => ACCESSORIES.find((a) => a.id === id);
