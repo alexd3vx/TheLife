@@ -16,7 +16,8 @@ interface SheetMeta {
 type VariantIndex = Record<string, SheetMeta>;
 
 const BASE = `${import.meta.env.BASE_URL}sprites/char2/`;
-const MIRROR: Record<number, number> = { 5: 3, 6: 2, 7: 1 };
+/** Flipping a picture left to right: with the camera at the south-east, 0 and 2 swap, 3 and 7 swap, 4 and 6 swap (1 and 5 are their own). */
+const MIRROR: Record<number, number> = { 2: 0, 6: 4, 7: 3 };
 
 const indexCache = new Map<string, Promise<VariantIndex | null>>();
 const imageCache = new Map<string, Promise<HTMLImageElement | null>>();

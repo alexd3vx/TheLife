@@ -36,11 +36,14 @@ export function variantsFor(body: BodyId): LayerVariant[] {
 export interface BakeClip {
   name: string;
   frames: number;
-  /** Directions drawn (0 south, 1 south-west, 2 west, 3 north-west, 4 north); 5 to 7 are mirrors of 3 to 1. */
+  /**
+   * Directions drawn. The camera looks from the south-east, so facing the camera is 1 and facing away is 5, and flipping a picture left to
+   * right swaps 0 with 2, 3 with 7 and 4 with 6 (1 and 5 stay as they are). So five drawn directions give all eight.
+   */
   dirs: number[];
   once?: boolean;
 }
-const FIVE = [0, 1, 2, 3, 4];
+const FIVE = [0, 1, 3, 4, 5];
 export const BAKE_CLIPS: BakeClip[] = [
   { name: "Idle_Loop", frames: 4, dirs: FIVE },
   { name: "Walk_Loop", frames: 8, dirs: FIVE },
@@ -49,11 +52,12 @@ export const BAKE_CLIPS: BakeClip[] = [
   { name: "Sitting_Idle_Loop", frames: 4, dirs: FIVE },
   { name: "Life_Cook_Loop", frames: 6, dirs: FIVE },
   { name: "Life_Eat_Loop", frames: 6, dirs: FIVE },
-  { name: "Life_Sleep_Loop", frames: 4, dirs: [0, 2, 4] },
+  { name: "Life_Sleep_Loop", frames: 4, dirs: [0, 4] },
   { name: "Life_Type_Loop", frames: 6, dirs: FIVE },
   { name: "Life_Brush_Loop", frames: 6, dirs: FIVE },
   { name: "Life_Wash_Loop", frames: 6, dirs: FIVE },
   { name: "Life_Read_Loop", frames: 4, dirs: FIVE },
+  { name: "Life_Eat_Standing_Loop", frames: 6, dirs: FIVE },
 ];
 
 const WHITE = {
