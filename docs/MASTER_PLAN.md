@@ -124,3 +124,11 @@ Decided: real Lagos clock; slow real-time needs; social apps are separate apps t
 - Objects: real sizes in metres; furniture is placed on a grid with rotate in an edit mode; big items can block doors.
 - Build order for the screens: inventory + bag, fridge and cooking, shop counter / buy screen, wardrobe and clothes.
 - Also done on request: no game state is saved on the device (server only); the phone charges only beside a socket.
+
+## Decisions, round 2 (shops, food, utilities, work) and the owner's order
+- Markets: bargaining; prices change with the (real) day; traders have limited stock that runs out. Supermarkets: fixed prices.
+- Food: recipes with real ingredients (rice, beans, stew, egusi, jollof), spoilage; the fridge only keeps cold with power.
+- Utilities: NEPA outages for everyone, generators and fuel, water (borehole, sachets), data and airtime as real costs.
+- Work: a PC or laptop at home that opens a real-looking computer UI (several laptop types, a working desktop with windows and apps) and work on it is a mini-game; also street hustles (trading, okada, food stalls), shifts at buildings, phone gigs, and player-run businesses.
+- Every object is interactable (windows, light bulbs, doors, taps...).
+- Order from the owner: make the Lagos map better first, then these systems; later a deep dive on realistic characters and animation (GTA 6 online beta feel); the installed PWA should feel like a native app.
