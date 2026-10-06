@@ -1,3 +1,5 @@
+import { isAdmin } from "../ui/admin";
+import GameHud from "../play/GameHud";
 import { GameIcon } from "../ui/icons";
 import { useEffect, useRef, useState } from "react";
 import { loadManifest } from "../lab/manifest";
@@ -23,12 +25,14 @@ export default function MapPage() {
   const [touring, setTouring] = useState<number | null>(null);
   const [result, setResult] = useState<TourResult | null>(null);
   const [night, setNight] = useState(false);
+  const nightRef = useRef(false);
   const [place, setPlace] = useState<string | null>(null);
   const [placeShown, setPlaceShown] = useState<string | null>(null);
   const [bigMap, setBigMap] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const settings = useSettings();
+  const admin = isAdmin();
   const district = getDistrict();
 
   useEffect(() => {
@@ -83,14 +87,20 @@ export default function MapPage() {
     <div className="play">
       <div className="play-stage" ref={containerRef} />
       <div className="play-top">
-        <a className="play-chip" href="#/play" aria-label="Back to the house">
-          ←<span className="play-chip-label"> House</span>
+        <a className="play-chip" href="#/" aria-label="Back to the menu">
+          ←<span className="play-chip-label"> Menu</span>
         </a>
-        <span className="play-chip">Neighbourhood test</span>
+        <span className="play-chip">Lagos Island</span>
+        {admin && (
+          <a className="play-chip" href="#/play" aria-label="The old house page">
+            House (test)
+          </a>
+        )}
         {stats && settings.showFps && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 
       {placeShown && <div className="map-place" role="status">{placeShown}</div>}
+      {!loading && !error && <GameHud onHour={(h) => { const dark = h < 6 || h >= 19; if (dark !== nightRef.current) { nightRef.current = dark; runtimeRef.current?.setNight(dark); setNight(dark); } }} />}
       {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && settings.showStats && (
@@ -148,13 +158,15 @@ export default function MapPage() {
 
       <div className="play-controls">
         <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
-        <button onClick={() => runtimeRef.current?.zoomOut()}>Whole district</button>
+        <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out</button>
         <button onClick={() => setBigMap(true)}>Map</button>
         <button onClick={() => setShowSettings(true)}><GameIcon name="settings" /> Settings</button>
-        <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day" : "Night"}</button>
-        <button onClick={runTour} disabled={touring !== null}>
-          {touring === null ? "Run the performance tour" : `Touring… ${touring}%`}
-        </button>
+        {admin && <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day (test)" : "Night (test)"}</button>}
+        {admin && (
+          <button onClick={runTour} disabled={touring !== null}>
+            {touring === null ? "Performance tour (test)" : `Touring… ${touring}%`}
+          </button>
+        )}
       </div>
 
       {result && (

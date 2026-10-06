@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { indexChunks, type ChunkData, type District } from "@thelife/game-core";
+import { chunkCoord, chunkKey, indexChunks, type ChunkData, type District } from "@thelife/game-core";
 import { buildChunk, type BuiltChunk, type Lod } from "./chunkBuilder";
 
 /** Distances (metres from the player to the nearest edge of a chunk) at which detail steps down. Past the last, a chunk is not loaded. */
@@ -36,11 +36,26 @@ export class ChunkStreamer {
   private queued = 0;
 
   constructor(district: District, private readonly budgetMs = 4) {
-    this.chunks = [...indexChunks(district).values()];
+    this.byKey = indexChunks(district);
+    this.chunks = [...this.byKey.values()];
     this.root.name = "chunks";
   }
 
   private rings: Rings = LOD_RINGS;
+  private readonly byKey: Map<string, ChunkData>;
+
+  /** The chunks that could be wanted around a point: only those within the outer ring, not all thousands. */
+  private candidates(px: number, pz: number): ChunkData[] {
+    const reach = this.rings[2] + 40;
+    const out: ChunkData[] = [];
+    for (let cx = chunkCoord(px - reach); cx <= chunkCoord(px + reach); cx++) {
+      for (let cz = chunkCoord(pz - reach); cz <= chunkCoord(pz + reach); cz++) {
+        const c = this.byKey.get(chunkKey(cx, cz));
+        if (c) out.push(c);
+      }
+    }
+    return out;
+  }
 
   /** Scales how far chunks are loaded (1 = normal), from the draw-distance setting. */
   setDrawDistance(scale: number): void {
@@ -65,7 +80,10 @@ export class ChunkStreamer {
   update(px: number, pz: number): void {
     const now = performance.now();
     const todo: { chunk: ChunkData; lod: Lod; dist: number }[] = [];
-    for (const chunk of this.chunks) {
+    const near = this.candidates(px, pz);
+    const nearSet = new Set(near);
+    for (const chunk of this.loaded.keys()) if (!nearSet.has(chunk)) this.unload(chunk);
+    for (const chunk of near) {
       const want = this.wanted(chunk, px, pz);
       const have = this.loaded.get(chunk);
       if (want === null) {
@@ -92,7 +110,7 @@ export class ChunkStreamer {
 
   /** Builds everything in range at once (for the first frame, before the loading screen goes away). */
   prime(px: number, pz: number): void {
-    for (const chunk of this.chunks) {
+    for (const chunk of this.candidates(px, pz)) {
       const want = this.wanted(chunk, px, pz);
       if (want !== null) this.build(chunk, want);
     }

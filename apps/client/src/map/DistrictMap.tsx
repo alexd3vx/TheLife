@@ -17,33 +17,62 @@ interface Props {
   compact?: boolean;
 }
 
-const LIGHT = { land: "#d9e6c6", road: "#ffffff", roadEdge: "#b8b3a6", block: "#e9e4d8", lot: "#cfc8b8", paving: "#c4c1b8", field: "#d3c68f", water: "#b9d8ee", runway: "#6b7078", park: "#bcd69b", text: "#2a2a2a" };
-const DARK = { land: "#1a2230", road: "#33425a", roadEdge: "#22304a", block: "#202a3a", lot: "#2e3b52", paving: "#2b3446", field: "#2a3a2c", water: "#14304a", runway: "#3a414d", park: "#1f3a2a", text: "#e8edf5" };
+const LIGHT = { water: [185, 216, 238], street: [255, 255, 255], block: [232, 214, 190], park: [176, 208, 140], market: [236, 170, 120], text: "#2a2a2a" } as const;
+const DARK = { water: [20, 48, 74], street: [58, 72, 96], block: [38, 48, 66], park: [32, 62, 44], market: [90, 62, 44], text: "#e8edf5" } as const;
 
-/** A drawn map of the neighbourhood from the same data the 3D world is built from: roads, blocks, buildings, and a pin on every named place. */
+/** The map picture, drawn once from the island's ground data (water, streets, blocks, parks, the market) and reused. */
+const pictures = new Map<string, string>();
+function mapPicture(district: District, dark: boolean): string {
+  const key = dark ? "dark" : "light";
+  const hit = pictures.get(key);
+  if (hit) return hit;
+  const t = district.terrain!;
+  const pal = dark ? DARK : LIGHT;
+  const S = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = t.width * S;
+  canvas.height = t.height * S;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(canvas.width, canvas.height);
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const c = t.classAt(((x + 0.5) / S) * t.cell, ((y + 0.5) / S) * t.cell);
+      const rgb = c === 0 ? pal.water : c === 1 ? pal.street : c === 2 ? pal.block : c === 3 ? pal.park : pal.market;
+      const o = (y * canvas.width + x) * 4;
+      img.data[o] = rgb[0];
+      img.data[o + 1] = rgb[1];
+      img.data[o + 2] = rgb[2];
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const url = canvas.toDataURL("image/png");
+  pictures.set(key, url);
+  return url;
+}
+
+/** A drawn map of the island from the same data the 3D world is built from, with a pin on every named place. */
 export default function DistrictMap({ district, player = null, others = [], home = null, selected = null, onSelect, dark = false, compact = false }: Props) {
   const col = dark ? DARK : LIGHT;
-  const H = district.bounds.maxX;
-  const [view, setView] = useState({ cx: 0, cz: 0, span: H * 2 });
+  const W = district.bounds.maxX;
+  const Hh = district.bounds.maxZ;
+  const [view, setView] = useState({ cx: district.spawn.x, cz: district.spawn.z, span: compact ? 520 : Math.max(W, Hh) });
   const drag = useRef<{ x: number; y: number; cx: number; cz: number; moved: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-
-  const layers = useMemo(
-    () => ({
-      blocks: district.blocks.map((b, i) => <rect key={i} x={b.area.minX} y={b.area.minZ} width={b.area.maxX - b.area.minX} height={b.area.maxZ - b.area.minZ} fill={b.kind === "park" ? col.park : b.kind === "farm" ? col.field : col.block} />),
-      lots: district.lots.map((l) => <rect key={l.id} x={l.footprint.minX} y={l.footprint.minZ} width={l.footprint.maxX - l.footprint.minX} height={l.footprint.maxZ - l.footprint.minZ} fill={l.landmark ? PIN_STYLE[l.landmark].colour : col.lot} opacity={l.landmark ? 0.85 : 1} />),
-      roads: district.roads.map((r, i) => <rect key={i} x={r.minX} y={r.minZ} width={r.maxX - r.minX} height={r.maxZ - r.minZ} fill={col.road} stroke={col.roadEdge} strokeWidth={0.6} />),
-      paving: district.paving.map((r, i) => <rect key={i} x={r.minX} y={r.minZ} width={r.maxX - r.minX} height={r.maxZ - r.minZ} fill={col.paving} />),
-    }),
-    [district, col],
+  const picture = useMemo(() => mapPicture(district, dark), [district, dark]);
+  const lotLayer = useMemo(
+    () => district.lots.filter((l) => l.landmark).map((l) => <rect key={l.id} x={l.footprint.minX} y={l.footprint.minZ} width={l.footprint.maxX - l.footprint.minX} height={l.footprint.maxZ - l.footprint.minZ} fill={PIN_STYLE[l.landmark!].colour} opacity={0.9} />),
+    [district],
   );
 
+  // A compact map follows the player.
+  const centre = compact && player ? player : { x: view.cx, z: view.cz };
   const span = view.span;
-  const vx = Math.max(-H, Math.min(H - span, view.cx - span / 2));
-  const vz = Math.max(-H, Math.min(H - span, view.cz - span / 2));
+  const vx = Math.max(Math.min(0, W - span), Math.min(W - span, centre.x - span / 2));
+  const vz = Math.max(Math.min(0, Hh - span), Math.min(Hh - span, centre.z - span / 2));
   const pin = (span / 432) * (compact ? 22 : 15);
 
-  const zoom = (factor: number) => setView((v) => ({ ...v, span: Math.max(80, Math.min(H * 2, v.span * factor)) }));
+  const zoom = (factor: number) => setView((v) => ({ ...v, span: Math.max(80, Math.min(Math.max(W, Hh), v.span * factor)) }));
   const centreOn = (p: { x: number; z: number } | null | undefined) => p && setView((v) => ({ ...v, cx: p.x, cz: p.z, span: Math.min(v.span, 160) }));
 
   return (
@@ -72,12 +101,8 @@ export default function DistrictMap({ district, player = null, others = [], home
           if (d && !d.moved) onSelect?.(null);
         }}
       >
-        <rect x={-H - 200} y={-H - 200} width={H * 2 + 400} height={H * 2 + 400} fill={col.land} />
-        {layers.blocks}
-        {layers.paving}
-        <rect x={district.runway.minX} y={district.runway.minZ} width={district.runway.maxX - district.runway.minX} height={district.runway.maxZ - district.runway.minZ} fill={col.runway} />
-        {layers.roads}
-        {layers.lots}
+        <image href={picture} x={0} y={0} width={W} height={Hh} preserveAspectRatio="none" />
+        {lotLayer}
         {district.landmarks.map((l) => {
           const on = selected === l.id;
           const s = PIN_STYLE[l.kind];
@@ -101,7 +126,7 @@ export default function DistrictMap({ district, player = null, others = [], home
                 const k = (r * 1.1) / Math.max(g.box[0], g.box[1]);
                 return <path d={g.d} fill="#fff" transform={`translate(${(-g.box[0] * k) / 2} ${(-g.box[1] * k) / 2}) scale(${k})`} style={{ pointerEvents: "none" }} />;
               })()}
-              {!compact && span < 300 && (
+              {!compact && span < 900 && (
                 <text y={r * 1.9} textAnchor="middle" fontSize={r * 0.82} fill={col.text} stroke={dark ? "#0b0f17" : "#ffffff"} strokeWidth={r * 0.2} paintOrder="stroke" style={{ pointerEvents: "none" }}>
                   {l.name}
                 </text>
@@ -118,7 +143,7 @@ export default function DistrictMap({ district, player = null, others = [], home
         {others.map((o) => (
           <g key={o.id} transform={`translate(${o.x} ${o.z})`} style={{ pointerEvents: "none" }}>
             <circle r={pin * 0.42} fill="#2fbf71" stroke="#fff" strokeWidth={pin * 0.1} />
-            {!compact && span < 300 && <text y={-pin * 0.7} textAnchor="middle" fontSize={pin * 0.6} fill="#0b3d22" stroke="#fff" strokeWidth={pin * 0.14} paintOrder="stroke">{o.name}</text>}
+            {!compact && span < 900 && <text y={-pin * 0.7} textAnchor="middle" fontSize={pin * 0.6} fill="#0b3d22" stroke="#fff" strokeWidth={pin * 0.14} paintOrder="stroke">{o.name}</text>}
           </g>
         ))}
         {player && (

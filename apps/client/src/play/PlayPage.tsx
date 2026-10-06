@@ -1,3 +1,4 @@
+import { isAdmin } from "../ui/admin";
 import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NeedId, SimEvent } from "@thelife/game-core";
@@ -128,12 +129,14 @@ export default function PlayPage() {
         <a className="play-chip" href="#/" aria-label="Back">
           ←<span className="play-chip-label"> Back</span>
         </a>
-        <a className="play-chip" href="#/map" aria-label="Map test">
-          <GameIcon name="map" /><span className="play-chip-label"> Map test</span>
+        <a className="play-chip" href="#/map" aria-label="Lagos Island">
+          <GameIcon name="map" /><span className="play-chip-label"> Lagos</span>
         </a>
-        <a className="play-chip" href="#/lab" aria-label="Customise your character">
-          <GameIcon name="palette" /><span className="play-chip-label"> Customise</span>
-        </a>
+        {isAdmin() && (
+          <a className="play-chip" href="#/lab" aria-label="Asset lab (test)">
+            <GameIcon name="palette" /><span className="play-chip-label"> Lab (test)</span>
+          </a>
+        )}
         {hud && (
           <div className="play-clock" aria-label="Time and money">
             <span><GameIcon name={isNight(hud.hourFloat) ? "moon" : "sun"} /></span>

@@ -131,3 +131,5 @@
 }
 .play-menu button:hover, .play-menu button:focus-visible { background: rgba(242, 164, 58, .22); }
 .play-menu button:active { background: rgba(242, 164, 58, .4); }
+.hud-top { position: absolute; z-index: 3; top: max(12px, env(safe-area-inset-top)); right: 64px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.hud-top .play-clock { margin-left: 0; }

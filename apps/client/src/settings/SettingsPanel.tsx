@@ -62,7 +62,7 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
             <GameIcon name="close" size={18} />
           </button>
         ) : (
-          <a className="st-close" href="#/play" aria-label="Back to the game">
+          <a className="st-close" href="#/map" aria-label="Back to the game">
             <GameIcon name="close" size={18} />
           </a>
         )}

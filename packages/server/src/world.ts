@@ -1,5 +1,4 @@
-import { MINT, balance, createLedger, generateDistrict, transfer, walkBlockers, type District, type Ledger } from "@thelife/game-core";
-import { blockRectCentres, createNavGrid, isFree, type NavGrid } from "@thelife/shared";
+import { MINT, balance, createLedger, generateLagos, transfer, walkableAt, type District, type Ledger } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView } from "@thelife/shared";
 
 /** Money a player starts with in the prototype world. */
@@ -29,14 +28,11 @@ export class Room {
   readonly players = new Map<string, Player>();
   readonly ledger: Ledger = createLedger();
   readonly district: District;
-  private readonly nav: NavGrid;
   private nextId = 1;
   private minute = 0;
 
-  constructor(readonly name: string, district = generateDistrict(1)) {
+  constructor(readonly name: string, district = generateLagos()) {
     this.district = district;
-    this.nav = createNavGrid(district.bounds, 0.5);
-    for (const r of walkBlockers(district)) blockRectCentres(this.nav, r, 0.25);
   }
 
   get size(): number {
@@ -63,7 +59,7 @@ export class Room {
       lastMoveAt: now,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now } },
     };
-    if (!isFree(this.nav, player.x, player.z)) {
+    if (!walkableAt(this.district, player.x, player.z)) {
       player.x = spawn.x;
       player.z = spawn.z;
     }
@@ -107,7 +103,7 @@ export class Room {
     const b = this.district.bounds;
     const inside = to.x > b.minX && to.x < b.maxX && to.z > b.minZ && to.z < b.maxZ;
     const farTooFast = distance > MAX_SPEED * dt + MAX_STEP_SLACK;
-    const blocked = to.level === 0 && to.y < 0.05 && !isFree(this.nav, to.x, to.z);
+    const blocked = to.level === 0 && to.y < 0.05 && !walkableAt(this.district, to.x, to.z, 0.1);
     const heightJump = Math.abs(to.y - player.y) > 4 * dt + 1.5;
     if (!inside || farTooFast || blocked || heightJump || to.level > 4) {
       return { ok: false, correct: { x: player.x, y: player.y, z: player.z, level: player.level } };

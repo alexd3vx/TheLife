@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { blockOutside, blockRectCentres, createNavGrid, isFree, type NavGrid } from "@thelife/shared";
-import { walkBlockers, hasInterior, generatePlan, climbStep, planBlockers, stairProgress, DISTRICT_HALF, type BuildingPlan, type Lot, type PlanStairs } from "@thelife/game-core";
+import { hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotIndexOf, coarseRoute, type BuildingPlan, type Lot, type PlanStairs, type Rect } from "@thelife/game-core";
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
@@ -10,7 +10,8 @@ import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
-import { buildGroundDetail, buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
+import { buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
+import { buildTerrain } from "./terrain";
 import { Pedestrians } from "./pedestrians";
 import { AdaptiveQuality } from "../graphics";
 import { getSettings, shadowMapSize, subscribeSettings, type Settings } from "../settings/settings";
@@ -127,17 +128,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   sun.shadow.normalBias = 0.05;
   scene.add(sun, sun.target);
 
-  // Ground: one big grass plane plus the roads and paving built once.
-  const grass = grassTexture();
-  grass.wrapS = grass.wrapT = THREE.RepeatWrapping;
-  grass.repeat.set(200, 200);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.01;
-  ground.receiveShadow = true;
-  scene.add(ground);
-  const groundDetail = buildGroundDetail(district, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
-  scene.add(groundDetail.group);
+  // Ground: water, streets, blocks and parks painted into textures that follow the player.
+  const terrain = buildTerrain(district);
+  scene.add(terrain.group);
 
   // Map pins floating above every named place.
   const pinSprites: THREE.Sprite[] = [];
@@ -159,14 +152,43 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(streamer.root);
   const remotes = new RemotePlayers(manifest);
   scene.add(remotes.root);
-  const peds = new Pedestrians(small ? 40 : 70);
+  const peds = new Pedestrians(district.terrain!, small ? 40 : 70);
   scene.add(peds.root);
 
-  // Walking: a 1 m navigation grid from the same data the server will have.
-  const interiorLots = district.lots.filter(hasInterior);
-  const nav = createNavGrid(district.bounds, 0.5);
-  for (const r of walkBlockers(district)) blockRectCentres(nav, r, 0.25);
-  // Keep the playable area's outer ring walkable but not the void beyond it.
+  // Walking: a 0.5 m navigation grid for a 180 m window around the player, rebuilt as they move (the island is far too big for one grid).
+  const NAV_HALF = 90;
+  const lotIndex = lotIndexOf(district);
+  const lotsWithin = (x: number, z: number, r: number): Lot[] => {
+    const seen = new Set<Lot>();
+    for (let dz = -r; dz <= r; dz += 24) for (let dx = -r; dx <= r; dx += 24) for (const l of lotIndex.near(x + dx, z + dz)) seen.add(l);
+    return [...seen];
+  };
+  const interiorLotAt = (x: number, z: number): Lot | null => {
+    for (const l of lotIndex.near(x, z)) {
+      if (!hasInterior(l)) continue;
+      const f = l.footprint;
+      if (x > f.minX - 0.3 && x < f.maxX + 0.3 && z > f.minZ - 0.3 && z < f.maxZ + 0.3) return l;
+    }
+    return null;
+  };
+  function buildNav(cx: number, cz: number): NavGrid {
+    const bounds: Rect = { minX: cx - NAV_HALF, maxX: cx + NAV_HALF, minZ: cz - NAV_HALF, maxZ: cz + NAV_HALF };
+    const g = createNavGrid(bounds, 0.5);
+    for (let iz = 0; iz < g.height; iz++) {
+      for (let ix = 0; ix < g.width; ix++) {
+        if (!district.terrain!.walkable(g.minX + (ix + 0.5) * g.cell, g.minZ + (iz + 0.5) * g.cell)) g.blocked[iz * g.width + ix] = 1;
+      }
+    }
+    for (const l of lotsWithin(cx, cz, NAV_HALF + 24)) {
+      for (const r of hasInterior(l) ? planBlockers(generatePlan(l)) : [l.footprint]) blockRectCentres(g, r, 0.25);
+    }
+    for (const t of district.trees) if (Math.abs(t.x - cx) < NAV_HALF && Math.abs(t.z - cz) < NAV_HALF) blockRectCentres(g, { minX: t.x - 0.35, maxX: t.x + 0.35, minZ: t.z - 0.35, maxZ: t.z + 0.35 }, 0.25);
+    for (const l of district.lamps) if (Math.abs(l.x - cx) < NAV_HALF && Math.abs(l.z - cz) < NAV_HALF) blockRectCentres(g, { minX: l.x - 0.15, maxX: l.x + 0.15, minZ: l.z - 0.15, maxZ: l.z + 0.15 }, 0.25);
+    for (const p of district.props) if (Math.abs(p.x - cx) < NAV_HALF && Math.abs(p.z - cz) < NAV_HALF) blockRectCentres(g, p.yaw === 90 ? { minX: p.x - 2.2, maxX: p.x + 2.2, minZ: p.z - 0.95, maxZ: p.z + 0.95 } : { minX: p.x - 0.95, maxX: p.x + 0.95, minZ: p.z - 2.2, maxZ: p.z + 2.2 }, 0.2);
+    return g;
+  }
+  let navCentre = { x: district.spawn.x, z: district.spawn.z };
+  let nav = buildNav(navCentre.x, navCentre.z);
 
   const avatar = new Avatar(manifest, loadSavedLook());
   await avatar.load();
@@ -184,14 +206,22 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   // ---- floors: the ground is the district grid; each upper floor of a building has its own small grid. Stairs are ramps:
   // the player's height follows the flight, and the grid is swapped when they reach the top or the bottom.
-  const groundNav = nav;
+  let groundNav = nav;
+  /** Rebuilds the walking grid when the player has moved well away from the middle of it (not while inside a building). */
+  function refreshNav() {
+    if (floorLot) return;
+    if (Math.hypot(controller.position.x - navCentre.x, controller.position.z - navCentre.z) < NAV_HALF * 0.45) return;
+    navCentre = { x: controller.position.x, z: controller.position.z };
+    nav = groundNav = buildNav(navCentre.x, navCentre.z);
+    controller.setNav(groundNav);
+  }
   const planCache = new Map<string, BuildingPlan>();
   const planOf = (lot: Lot) => {
     let p = planCache.get(lot.id);
     if (!p) planCache.set(lot.id, (p = generatePlan(lot)));
     return p;
   };
-  const doors = new DoorManager(scene, interiorLots, planOf);
+  const doors = new DoorManager(scene, (x, z) => lotsWithin(x, z, 40).filter(hasInterior), planOf);
   // Inside a building the street is switched off: you see the building on its own, like the house. Outside carries on without you.
   const interiorScenes = new Map<string, { group: THREE.Group; geometries: THREE.BufferGeometry[] }>();
   let interiorGroup: THREE.Group | null = null;
@@ -200,8 +230,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     interiorGroup = null;
     const inside = lot !== null;
     streamer.root.visible = !inside;
-    groundDetail.group.visible = !inside;
-    ground.visible = !inside;
+    terrain.setVisible(!inside);
     peds.setVisible(!inside);
     doors.setVisible(!inside);
     for (const pin of pinSprites) pin.visible = !inside;
@@ -244,7 +273,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   /** Updates which floor the player is on and how high they stand. Returns the height in metres. */
   function updateFloor(): number {
     const px = controller.position.x, pz = controller.position.z;
-    const inside = interiorLots.find((l) => px > l.footprint.minX - 0.3 && px < l.footprint.maxX + 0.3 && pz > l.footprint.minZ - 0.3 && pz < l.footprint.maxZ + 0.3) ?? null;
+    const inside = interiorLotAt(px, pz);
     if (inside !== floorLot) {
       floorLot = inside;
       floorLevel = 0;
@@ -301,7 +330,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   controls.enableDamping = true;
   controls.dampingFactor = 0.09;
   controls.minDistance = 4;
-  controls.maxDistance = 420;
+  controls.maxDistance = 900;
   controls.minPolarAngle = 0.15;
   controls.maxPolarAngle = 1.42;
   controls.screenSpacePanning = false;
@@ -344,10 +373,36 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const hits = raycaster.intersectObjects(pinSprites, false);
     return hits[0]?.object.userData.landmarkId ?? null;
   }
+  // Long walks: a rough route over the whole map, then each leg planned on the walking grid around the player.
+  let farRoute: { x: number; z: number }[] | null = null;
+  let farPace: "walk" | "run" | "auto" = "auto";
+  function walkTo(x: number, z: number, pace: "walk" | "run" | "auto"): boolean {
+    farRoute = null;
+    const px = controller.position.x, pz = controller.position.z;
+    const near = Math.abs(x - px) < NAV_HALF - 10 && Math.abs(z - pz) < NAV_HALF - 10;
+    if (floorLot || near) {
+      const ok = controller.tapGround(x, z, pace);
+      if (ok || floorLot) return ok;
+    }
+    const route = coarseRoute(district.terrain!, px, pz, x, z);
+    if (!route) return false;
+    farRoute = route;
+    farPace = pace;
+    return true;
+  }
+  /** Called every frame: when the character has finished one leg of a long walk, start the next. */
+  function advanceFar() {
+    if (!farRoute || controller.mode !== "idle") return;
+    for (let tries = 0; tries < 6 && farRoute.length; tries++) {
+      const wp = farRoute.shift()!;
+      if (controller.tapGround(wp.x, wp.z, farPace)) return;
+    }
+    if (!farRoute.length) farRoute = null;
+  }
   function goTo(id: string, pace: "walk" | "run" | "auto"): boolean {
     const lm = district.landmarks.find((l) => l.id === id);
     if (!lm) return false;
-    const ok = controller.tapGround(lm.entrance.x, lm.entrance.z, pace);
+    const ok = walkTo(lm.entrance.x, lm.entrance.z, pace);
     showMarker(lm.entrance.x, lm.entrance.z, ok);
     return ok;
   }
@@ -356,19 +411,19 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const pinHit = pinAt(clientX, clientY);
     if (pinHit) {
       const lm = district.landmarks.find((l) => l.id === pinHit)!;
-      showMarker(lm.entrance.x, lm.entrance.z, controller.canReach(lm.entrance.x, lm.entrance.z));
       events.onMenu(null);
       goTo(lm.id, "auto");
       return;
     }
     plane.constant = -controller.position.y - 0.02; // taps land on the floor the player is on
     const point = groundAt(clientX, clientY);
-    if (!point || Math.abs(point.x) > DISTRICT_HALF || Math.abs(point.z) > DISTRICT_HALF) return events.onMenu(null);
+    const bnds = district.bounds;
+    if (!point || point.x < bnds.minX || point.x > bnds.maxX || point.z < bnds.minZ || point.z > bnds.maxZ) return events.onMenu(null);
     const stairs = stairTarget(point.x, point.z);
     const { x, z } = stairs ?? point;
     // Plain movement has no menu: tap and go.
     events.onMenu(null);
-    showMarker(x, z, controller.tapGround(x, z, "auto"));
+    showMarker(x, z, walkTo(x, z, "auto"));
   }
   const down = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
   const canvas = renderer.domElement;
@@ -484,7 +539,10 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const rawDt = clock.getDelta();
     const dt = Math.min(rawDt, 0.1);
     if (document.hidden) return;
+    refreshNav();
+    advanceFar();
     controller.update(dt);
+    terrain.update(controller.position.x, controller.position.z);
     remotes.focus.copy(controller.position);
     remotes.update(dt);
     localSpeed += (Math.hypot(controller.position.x - lastX, controller.position.z - lastZ) / Math.max(dt, 0.001) - localSpeed) * Math.min(1, dt * 8);
@@ -593,7 +651,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     goTo,
     setNight(on) {
       night = on;
-      groundDetail.setNight(on);
+      terrain.setNight(on);
       SKY.set(on ? "#0d1426" : "#a9cbe8");
       scene.fog = new THREE.Fog(SKY, (on ? 90 : 140) * getSettings().drawDistance, (on ? 360 : 330) * getSettings().drawDistance);
       hemi.intensity = on ? 0.38 : 0.85;
@@ -619,6 +677,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       correct: (x, z) => controller.place(x, z, controller.yaw),
     },
     dispose() {
+      terrain.dispose();
       unsubscribeSettings();
       fx?.dispose();
       remotes.dispose();
@@ -659,7 +718,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       landmarks: district.landmarks,
       plan: (id: string) => planOf(district.lots.find((l) => l.id === id)!),
       floor: () => ({ level: floorLevel, y: controller.position.y, lot: floorLot?.id ?? null }),
-      houses: () => interiorLots.map((l) => ({ id: l.id, floors: l.floors, garage: l.garage, facing: l.facing, inside: generatePlan(l).inside, kind: l.kind })),
+      houses: () => district.lots.filter(hasInterior).slice(0, 400).map((l) => ({ id: l.id, floors: l.floors, garage: l.garage, facing: l.facing, inside: generatePlan(l).inside, kind: l.kind })),
       state: () => controller.state,
       night: () => night,
     },

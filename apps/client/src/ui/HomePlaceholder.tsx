@@ -1,3 +1,4 @@
+import { isAdmin } from "./admin";
 import { lazy, Suspense } from "react";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -24,19 +25,29 @@ export function HomePlaceholder() {
           </p>
         ) : (
           <p>
-            Playing <strong>offline</strong>. Your life is saved on this device.
+            Your life is saved on this device.
           </p>
         )}
         {save && <p className="muted">Save started {new Date(save.createdAt).toLocaleDateString()}</p>}
-        <a className="btn btn-primary" href="#/play" style={linkStyle}>
-          Play: your house
+        <a className="btn btn-primary" href="#/map" style={linkStyle}>
+          Play: Lagos Island
         </a>
-        <a className="btn btn-ghost" href="#/showroom" style={linkStyle}>
-          Furniture showroom (test everything)
+        <a className="btn btn-ghost" href="#/settings" style={linkStyle}>
+          Settings
         </a>
-        <a className="btn btn-ghost" href="#/lab" style={linkStyle}>
-          Character and asset lab
-        </a>
+        {isAdmin() && (
+          <>
+            <a className="btn btn-ghost" href="#/play" style={linkStyle}>
+              House (test)
+            </a>
+            <a className="btn btn-ghost" href="#/showroom" style={linkStyle}>
+              Furniture showroom (test)
+            </a>
+            <a className="btn btn-ghost" href="#/lab" style={linkStyle}>
+              Character and asset lab (test)
+            </a>
+          </>
+        )}
         <button className="btn btn-ghost" onClick={() => void leave()}>
           {user ? "Log out" : "Back to start"}
         </button>

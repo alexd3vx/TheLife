@@ -25,7 +25,7 @@ export class DoorManager {
   private frame = 0;
   private readonly materials = new Map<number, THREE.MeshStandardMaterial>();
 
-  constructor(scene: THREE.Scene, private readonly lots: Lot[], private readonly planOf: (lot: Lot) => BuildingPlan) {
+  constructor(scene: THREE.Scene, private readonly lotsNear: (x: number, z: number) => Lot[], private readonly planOf: (lot: Lot) => BuildingPlan) {
     scene.add(this.root);
   }
 
@@ -72,7 +72,8 @@ export class DoorManager {
 
   update(px: number, pz: number, dt: number): void {
     if (this.frame++ % 30 === 0) {
-      const near = this.lots
+      const near = this
+        .lotsNear(px, pz)
         .map((l) => ({ l, d: Math.hypot((l.footprint.minX + l.footprint.maxX) / 2 - px, (l.footprint.minZ + l.footprint.maxZ) / 2 - pz) }))
         .filter((x) => x.d < 45)
         .sort((a, b) => a.d - b.d)

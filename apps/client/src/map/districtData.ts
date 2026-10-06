@@ -1,8 +1,8 @@
-import { generateDistrict, type District } from "@thelife/game-core";
+import { generateLagos, type District } from "@thelife/game-core";
 
 let cached: District | null = null;
 
-/** The neighbourhood, generated once and shared by the 3D map, the minimap and the phone. */
+/** The world (Lagos Island), generated once and shared by the 3D map, the minimap and the phone. */
 export function getDistrict(): District {
-  return (cached ??= generateDistrict(1));
+  return (cached ??= generateLagos());
 }

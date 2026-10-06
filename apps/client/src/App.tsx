@@ -1,3 +1,4 @@
+import { isAdmin } from "./ui/admin";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "./auth/AuthProvider";
 import { AuthPage } from "./ui/AuthPage";
@@ -39,7 +40,8 @@ export function App() {
   const hash = useHashRoute();
   useLifeTick();
 
-  if (hash.startsWith("#/lab")) {
+  const admin = isAdmin();
+  if (admin && hash.startsWith("#/lab")) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <LabPage />
@@ -67,7 +69,7 @@ export function App() {
       </Suspense>
     );
   }
-  if (hash.startsWith("#/showroom")) {
+  if (admin && hash.startsWith("#/showroom")) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <ShowroomPage />
