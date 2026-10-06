@@ -138,3 +138,11 @@ Decided: real Lagos clock; slow real-time needs; social apps are separate apps t
 - Characters: search the whole web for the best semi-realistic, highly customisable character (free licence), and make customisation much deeper. Houses and buildings get better exteriors that depend on the house kind. On registration the player lands at the airport: the arrival cinematic and animations differ by background (nepo, middle, lapo). Then they walk by tap or by control.
 - PWA: install to the home screen, full screen, own icon and splash; game files cached for fast loading (play still needs internet); joystick + look pad + action buttons the player can move, resize and re-bind; haptics and sound cues.
 - Performance: looks great on mid phones, quality drops automatically on weak ones.
+
+## Decisions, round 4 (arrival, customisation, homes, scale)
+- Arrival by background: nepo = private jet / first class with a driver waiting; middle = economy flight, taxi or a friend; lapo = cheap flight or bus, tired, haggling for transport. Cinematic, with different animations.
+- Customisation: face and body sliders; hair, braids, beards, makeup, tattoos; clothes and traditional wear; voice and walk style. Voice comes with the chosen sex (male or female), and the creator warns players to choose their real gender and respect others.
+- Homes: a different home per background, in the world, near the player. Nepo: a fully furnished duplex. Middle: a mid-furnished flat. Lapo: a rented room. The house is a building in the Lagos map (not the separate green-island scene): you walk out of your own door into the street. Same for every building: walk in and out. Later (2.5D/3D): walk to your home, or fast-travel by transport with a cutscene to your place.
+  - How: each player's interior is a private instance (like GTA online apartments); the door is on a real home building in a zone that fits the tier (nepo east/Ikoyi, middle central, lapo dense old Lagos); exiting puts you at that door.
+- More cinematic everywhere.
+- Scale: about 100 players for testing, after the features are done; more engineering later if feedback is good.
