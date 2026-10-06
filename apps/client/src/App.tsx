@@ -14,6 +14,7 @@ const CreatorPage = lazy(() => import("./creator/CreatorPage"));
 const ArrivalFilm = lazy(() => import("./arrival/ArrivalFilm"));
 const BakePage = lazy(() => import("./iso/bake/BakePage"));
 const IsoPage = lazy(() => import("./iso/IsoPage"));
+const CharTestPage = lazy(() => import("./iso/CharTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -42,6 +43,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <IsoPage />
+      </Suspense>
+    );
+  }
+  if (import.meta.env.DEV && hash.startsWith("#/chartest")) {
+    return (
+      <Suspense fallback={null}>
+        <CharTestPage />
       </Suspense>
     );
   }

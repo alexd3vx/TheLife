@@ -1,18 +1,25 @@
-// Converts the baked PNG sprites to WebP (much smaller). Run from tools/assets so `sharp` resolves: node ../sprites/to-webp.mjs
+// Converts the baked PNG sprites to WebP (much smaller). Run from tools/assets so `sharp` resolves:
+//   cd tools/assets && cp ../sprites/to-webp.mjs ./x.mjs && node x.mjs && rm x.mjs
 import sharp from "sharp";
 import { readdirSync, statSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "../../apps/client/public/sprites");
-let before = 0, after = 0;
-for (const dir of ["props", "char"]) {
-  for (const f of readdirSync(join(root, dir))) {
+let before = 0, after = 0, n = 0;
+async function walk(dir) {
+  for (const f of readdirSync(dir)) {
+    const p = join(dir, f);
+    if (statSync(p).isDirectory()) {
+      await walk(p);
+      continue;
+    }
     if (!f.endsWith(".png")) continue;
-    const src = join(root, dir, f);
-    const dst = join(root, dir, f.replace(/\.png$/, ".webp"));
-    before += statSync(src).size;
-    await sharp(src).webp({ quality: 86, alphaQuality: 90, effort: 5 }).toFile(dst);
+    const dst = p.replace(/\.png$/, ".webp");
+    before += statSync(p).size;
+    await sharp(p).webp({ quality: 84, alphaQuality: 92, effort: 4 }).toFile(dst);
     after += statSync(dst).size;
-    unlinkSync(src);
+    unlinkSync(p);
+    n++;
   }
 }
-console.log(`PNG ${(before / 1e6).toFixed(1)} MB -> WebP ${(after / 1e6).toFixed(1)} MB`);
+await walk(root);
+console.log(`${n} files: PNG ${(before / 1e6).toFixed(1)} MB -> WebP ${(after / 1e6).toFixed(1)} MB`);

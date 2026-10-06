@@ -129,6 +129,12 @@ function drawAnkara(size: number) {
 
 const cache = new Map<FabricId, THREE.CanvasTexture>();
 
+/** The raw tileable pattern (a plain canvas), for the 2D game. */
+export function fabricCanvas(id: FabricId): HTMLCanvasElement {
+  const size = id === "ankara" ? 256 : 128;
+  return id === "stripes" ? drawStripes(size) : id === "ankara" ? drawAnkara(size) : id === "denim" ? drawDenim(size) : drawPlain(size);
+}
+
 export function fabricTexture(id: FabricId): THREE.CanvasTexture {
   let texture = cache.get(id);
   if (!texture) {

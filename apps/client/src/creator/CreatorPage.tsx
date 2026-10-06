@@ -1,32 +1,25 @@
 import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
-import { Avatar } from "../lab/avatar";
-import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, bodyFor, loadSavedLook, saveLook, sexOf, type Look } from "../lab/looks";
-import { loadManifest, type AssetManifest } from "../lab/manifest";
-import { PROC_BOTTOMS, PROC_TOPS } from "../lab/procedural/garments";
-import { PROC_HAIR } from "../lab/procedural/hair";
-import { createViewer, type Viewer } from "../lab/viewer";
+import { DEFAULT_LOOK, sexOf, type Look } from "../lab/looks";
+import StudioStage from "../iso/StudioStage";
+import StudioPanel from "./StudioPanel";
 import { setPending, takeRestart } from "../play/pendingLife";
 import "./creator.css";
 
 const naira = (n: number) => `₦${n.toLocaleString()}`;
 const TIERS: Tier[] = ["lapo", "middle", "nepo"];
 const PHONE_LABEL = { basic: "LifePhone Go (cracked screen)", mid: "LifePhone Plus", flagship: "LifePhone Max" } as const;
-const HAIR_CHOICES = [...PROC_HAIR, { id: "hair_buzzed", label: "Buzzed" }, { id: "hair_parted", label: "Side parted" }];
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 /** Make your person, then roll the background that decides how life starts: lapo, middle or nepo. */
 export default function CreatorPage() {
-  const stageRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<Viewer | null>(null);
-  const avatarRef = useRef<Avatar | null>(null);
-  const [manifest, setManifest] = useState<AssetManifest | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [look, setLook] = useState<Look>(() => loadSavedLook());
+  const lookRef = useRef<Look>({ ...DEFAULT_LOOK });
+  const [look, setLook] = useState<Look>(() => ({ ...DEFAULT_LOOK }));
+  const [walking, setWalking] = useState(false);
   const [step, setStep] = useState<"look" | "background" | "traits">("look");
   const [traits, setTraits] = useState<string[]>([]);
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [rolling, setRolling] = useState(false);
   const [reel, setReel] = useState<Tier | null>(null);
@@ -34,55 +27,12 @@ export default function CreatorPage() {
   const [firstName, setFirstName] = useState("");
   const [surname, setSurname] = useState("");
 
-  useEffect(() => {
-    const container = stageRef.current;
-    if (!container) return;
-    const viewer = createViewer(container);
-    if (!viewer) {
-      setError("Your browser can't run WebGL, which the game needs.");
-      return;
-    }
-    viewerRef.current = viewer;
-    loadManifest()
-      .then(setManifest)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-    return () => {
-      viewer.dispose();
-      viewerRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!manifest || !viewer) return;
-    const avatar = new Avatar(manifest, loadSavedLook());
-    avatarRef.current = avatar;
-    viewer.addFrameCallback((delta) => avatar.update(delta));
-    avatar
-      .load()
-      .then(() => {
-        avatar.play("Idle_Loop", 0);
-        viewer.setSubject(avatar.root);
-        viewer.setTurntable(true);
-        setBusy(false);
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-    return () => avatar.dispose();
-  }, [manifest]);
-
   const update = useCallback((patch: Partial<Look>) => {
     setLook((prev) => {
       const next = { ...prev, ...patch };
-      saveLook(next);
+      lookRef.current = next;
       return next;
     });
-    const avatar = avatarRef.current;
-    if (!avatar) return;
-    setBusy(true);
-    avatar
-      .setLook(patch)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setBusy(false));
   }, []);
 
   const roll = useCallback(async () => {
@@ -112,8 +62,7 @@ export default function CreatorPage() {
 
   const start = useCallback(() => {
     if (!profile) return;
-    saveLook(look);
-    setPending({ ...profile, traits: sanitizeTraits(traits), firstName: firstName.trim() || profile.firstName, surname: surname.trim() || profile.surname }, takeRestart());
+    setPending({ ...profile, traits: sanitizeTraits(traits), firstName: firstName.trim() || profile.firstName, surname: surname.trim() || profile.surname }, takeRestart(), JSON.stringify(look));
     window.location.hash = "#/play";
   }, [profile, look, firstName, surname, traits]);
 
@@ -133,19 +82,12 @@ export default function CreatorPage() {
     });
   }, []);
 
-  const tops = PROC_TOPS;
-  const bottoms = PROC_BOTTOMS;
-  const hairChoices = useMemo(() => HAIR_CHOICES, []);
-
   return (
     <div className={`creator${step === "look" ? "" : " is-full"}`}>
-      <div className="creator-stage" ref={stageRef}>
-        {busy && !error && <div className="creator-busy">Working…</div>}
-        {error && <div className="creator-error">{error}</div>}
-        <div className="creator-view">
-          <button onClick={() => viewerRef.current?.resetCamera()}>Full</button>
-          <button onClick={() => viewerRef.current?.closeUp(0.93, 0.28)}>Face</button>
-        </div>
+      <div className="creator-stage">
+        <StudioStage look={look} walking={walking} onBusy={setBusy} />
+        {busy && <div className="creator-busy">Dressing…</div>}
+        <div className="studio-hint">Drag to turn around</div>
       </div>
 
       <aside className="creator-panel">
@@ -171,93 +113,7 @@ export default function CreatorPage() {
           </div>
         </header>
 
-        {step === "look" && (
-          <div className="creator-body">
-            <section>
-              <h2>Body</h2>
-              <div className="creator-segment">
-                {(["male", "female"] as const).map((sex) => (
-                  <button key={sex} aria-pressed={sexOf(look.body) === sex} onClick={() => update({ body: bodyFor(sex, true), beard: sex === "male" ? look.beard : false, brows: null })}>
-                    {sex === "male" ? "Male" : "Female"}
-                  </button>
-                ))}
-              </div>
-              <h3>Skin tone</h3>
-              <div className="creator-swatches">
-                {SKIN_TONES.map((tone) => (
-                  <button key={tone.id} title={tone.label} aria-label={tone.label} aria-pressed={look.skinTone === tone.id} style={{ background: tone.base }} onClick={() => update({ skinTone: tone.id })} />
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <h2>Hair</h2>
-              <div className="creator-chips">
-                <button aria-pressed={look.hair === null} onClick={() => update({ hair: null })}>
-                  None
-                </button>
-                {hairChoices.map((h) => (
-                  <button key={h.id} aria-pressed={look.hair === h.id} onClick={() => update({ hair: h.id })}>
-                    {h.label}
-                  </button>
-                ))}
-              </div>
-              <div className="creator-swatches">
-                {HAIR_COLORS.map((c) => (
-                  <button key={c.id} title={c.label} aria-label={c.label} aria-pressed={look.hairColor === c.id} style={{ background: c.color }} onClick={() => update({ hairColor: c.id })} />
-                ))}
-              </div>
-              {sexOf(look.body) === "male" && (
-                <label className="creator-check">
-                  <input type="checkbox" checked={look.beard} onChange={(e) => update({ beard: e.target.checked })} /> Beard
-                </label>
-              )}
-            </section>
-
-            <section>
-              <h2>Eyes</h2>
-              <div className="creator-swatches">
-                {EYE_COLORS.map((c) => (
-                  <button key={c.id} title={c.label} aria-label={c.label} aria-pressed={look.eyeColor === c.id} style={{ background: c.id === "brown" ? "#5a3a22" : c.color }} onClick={() => update({ eyeColor: c.id })} />
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <h2>Clothes</h2>
-              <h3>Top</h3>
-              <div className="creator-chips">
-                {tops.map((t) => (
-                  <button key={t.id} aria-pressed={look.top === t.id} onClick={() => update({ top: t.id })}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <div className="creator-swatches small">
-                {CLOTH_COLORS.map((c) => (
-                  <button key={c.id} title={c.label} aria-label={`Top ${c.label}`} aria-pressed={look.topColor === c.id} style={{ background: c.color }} onClick={() => update({ topColor: c.id })} />
-                ))}
-              </div>
-              <h3>Bottom</h3>
-              <div className="creator-chips">
-                {bottoms.map((t) => (
-                  <button key={t.id} aria-pressed={look.bottom === t.id} onClick={() => update({ bottom: t.id })}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <div className="creator-swatches small">
-                {CLOTH_COLORS.map((c) => (
-                  <button key={c.id} title={c.label} aria-label={`Bottom ${c.label}`} aria-pressed={look.bottomColor === c.id} style={{ background: c.color }} onClick={() => update({ bottomColor: c.id })} />
-                ))}
-              </div>
-            </section>
-
-            <button className="btn btn-primary creator-next" onClick={() => setStep("background")}>
-              Next: your background
-            </button>
-          </div>
-        )}
+        {step === "look" && <StudioPanel look={look} update={update} walking={walking} setWalking={setWalking} onNext={() => setStep("background")} />}
 
         {step === "background" && (
           <div className="creator-body">

@@ -40,6 +40,30 @@ if (mode === "props") {
   let old = {};
   try { old = JSON.parse((await import("node:fs")).readFileSync(file, "utf8")); } catch {}
   writeFileSync(file, JSON.stringify({ ...old, ...index }));
+} else if (mode === "layers") {
+  // node bake.mjs layers <realmale|realfemale> [key,key] [clip,clip]
+  const body = process.argv[3];
+  const keysArg = process.argv[4] && process.argv[4] !== "all" ? process.argv[4].split(",") : null;
+  const clipsArg = process.argv[5] ? process.argv[5].split(",") : null;
+  const variants = await page.evaluate((b) => window.__bake.layerVariants(b), body);
+  for (const v of variants) {
+    if (keysArg && !keysArg.includes(v.key)) continue;
+    const t0 = Date.now();
+    const sheets = await page.evaluate(([b, k, c]) => window.__bake.layer(b, k, c), [body, v.key, clipsArg]).catch((e) => { console.log("FAILED", v.key, e.message.slice(0, 100)); return null; });
+    if (!sheets) continue;
+    const index = {};
+    for (const [clip, sheet] of Object.entries(sheets)) {
+      if (!sheet) continue;
+      save(`char2/${body}/${v.key}/${clip}.png`, sheet.image);
+      index[clip] = { width: sheet.width, height: sheet.height, cells: sheet.cells.map((c) => [c.dir, c.frame, c.x, c.y, c.w, c.h, c.ax, c.ay]) };
+    }
+    const file = join(out, `char2/${body}/${v.key}/index.json`);
+    let old = {};
+    try { old = JSON.parse((await import("node:fs")).readFileSync(file, "utf8")); } catch {}
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({ ...old, ...index }));
+    console.log(body, v.key, Object.keys(index).length, "clips", Math.round((Date.now() - t0) / 1000) + "s");
+  }
 } else {
   const sprites = await page.evaluate((o) => window.__bake.character(o), only ?? null);
   const index = { frames: {} };

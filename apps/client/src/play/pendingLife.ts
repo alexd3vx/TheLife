@@ -3,10 +3,10 @@ import type { Profile } from "@thelife/game-core";
 // The character just made in the creator, waiting to be sent to the server (which keeps the life; nothing about your game is saved
 // on this device). It only lives in this tab's memory, long enough to survive a reload while the connection is made.
 const KEY = "thelife.pending";
-let memory: { profile: Profile; replace: boolean } | null = null;
+let memory: { profile: Profile; replace: boolean; look?: string } | null = null;
 
-export function setPending(profile: Profile, replace = false): void {
-  memory = { profile, replace };
+export function setPending(profile: Profile, replace = false, look?: string): void {
+  memory = { profile, replace, look };
   try {
     sessionStorage.setItem(KEY, JSON.stringify(memory));
   } catch {
@@ -14,11 +14,11 @@ export function setPending(profile: Profile, replace = false): void {
   }
 }
 
-export function getPending(): { profile: Profile; replace: boolean } | null {
+export function getPending(): { profile: Profile; replace: boolean; look?: string } | null {
   if (memory) return memory;
   try {
     const raw = sessionStorage.getItem(KEY);
-    if (raw) return (memory = JSON.parse(raw) as { profile: Profile; replace: boolean });
+    if (raw) return (memory = JSON.parse(raw) as { profile: Profile; replace: boolean; look?: string });
   } catch {
     /* ignore */
   }

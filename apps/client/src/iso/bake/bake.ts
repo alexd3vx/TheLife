@@ -23,23 +23,35 @@ export interface Sprite {
   ay: number;
 }
 
-let renderer: THREE.WebGLRenderer | null = null;
-const CANVAS = { w: 640, h: 720, ox: 320, oy: 560 }; // the drawing area, and where the origin lands in it
+/** The drawing area (in final pixels), and where the model's origin lands in it. */
+export interface Area {
+  /** Strength of the light, 1 by default. People are drawn dimmer so the shading survives being coloured afterwards. */
+  light?: number;
+  w: number;
+  h: number;
+  ox: number;
+  oy: number;
+}
+export const PROP_AREA: Area = { w: 640, h: 720, ox: 320, oy: 560 };
+/** People are smaller than furniture, so a smaller area makes baking a whole character fast. */
+export const CHAR_AREA: Area = { w: 340, h: 400, ox: 170, oy: 320, light: 0.62 };
 
-function gl(): THREE.WebGLRenderer {
+let renderer: THREE.WebGLRenderer | null = null;
+
+function gl(area: Area): THREE.WebGLRenderer {
   if (!renderer) {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setSize(CANVAS.w * SS, CANVAS.h * SS, false);
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
   }
+  if (renderer.domElement.width !== area.w * SS || renderer.domElement.height !== area.h * SS) renderer.setSize(area.w * SS, area.h * SS, false);
   return renderer;
 }
 
-function camera(): THREE.OrthographicCamera {
+function camera(area: Area): THREE.OrthographicCamera {
   const s = K * SS;
-  const w = CANVAS.w * SS, h = CANVAS.h * SS;
-  const cam = new THREE.OrthographicCamera(-(CANVAS.ox * SS) / s, (w - CANVAS.ox * SS) / s, (CANVAS.oy * SS) / s, -(h - CANVAS.oy * SS) / s, 0.1, 100);
+  const w = area.w * SS, h = area.h * SS;
+  const cam = new THREE.OrthographicCamera(-(area.ox * SS) / s, (w - area.ox * SS) / s, (area.oy * SS) / s, -(h - area.oy * SS) / s, 0.1, 100);
   const d = 30;
   cam.position.set(d * Math.cos(ELEVATION) * Math.SQRT1_2, d * Math.sin(ELEVATION), d * Math.cos(ELEVATION) * Math.SQRT1_2);
   cam.lookAt(0, 0, 0);
@@ -47,16 +59,19 @@ function camera(): THREE.OrthographicCamera {
   return cam;
 }
 
-const ramp = (() => {
-  const data = new Uint8Array([70, 70, 70, 255, 130, 130, 130, 255, 200, 200, 200, 255, 255, 255, 255, 255]);
-  const t = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
+const makeRamp = (steps: number[]) => {
+  const data = new Uint8Array(steps.flatMap((v) => [v, v, v, 255]));
+  const t = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
   t.minFilter = t.magFilter = THREE.NearestFilter;
   t.needsUpdate = true;
   return t;
-})();
+};
+const ramp = makeRamp([70, 130, 200, 255]);
+/** For people, whose colours are applied afterwards by multiplying: the shadows stay light enough for dark skin and dark cloth to read. */
+const softRamp = makeRamp([95, 150, 205, 255]);
 
 /** Swaps real-world shading for flat, banded colour so everything looks hand-painted. */
-export function toonify(root: THREE.Object3D): void {
+export function toonify(root: THREE.Object3D, soft = false): void {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -64,9 +79,10 @@ export function toonify(root: THREE.Object3D): void {
       const s = m as THREE.MeshStandardMaterial;
       if (!s.isMeshStandardMaterial && !(m as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) return m;
       const t = new THREE.MeshToonMaterial({
-        color: s.color.clone().multiplyScalar(1.12),
+        name: s.name,
+        color: s.color.clone().multiplyScalar(soft ? 1 : 1.12),
         map: s.map ?? null,
-        gradientMap: ramp,
+        gradientMap: soft ? softRamp : ramp,
         transparent: s.transparent,
         opacity: s.opacity,
         alphaTest: s.alphaTest,
@@ -82,13 +98,13 @@ export function toonify(root: THREE.Object3D): void {
   });
 }
 
-function lights(): THREE.Group {
+function lights(k = 1): THREE.Group {
   const g = new THREE.Group();
-  g.add(new THREE.AmbientLight("#ffe9d2", 1.25));
-  const sun = new THREE.DirectionalLight("#fff3e0", 2.1);
+  g.add(new THREE.AmbientLight("#ffe9d2", 1.25 * k));
+  const sun = new THREE.DirectionalLight("#fff3e0", 2.1 * k);
   sun.position.set(-4, 7, 5); // from the left, above and in front, so the right side is the shaded one
   g.add(sun);
-  const fill = new THREE.DirectionalLight("#9fb4ff", 0.5);
+  const fill = new THREE.DirectionalLight("#9fb4ff", 0.5 * k);
   fill.position.set(6, 2, -3);
   g.add(fill);
   return g;
@@ -97,18 +113,18 @@ function lights(): THREE.Group {
 const OUTLINE = "#3a2418";
 
 /** Outline, grain, warm colour: the "painted" finish, then trim the empty edges. */
-function finish(src: HTMLCanvasElement): { canvas: HTMLCanvasElement; ax: number; ay: number } | null {
+function finish(src: HTMLCanvasElement, A: Area): { canvas: HTMLCanvasElement; ax: number; ay: number } | null {
   // shrink the double-size drawing
   const small = document.createElement("canvas");
-  small.width = CANVAS.w;
-  small.height = CANVAS.h;
+  small.width = A.w;
+  small.height = A.h;
   const sc = small.getContext("2d")!;
   sc.imageSmoothingQuality = "high";
-  sc.drawImage(src, 0, 0, CANVAS.w, CANVAS.h);
+  sc.drawImage(src, 0, 0, A.w, A.h);
   // find what was drawn
-  const data = sc.getImageData(0, 0, CANVAS.w, CANVAS.h).data;
-  let minX = CANVAS.w, minY = CANVAS.h, maxX = -1, maxY = -1;
-  for (let y = 0; y < CANVAS.h; y++) for (let x = 0; x < CANVAS.w; x++) if (data[(y * CANVAS.w + x) * 4 + 3]! > 10) {
+  const data = sc.getImageData(0, 0, A.w, A.h).data;
+  let minX = A.w, minY = A.h, maxX = -1, maxY = -1;
+  for (let y = 0; y < A.h; y++) for (let x = 0; x < A.w; x++) if (data[(y * A.w + x) * 4 + 3]! > 10) {
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;
@@ -118,8 +134,8 @@ function finish(src: HTMLCanvasElement): { canvas: HTMLCanvasElement; ax: number
   const pad = 4;
   minX = Math.max(0, minX - pad);
   minY = Math.max(0, minY - pad);
-  maxX = Math.min(CANVAS.w - 1, maxX + pad);
-  maxY = Math.min(CANVAS.h - 1, maxY + pad);
+  maxX = Math.min(A.w - 1, maxX + pad);
+  maxY = Math.min(A.h - 1, maxY + pad);
   const w = maxX - minX + 1, h = maxY - minY + 1;
   const out = document.createElement("canvas");
   out.width = w;
@@ -156,22 +172,22 @@ function finish(src: HTMLCanvasElement): { canvas: HTMLCanvasElement; ax: number
   oc.drawImage(grain, 0, 0);
   oc.globalAlpha = 1;
   oc.globalCompositeOperation = "source-over";
-  return { canvas: out, ax: CANVAS.ox - minX, ay: CANVAS.oy - minY };
+  return { canvas: out, ax: A.ox - minX, ay: A.oy - minY };
 }
 
 /** Draws one object (placed with its base middle at the origin) from the isometric camera. */
-export function shoot(object: THREE.Object3D): { canvas: HTMLCanvasElement; ax: number; ay: number } | null {
+export function shoot(object: THREE.Object3D, area: Area = PROP_AREA): { canvas: HTMLCanvasElement; ax: number; ay: number } | null {
   const scene = new THREE.Scene();
-  scene.add(lights());
+  scene.add(lights(area.light ?? 1));
   scene.add(object);
-  const r = gl();
-  r.render(scene, camera());
+  const r = gl(area);
+  r.render(scene, camera(area));
   const copy = document.createElement("canvas");
   copy.width = r.domElement.width;
   copy.height = r.domElement.height;
   copy.getContext("2d")!.drawImage(r.domElement, 0, 0);
   scene.remove(object);
-  return finish(copy);
+  return finish(copy, area);
 }
 
 export function toSprite(id: string, rot: number, shot: { canvas: HTMLCanvasElement; ax: number; ay: number }): Sprite {

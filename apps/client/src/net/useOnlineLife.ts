@@ -33,7 +33,7 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
           window.location.hash = "#/create";
           return;
         }
-        world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true });
+        world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true, ...(pending?.look ? { look: pending.look } : {}) });
         set({ phase: "creating", justArrived: true });
       } else if (m.t === "life") {
         clearPending();

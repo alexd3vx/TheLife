@@ -147,10 +147,52 @@ export function buildLifeClips(
   ctx: Context,
   library: Map<string, THREE.AnimationClip>,
 ): THREE.AnimationClip[] {
-  const idle = library.get("Idle_Loop");
+  const libraryIdle = library.get("Idle_Loop");
   const sitting = library.get("Sitting_Idle_Loop");
-  if (!idle || !sitting) return [];
+  if (!libraryIdle || !sitting) return [];
   const out: THREE.AnimationClip[] = [];
+
+  // The library's idle is a fighter's stance: feet wide, knees bent, arms out like a gorilla. Ordinary people stand up straight with
+  // their arms down, so the standing pose is built from the T-pose instead: arms lowered to the sides, a slight bend in the elbows,
+  // and a slow breath in the chest. Every standing life clip below (cook, wash, read...) grows from this pose, and it replaces "Idle_Loop".
+  let idle = libraryIdle;
+  const tpose = library.get("A_TPose");
+  if (tpose) {
+    const duration = 4.4;
+    const stand = cloneClip(tpose, "Idle_Loop", duration);
+    posedAt(ctx, tpose);
+    const armL = bend(ctx, "upperarm_l", new THREE.Vector3(-0.16, -1, 0.04), 76);
+    const armR = bend(ctx, "upperarm_r", new THREE.Vector3(0.16, -1, 0.04), 76);
+    // with the arms down, the elbows bend a little forward (measured on the lowered pose below)
+    const chestIn = bend(ctx, "spine_03", FORWARD, 2.2);
+    const headTilt = bend(ctx, "neck_01", FORWARD, 2.5);
+    addRotation(stand, "upperarm_l", cycle(duration, 8, (p) => slerp(identity(), armL, 1 + Math.sin(p * Math.PI * 2) * 0.012)));
+    addRotation(stand, "upperarm_r", cycle(duration, 8, (p) => slerp(identity(), armR, 1 + Math.sin(p * Math.PI * 2 + 1) * 0.012)));
+    addRotation(stand, "spine_03", cycle(duration, 8, (p) => slerp(identity(), chestIn, 0.5 + 0.5 * Math.sin(p * Math.PI * 2))));
+    addRotation(stand, "neck_01", cycle(duration, 8, (p) => slerp(identity(), headTilt, 0.5 + 0.5 * Math.sin(p * Math.PI * 2 + 0.6))));
+    // the elbows, once the arms hang
+    posedAt(ctx, stand);
+    const elbowL = bend(ctx, "lowerarm_l", FORWARD, 14);
+    const elbowR = bend(ctx, "lowerarm_r", FORWARD, 14);
+    addRotation(stand, "lowerarm_l", cycle(duration, 8, () => elbowL));
+    addRotation(stand, "lowerarm_r", cycle(duration, 8, () => elbowR));
+    out.push(stand);
+    idle = stand;
+  }
+
+  // The library walk leans forward like a sprinter. An ordinary walk keeps the back straight: the spine is eased back a few degrees.
+  {
+    const base = library.get("Walk_Formal_Loop") ?? library.get("Walk_Loop");
+    if (base) {
+      const walk = cloneClip(base, "Walk_Loop");
+      posedAt(ctx, base);
+      for (const [bone, deg] of [["spine_01", -4.5], ["spine_02", -4.5], ["spine_03", -4], ["neck_01", -2]] as const) {
+        const q = bend(ctx, bone, FORWARD, deg);
+        addRotation(walk, bone, cycle(walk.duration, 12, () => q));
+      }
+      out.push(walk);
+    }
+  }
 
   // Bringing a hand to the mouth: lift the upper arm forward, bend the elbow, hold, lower.
   const handToMouth = (base: THREE.AnimationClip, name: string, duration: number, shoulderDeg: number, elbowDeg: number, rise: number, hold: number) => {

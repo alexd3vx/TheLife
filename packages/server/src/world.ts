@@ -105,25 +105,37 @@ export class Room {
     const away = simulateAbsence(state, (now - saved.savedAt) / 60000);
     player.away = away.lines.length ? away.lines : null;
     player.life = new Sim(state, { realClock: true });
+    if (state.look) player.look = state.look;
     player.lastStepAt = now;
     this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
   }
 
   /** Starts a new life from a character choice. The profile is rebuilt from the background, so nothing is taken on trust. */
-  createLife(player: Player, choice: NewLifeChoices, now: number, replace = false): { ok: true } | { ok: false; reason: string } {
+  createLife(player: Player, choice: NewLifeChoices, now: number, replace = false, look?: string): { ok: true } | { ok: false; reason: string } {
     if (player.life && !replace) return { ok: false, reason: "You already have a life." };
     if (player.life && now - player.lastCreateAt < 60_000) return { ok: false, reason: "Wait a minute before starting over again." };
     player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
     player.life = new Sim(createGameState(profile), { realClock: true });
+    if (look) {
+      player.life.state.look = look;
+      player.look = look;
+    }
     player.lastStepAt = now;
     this.assignHome(player);
     player.away = null;
     this.rename(player, `${profile.firstName} ${profile.surname}`.trim());
     this.saveLife(player, now);
     return { ok: true };
+  }
+
+  /** Saves a new look with the life (the wardrobe and the hairdresser use this). */
+  setLook(player: Player, look: string): void {
+    if (!player.life) return;
+    player.life.state.look = look;
+    player.look = look;
   }
 
   /** A player's home is a building of their background, the same one every time (their account decides). */

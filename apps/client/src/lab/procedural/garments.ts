@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { BOTTOMS, SHOES, TOPS } from "../../iso/wardrobe";
 import { jointPos, type BodyRest } from "./bodyRest";
 import { buildGeometry, clipField, clipPlane, extractTriangles, type Triangle } from "./geometryClip";
 
@@ -7,17 +8,9 @@ export interface GarmentChoice {
   label: string;
 }
 
-export const PROC_TOPS: GarmentChoice[] = [
-  { id: "p_tee", label: "T-shirt" },
-  { id: "p_tank", label: "Tank top" },
-  { id: "p_long", label: "Long sleeve" },
-  { id: "p_kaftan", label: "Kaftan" },
-];
-export const PROC_BOTTOMS: GarmentChoice[] = [
-  { id: "p_shorts", label: "Shorts" },
-  { id: "p_trousers", label: "Trousers" },
-];
-export const PROC_SHOES: GarmentChoice[] = [{ id: "p_sneakers", label: "Sneakers" }];
+export const PROC_TOPS: GarmentChoice[] = TOPS;
+export const PROC_BOTTOMS: GarmentChoice[] = BOTTOMS;
+export const PROC_SHOES: GarmentChoice[] = SHOES;
 
 export interface GarmentResult {
   geometry: THREE.BufferGeometry;
@@ -101,6 +94,160 @@ function withoutArms(triangles: Triangle[], rest: BodyRest): Triangle[] {
 }
 
 const SPECS: Record<string, Spec> = {
+  p_vest: {
+    slot: "top",
+    offset: 0.016,
+    covers: ["spine_01", "spine_02", "spine_03"],
+    cut(tris, rest) {
+      const hem = jointPos(rest, "pelvis").y + 0.08;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.13, 0.13);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", -0.2);
+    },
+  },
+  p_crop: {
+    slot: "top",
+    offset: 0.018,
+    covers: ["spine_02", "spine_03", ...both("clavicle")],
+    cut(tris, rest) {
+      const hem = jointPos(rest, "pelvis").y + 0.27;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.085, 0.03);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.35);
+    },
+  },
+  p_polo: {
+    slot: "top",
+    offset: 0.021,
+    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
+    cut(tris, rest) {
+      const hem = jointPos(rest, "pelvis").y + 0.05;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.075, 0.015);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.42);
+    },
+  },
+  p_hoodie: {
+    slot: "top",
+    offset: 0.036,
+    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
+    cut(tris, rest) {
+      const hem = jointPos(rest, "pelvis").y + 0.02;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.095, 0.015);
+      return cutSleeves(out, rest, "lowerarm", "hand", 0.85);
+    },
+  },
+  p_jersey: {
+    slot: "top",
+    offset: 0.028,
+    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
+    cut(tris, rest) {
+      const hem = jointPos(rest, "pelvis").y + 0.0;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.1, 0.05);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.25);
+    },
+  },
+  p_dress: {
+    slot: "top",
+    offset: 0.026,
+    covers: ["spine_01", "spine_02", "spine_03", "pelvis", ...both("clavicle")],
+    cut(tris, rest) {
+      const thigh = jointPos(rest, "thigh_l").y;
+      const calf = jointPos(rest, "calf_l").y;
+      const hem = thigh + (calf - thigh) * 0.8;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.11, 0.08);
+      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.1);
+    },
+  },
+  p_agbada: {
+    slot: "top",
+    offset: 0.06,
+    covers: ["spine_01", "spine_02", "spine_03", "pelvis", ...both("clavicle")],
+    cut(tris, rest) {
+      const calf = jointPos(rest, "calf_l").y;
+      const foot = jointPos(rest, "foot_l").y;
+      const hem = calf + (foot - calf) * 0.35;
+      let out = clipPlane(tris, [0, 1, 0], -hem);
+      out = cutNeckline(out, rest, 0.095, 0.035);
+      return cutSleeves(out, rest, "lowerarm", "hand", 0.6);
+    },
+  },
+  p_jeans: {
+    slot: "bottom",
+    offset: 0.009,
+    covers: ["pelvis", ...both("thigh"), ...both("calf")],
+    cut(tris, rest) {
+      const waist = jointPos(rest, "pelvis").y + 0.17;
+      const ankle = jointPos(rest, "foot_l").y + 0.045;
+      return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
+    },
+  },
+  p_capri: {
+    slot: "bottom",
+    offset: 0.012,
+    covers: ["pelvis", ...both("thigh")],
+    cut(tris, rest) {
+      const thigh = jointPos(rest, "thigh_l").y;
+      const calf = jointPos(rest, "calf_l").y;
+      const foot = jointPos(rest, "foot_l").y;
+      const waist = jointPos(rest, "pelvis").y + 0.17;
+      const hem = calf + (foot - calf) * 0.35;
+      void thigh;
+      return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -hem);
+    },
+  },
+  p_palazzo: {
+    slot: "bottom",
+    offset: 0.05,
+    covers: ["pelvis", ...both("thigh"), ...both("calf")],
+    cut(tris, rest) {
+      const waist = jointPos(rest, "pelvis").y + 0.17;
+      const ankle = jointPos(rest, "foot_l").y + 0.03;
+      return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
+    },
+  },
+  p_slippers: {
+    slot: "shoes",
+    offset: 0.012,
+    covers: [...both("foot"), ...both("ball"), ...both("ball_leaf")],
+    cut(tris, rest) {
+      const top = jointPos(rest, "foot_l").y + 0.035;
+      return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
+    },
+  },
+  p_sandals: {
+    slot: "shoes",
+    offset: 0.014,
+    covers: [...both("ball"), ...both("ball_leaf")],
+    cut(tris, rest) {
+      const top = jointPos(rest, "foot_l").y + 0.045;
+      return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
+    },
+  },
+  p_boots: {
+    slot: "shoes",
+    offset: 0.02,
+    covers: [...both("foot"), ...both("ball"), ...both("ball_leaf")],
+    cut(tris, rest) {
+      const top = jointPos(rest, "foot_l").y + 0.17;
+      return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
+    },
+    adjust(p) {
+      if (p.y < 0.05) p.y -= (0.05 - p.y) * 0.5;
+    },
+  },
+  p_formal: {
+    slot: "shoes",
+    offset: 0.015,
+    covers: [...both("foot"), ...both("ball"), ...both("ball_leaf")],
+    cut(tris, rest) {
+      const top = jointPos(rest, "foot_l").y + 0.085;
+      return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
+    },
+  },
   p_tee: {
     slot: "top",
     offset: 0.02,

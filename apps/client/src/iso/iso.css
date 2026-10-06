@@ -1,2 +1,5 @@
 .iso-wait { width: 56px; height: 28px; background: #f2a43a; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); animation: iso-wait 1.1s ease-in-out infinite; }
 @keyframes iso-wait { 0%, 100% { transform: scale(.7); opacity: .5; } 50% { transform: scale(1.1); opacity: 1; } }
+.iso-bar { display: block; width: 120px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; margin-top: 14px; }
+.iso-bar i { display: block; height: 100%; background: #f2a43a; transition: width .3s ease; }
+.play-loading { flex-direction: column; }

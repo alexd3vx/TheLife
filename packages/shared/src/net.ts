@@ -39,8 +39,10 @@ export type ClientMessage =
   | { t: "hello"; name: string; protocol: number; look?: string; /** The player's private key: it is how the server finds their life again. */ key: string; /** A Supabase access token. When it checks out, the account (not the key) owns the life. */ token?: string; /** Where the player is at first: at home (not seen in the city) or out in the city. Default: the city. */ where?: Where }
   /** Moves the player between home and the city (others only see them while they are in the city). */
   | { t: "place"; where: Where }
+  /** Changes how the character looks (wardrobe, hairdresser). */
+  | { t: "look"; look: string }
   /** Starts a new life. The server rebuilds the whole profile from the background id, so only these choices are used. */
-  | { t: "create"; profile: NewLife; /** Throw the current life away and start this one instead ("New game"). */ replace?: boolean }
+  | { t: "create"; profile: NewLife; /** How the character looks (a cleaned JSON string). */ look?: string; /** Throw the current life away and start this one instead ("New game"). */ replace?: boolean }
   /** Asks the server to run one game action (a whitelisted function) on this player's life. */
   | { t: "do"; id: number; fn: string; args: RpcArg[] }
   | { t: "move"; x: number; y: number; z: number; yaw: number; clip: string; level: number }
@@ -94,6 +96,10 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     }
     case "place":
       return { t: "place", where: m.where === "home" ? "home" : "world" };
+    case "look": {
+      const look = typeof m.look === "string" ? cleanLook(m.look) : undefined;
+      return look ? { t: "look", look } : null;
+    }
     case "create": {
       const p = m.profile as Record<string, unknown> | null;
       if (!p || typeof p !== "object") return null;
@@ -104,6 +110,7 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       return {
         t: "create",
         replace: m.replace === true,
+        look: typeof m.look === "string" ? cleanLook(m.look) : undefined,
         profile: { backgroundId: text(p.backgroundId, 40), sex: p.sex === "female" ? "female" : "male", firstName: firstName.slice(0, 14), surname: cleanName(text(p.surname, 40)).slice(0, 14), hometown: text(p.hometown, 40), startingMoney: Math.round(p.startingMoney), traits },
       };
     }
@@ -140,11 +147,12 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
   }
 }
 
-const LOOK_KEYS = ["body", "skinTone", "hair", "hairColor", "beard", "brows", "eyeColor", "top", "bottom", "shoes", "hood", "pauldrons", "outfitVariant", "topColor", "bottomColor", "shoesColor", "topFabric", "bottomFabric"];
+const LOOK_KEYS = ["body", "skinTone", "hair", "hairColor", "beard", "brows", "eyeColor", "top", "bottom", "shoes", "hood", "pauldrons", "outfitVariant", "topColor", "bottomColor", "shoesColor", "topFabric", "bottomFabric", "accessory", "accessoryColor"];
+const LOOK_NUMBERS = ["height", "build"];
 
 /** A character's look from a client: only the known fields, only short ids, booleans or null. Anything else is dropped. */
 export function cleanLook(raw: string): string | undefined {
-  if (raw.length > 1_200) return undefined;
+  if (raw.length > 1_500) return undefined;
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -152,11 +160,15 @@ export function cleanLook(raw: string): string | undefined {
     return undefined;
   }
   if (!value || typeof value !== "object") return undefined;
-  const out: Record<string, string | boolean | null> = {};
+  const out: Record<string, string | boolean | number | null> = {};
   for (const key of LOOK_KEYS) {
     const v = (value as Record<string, unknown>)[key];
     if (typeof v === "boolean" || v === null) out[key] = v;
     else if (typeof v === "string" && /^[\w-]{1,30}$/.test(v)) out[key] = v;
+  }
+  for (const key of LOOK_NUMBERS) {
+    const v = (value as Record<string, unknown>)[key];
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.round(Math.max(0.8, Math.min(1.25, v)) * 100) / 100;
   }
   return Object.keys(out).length ? JSON.stringify(out) : undefined;
 }

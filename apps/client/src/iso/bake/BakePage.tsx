@@ -5,7 +5,8 @@ import { loadManifest } from "../../lab/manifest";
 import { createFurniture } from "../../furniture/instance";
 import { Avatar } from "../../lab/avatar";
 import { DEFAULT_LOOK, loadSavedLook } from "../../lab/looks";
-import { shoot, toSprite, toonify, type Sprite } from "./bake";
+import { CHAR_AREA, shoot, toSprite, toonify, type Sprite } from "./bake";
+import { BAKE_CLIPS, LayerBaker, variantsFor, type BodyId, type Sheet } from "./layers";
 
 // A page for the sprite baker (tools/sprites/bake.mjs drives it in a headless browser). It exposes two functions on window.
 
@@ -18,6 +19,10 @@ declare global {
       props(ids: string[], onSprite?: (s: Sprite) => void): Promise<(Sprite & { size: [number, number, number] })[]>;
       character(only?: string[], look?: Partial<typeof DEFAULT_LOOK>, onSprite?: (s: CharSprite) => void): Promise<CharSprite[]>;
       furnitureIds(): string[];
+      contact(clips: string[], times?: number[]): Promise<string>;
+      layerVariants(body: BodyId): { key: string; kind: string; id: string }[];
+      layerClips(): { name: string }[];
+      layer(body: BodyId, key: string, clips?: string[]): Promise<Record<string, Sheet | null>>;
     };
   }
 }
@@ -32,9 +37,55 @@ export interface CharSprite extends Sprite {
 export default function BakePage() {
   useEffect(() => {
     let manifest: Awaited<ReturnType<typeof loadManifest>> | null = null;
+    const bakers = new Map<BodyId, LayerBaker>();
     const api: NonNullable<Window["__bake"]> = {
       ready: false,
       furnitureIds: () => FURNITURE.map((f) => f.id),
+      async contact(clips, times = [0.2]) {
+        manifest ??= await loadManifest();
+        const avatar = new Avatar(manifest, { ...DEFAULT_LOOK, ...loadSavedLook() });
+        await avatar.load();
+        toonify(avatar.root, false);
+        const cells: HTMLCanvasElement[] = [];
+        for (const clip of clips) {
+          for (const dir of [0, 2]) {
+            for (const t of times) {
+              avatar.root.rotation.y = (dir * Math.PI * 2) / 8;
+              avatar.stop();
+              avatar.play(clip, 0);
+              avatar.update(t);
+              const holder = new THREE.Group();
+              holder.add(avatar.root);
+              const shot = shoot(holder, CHAR_AREA);
+              holder.remove(avatar.root);
+              if (shot) cells.push(shot.canvas);
+            }
+          }
+        }
+        const w = 150, h = 260;
+        const sheet = document.createElement("canvas");
+        sheet.width = w * Math.min(cells.length, 12);
+        sheet.height = h * Math.ceil(cells.length / 12);
+        const c = sheet.getContext("2d")!;
+        c.fillStyle = "#d9c7a4";
+        c.fillRect(0, 0, sheet.width, sheet.height);
+        cells.forEach((cv, i) => c.drawImage(cv, (i % 12) * w + (w - cv.width) / 2, Math.floor(i / 12) * h + 10, cv.width * 0.8, cv.height * 0.8));
+        return sheet.toDataURL("image/png");
+      },
+      layerVariants: (body) => variantsFor(body),
+      layerClips: () => BAKE_CLIPS.map((c) => ({ name: c.name })),
+      async layer(body, key, clips) {
+        manifest ??= await loadManifest();
+        let baker = bakers.get(body);
+        if (!baker) {
+          baker = new LayerBaker(manifest, body);
+          await baker.open();
+          bakers.set(body, baker);
+        }
+        const v = variantsFor(body).find((x) => x.key === key);
+        if (!v) throw new Error(`no layer ${key}`);
+        return baker.bake(v, BAKE_CLIPS.filter((c) => !clips || clips.includes(c.name)));
+      },
       async props(ids, onSprite) {
         manifest ??= await loadManifest();
         const out: (Sprite & { size: [number, number, number] })[] = [];

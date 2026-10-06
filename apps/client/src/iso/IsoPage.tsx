@@ -7,6 +7,8 @@ import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { layoutForTier } from "../play/layouts";
 import { IsoRoom, type IsoGame, type Tier } from "./IsoRoom";
+import { PaperDoll } from "./paperdoll";
+import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
 
@@ -24,7 +26,7 @@ export default function IsoPage() {
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; options: { label: string; run(): void }[] } | null>(null);
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const session = life.session;
-  const welcome = useWelcomeBack(life);
+  const welcome = useWelcomeBack(life, ready);
   if (import.meta.env.DEV) (window as unknown as { __life: unknown }).__life = { justArrived: life.justArrived, phase: life.phase, has: !!life.session, showing: welcome.showing };
   const tier = (session?.sim.state.profile?.tier ?? "middle") as Tier;
 
@@ -37,23 +39,23 @@ export default function IsoPage() {
       active: () => session.active(),
       notice: (t) => session.notice(t),
     };
-    const room = new IsoRoom(canvas, layoutForTier(tier), tier, game);
-    roomRef.current = room;
-    room.onStatus = setStatus;
-    room.onMenu = setMenu;
-    room.onKitchen = setKitchen;
-    room.introDone = () => setIntroOn(false);
-    let detach: (() => void) | null = null;
     let gone = false;
-    room.load().then(
-      () => {
-        if (gone) return;
-        detach = room.attach();
-        setReady(true);
-        if (import.meta.env.DEV) (window as unknown as { __iso: IsoRoom }).__iso = room;
-      },
-      (e) => setError(e instanceof Error ? e.message : String(e)),
-    );
+    let detach: (() => void) | null = null;
+    (async () => {
+      // The character is stacked together from sprite layers in their saved look: no 3D, and it is ready as soon as the pictures load.
+      const char = new PaperDoll(parseLook(session.sim.state.look));
+      const room = new IsoRoom(canvas, layoutForTier(tier), tier, game, char);
+      roomRef.current = room;
+      room.onStatus = setStatus;
+      room.onMenu = setMenu;
+      room.onKitchen = setKitchen;
+      room.introDone = () => setIntroOn(false);
+      await room.load();
+      if (gone) return;
+      detach = room.attach();
+      setReady(true);
+      if (import.meta.env.DEV) (window as unknown as { __iso: IsoRoom }).__iso = room;
+    })().catch((e) => !gone && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       gone = true;
       detach?.();
@@ -63,6 +65,7 @@ export default function IsoPage() {
 
   // The arrival: once the room's pictures are loaded, and any film or welcome-back scene has finished, the room paints itself in.
   const filmShowing = life.justArrived && !!session && !filmDone;
+  const offline = life.phase === "offline" && !session;
   useEffect(() => {
     if (!ready || filmShowing || welcome.showing || introStarted.current) return;
     introStarted.current = true;
@@ -89,19 +92,13 @@ export default function IsoPage() {
         <KitchenPanel session={session} initialTab={kitchen} onClose={() => setKitchen(null)} runUse={(a) => roomRef.current?.useAction(a === "cook" ? "cook" : a) ?? false} />
       )}
       {filmShowing && <ArrivalFilm tier={tier} onDone={() => setFilmDone(true)} />}
-      {!ready && !error && !filmShowing && (
-        <div className="play-loading" role="status">
-          {life.phase === "offline" ? (
-            <>
-              <span>{life.detail || "Can't reach the world right now."}</span>
-              <button className="btn btn-primary" onClick={() => world.reconnect()}>Try again</button>
-            </>
-          ) : (
-            <span className="iso-wait" aria-label="Loading" />
-          )}
+      {welcome.node}
+      {offline && (
+        <div className="play-loading" role="status" style={{ zIndex: 60 }}>
+          <span>{life.detail || "Can't reach the world right now."}</span>
+          <button className="btn btn-primary" onClick={() => world.reconnect()}>Try again</button>
         </div>
       )}
-      {welcome.node}
       {error && <div className="play-error">{error}</div>}
     </div>
   );

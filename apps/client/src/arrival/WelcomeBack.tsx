@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FilmRenderer } from "./filmCanvas";
 import "./arrival.css";
 
@@ -8,14 +8,18 @@ const hello = (hour: number) => (hour < 5 ? "Still up" : hour < 12 ? "Good morni
  * For someone coming back to their life: Lagos at the real time of day drifts past, a greeting, and what has changed. It is short and
  * can be skipped with a tap. (The long arrival film is only for a brand new person.)
  */
-export default function WelcomeBack({ name, tier, hour, date, time, awayCount, onDone }: { name: string; tier: "lapo" | "middle" | "nepo"; hour: number; date: string; time: string; awayCount: number; onDone(): void }) {
+export default function WelcomeBack({ name, tier, hour, date, time, awayCount, ready = true, onDone }: { name?: string; tier: "lapo" | "middle" | "nepo"; hour: number; date?: string; time?: string; awayCount: number; /** The cutscene is also the loading screen: it stays until the game is ready (and has played its minimum time). */ ready?: boolean; onDone(): void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const done = useRef(onDone);
   done.current = onDone;
+  const [minDone, setMinDone] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => done.current(), 4200);
+    const t = window.setTimeout(() => setMinDone(true), 4200);
     return () => window.clearTimeout(t);
   }, []);
+  useEffect(() => {
+    if (minDone && ready) done.current();
+  }, [minDone, ready]);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -34,18 +38,18 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, o
     return () => cancelAnimationFrame(raf);
   }, [tier, hour]);
   return (
-    <div className="film welcome" role="presentation" onPointerDown={onDone}>
+    <div className="film welcome" role="presentation" onPointerDown={() => ready && onDone()}>
       <canvas ref={canvasRef} className="film-canvas" />
       <div className="film-vignette" />
       <div className="film-bars top" />
       <div className="film-bars bottom" />
       <div className="welcome-text">
         <small>{hello(hour)}</small>
-        <h2>Welcome back, {name}</h2>
-        <p>{date} · {time} in Lagos</p>
+        <h2>{name ? `Welcome back, ${name}` : "Welcome back"}</h2>
+        <p>{date && time ? `${date} · ${time} in Lagos` : "Lagos is waking up"}</p>
         {awayCount > 0 && <em>{awayCount} thing{awayCount === 1 ? "" : "s"} happened while you were away.</em>}
       </div>
-      <button className="film-skip" onClick={(e) => { e.stopPropagation(); onDone(); }}>Skip</button>
+      {ready && <button className="film-skip" onClick={(e) => { e.stopPropagation(); onDone(); }}>Skip</button>}
     </div>
   );
 }

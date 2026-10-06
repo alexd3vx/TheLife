@@ -1,7 +1,8 @@
 import { blockOutside, blockRect, createNavGrid, findPath, isFree, nearestFree, type NavGrid, type Point } from "@thelife/shared";
 import { ACTIONS, furnitureById } from "@thelife/game-core";
 import type { Layout, Placement } from "../play/layout";
-import { charImage, charMeta, propImage, propsMeta, type CharFrameMeta, type PropMeta, type SpriteMeta } from "./assets";
+import { propImage, propsMeta, type PropMeta, type SpriteMeta } from "./assets";
+import { StaticChar, type CharProvider } from "./charProvider";
 import { HALF_H, HALF_W, PX_PER_M_UP, SPRITE_SHARP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
@@ -95,8 +96,7 @@ export class IsoRoom {
   private ctx: CanvasRenderingContext2D;
   private items: Item[] = [];
   private nav!: NavGrid;
-  private charFrames = new Map<string, CharFrameMeta[]>();
-  private charImgs = new Map<string, HTMLImageElement>();
+  private char!: CharProvider;
   private raf = 0;
   private last = 0;
   private time = 0;
@@ -141,7 +141,9 @@ export class IsoRoom {
     private readonly layout: Layout,
     private readonly tier: Tier,
     private readonly game: IsoGame | null,
+    char?: CharProvider,
   ) {
+    if (char) this.char = char;
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.pos = { x: layout.start.x, z: layout.start.z };
     this.yaw = layout.start.yaw;
@@ -150,8 +152,13 @@ export class IsoRoom {
   // ------------------------------------------------------------------ loading
 
   async load(): Promise<void> {
-    const [props, chars] = await Promise.all([propsMeta(), charMeta()]);
-    for (const [clip, frames] of Object.entries(chars.frames)) this.charFrames.set(clip, frames);
+    const props = await propsMeta();
+    if (!this.char) {
+      const stat = new StaticChar();
+      await stat.init();
+      this.char = stat;
+    }
+    // (the character is a paper doll of sprite layers; see paperdoll.ts)
     const items: Item[] = [];
     const byId = new Map<string, Item>();
     for (const def of this.layout.items) {
@@ -187,18 +194,9 @@ export class IsoRoom {
   }
 
   private async preloadChar() {
-    // load the frames of idle and walk right away; the others as they are needed
-    await Promise.all(["Idle_Loop", "Walk_Loop", "Sitting_Enter", "Sitting_Exit"].flatMap((clip) => (this.charFrames.get(clip) ?? []).map((f) => this.loadChar(clip, f.dir, f.frame))));
-  }
-
-  private loadChar(clip: string, dir: number, frame: number): Promise<HTMLImageElement | null> {
-    const k = `${clip}_${dir}_${frame}`;
-    const have = this.charImgs.get(k);
-    if (have) return Promise.resolve(have);
-    return charImage(clip, dir, frame).then((img) => {
-      this.charImgs.set(k, img);
-      return img;
-    }, () => null);
+    // standing, walking, sitting down and getting up first; the rest while you play
+    await this.char.prepare(["Idle_Loop", "Walk_Loop", "Sitting_Enter", "Sitting_Exit"]);
+    for (const c of ["Sitting_Idle_Loop", "Life_Cook_Loop", "Life_Eat_Loop", "Life_Sleep_Loop", "Life_Type_Loop", "Life_Brush_Loop", "Life_Wash_Loop", "Life_Read_Loop", "Dance_Loop"]) this.char.ensure(c);
   }
 
   // ------------------------------------------------------------------ the floor plan: walking and using things
@@ -720,33 +718,26 @@ export class IsoRoom {
   private fitCy = 0;
   private fitZoom = 1;
 
-  private charSprite(): { img: HTMLImageElement; meta: SpriteMeta } | null {
-    const frames = this.charFrames.get(this.clip) ?? this.charFrames.get("Idle_Loop");
-    if (!frames) return null;
-    const name = this.charFrames.has(this.clip) ? this.clip : "Idle_Loop";
+  private charSprite(): { img: CanvasImageSource; meta: SpriteMeta } | null {
+    const want = this.char.ready(this.clip) ? this.clip : "Idle_Loop";
+    if (want !== this.clip) this.char.ensure(this.clip);
     let dir = dirOf(Math.sin(this.yaw), Math.cos(this.yaw));
-    // clips baked in fewer directions: the nearest one
-    const dirs = [...new Set(frames.map((f) => f.dir))];
+    // animations made in fewer directions use the nearest one
+    const dirs = this.char.dirs(want);
+    if (!dirs.length) return null;
     if (!dirs.includes(dir)) dir = dirs.reduce((best, d) => (Math.min((d - dir + 8) % 8, (dir - d + 8) % 8) < Math.min((best - dir + 8) % 8, (dir - best + 8) % 8) ? d : best), dirs[0]!);
-    const mine = frames.filter((f) => f.dir === dir);
+    const n = this.char.count(want, dir);
+    if (!n) return null;
     let idx: number;
-    if (this.move && (name === "Sitting_Enter" || name === "Sitting_Exit")) {
+    if (this.move && want === this.clip && (want === "Sitting_Enter" || want === "Sitting_Exit")) {
       const k = Math.min(1, this.move.t / this.move.dur);
-      idx = Math.min(mine.length - 1, Math.round(k * (mine.length - 1)));
+      idx = Math.min(n - 1, Math.round(k * (n - 1)));
     } else {
-      const fps = name === "Idle_Loop" ? 5 : name === "Walk_Loop" ? 10 : FRAME_FPS;
-      idx = Math.floor(this.clipTime * fps) % mine.length;
+      const fps = want === "Idle_Loop" ? 5 : want === "Walk_Loop" ? 10 : FRAME_FPS;
+      idx = Math.floor(this.clipTime * fps) % n;
     }
-    const meta = mine.find((f) => f.frame === idx) ?? mine[0]!;
-    const k = `${name}_${meta.dir}_${meta.frame}`;
-    const img = this.charImgs.get(k);
-    if (!img) {
-      void this.loadChar(name, meta.dir, meta.frame);
-      const idle = this.charImgs.get(`Idle_Loop_${dirOf(Math.sin(this.yaw), Math.cos(this.yaw))}_0`);
-      const im = this.charFrames.get("Idle_Loop")?.find((f) => f.dir === dirOf(Math.sin(this.yaw), Math.cos(this.yaw)));
-      return idle && im ? { img: idle, meta: im } : null;
-    }
-    return { img, meta };
+    const f = this.char.frame(want, dir, idx);
+    return f ? { img: f.img, meta: f } : null;
   }
 
   // ------------------------------------------------------------------ drawing
@@ -982,7 +973,8 @@ export class IsoRoom {
     if (sprite && showChar) {
       const [px, py] = project(this.pos.x, this.lift, this.pos.z);
       const m = sprite.meta;
-      const box = { x: px - m.ax / SPRITE_SHARP, y: py - m.ay / SPRITE_SHARP, w: m.w / SPRITE_SHARP, h: m.h / SPRITE_SHARP };
+      const shape = this.char.shape?.() ?? { w: 1, h: 1 };
+      const box = { x: px - (m.ax / SPRITE_SHARP) * shape.w, y: py - (m.ay / SPRITE_SHARP) * shape.h, w: (m.w / SPRITE_SHARP) * shape.w, h: (m.h / SPRITE_SHARP) * shape.h };
       list.push({
         key: this.pos.x + this.pos.z + 0.35,
         draw: (cx) => {

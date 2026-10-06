@@ -43,6 +43,8 @@ export interface GameState {
   inventory: Inventory;
   /** The fridge, the cupboard and the cooked food. */
   kitchen: KitchenState;
+  /** How the character looks (a cleaned JSON string; see the client's Look). Kept with the life, on the server. */
+  look?: string;
   /** Skill experience by skill id. */
   skills: Record<string, number>;
   /** Pay earned but not yet paid out (fractions of a naira). */

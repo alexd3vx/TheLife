@@ -42,6 +42,7 @@ export function parseGameState(raw: unknown): GameState | null {
     ledger: { accounts: { ...accounts }, entries, nextId: (r.ledger as GameState["ledger"]).nextId ?? entries.length + 1 },
     inventory,
     kitchen: parseKitchen(r.kitchen, profile?.tier),
+    ...(typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {}),
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
     rentOwed: Math.max(0, r.rentOwed ?? 0),

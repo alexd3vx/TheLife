@@ -18,6 +18,11 @@ export const SKIN_TONES: SkinTone[] = [
   { id: "caramel", label: "Caramel", map: "light", tint: "#b98458", base: "#b98a62" },
   { id: "honey", label: "Honey", map: "light", tint: "#d4a577", base: "#d6a97f" },
   { id: "light", label: "Light", map: "light", tint: "#f0d2b4", base: "#e9c8a8" },
+  { id: "midnight", label: "Midnight", map: "dark", tint: "#ffffff", base: "#2a1a16" },
+  { id: "chestnut", label: "Chestnut", map: "light", tint: "#6a4330", base: "#684432" },
+  { id: "mocha", label: "Mocha", map: "light", tint: "#8a5c40", base: "#8a5c42" },
+  { id: "bronze", label: "Bronze", map: "light", tint: "#a97648", base: "#a97a50" },
+  { id: "sand", label: "Sand", map: "light", tint: "#e2bd94", base: "#dfb78e" },
 ];
 
 export interface Swatch {
@@ -35,6 +40,11 @@ export const HAIR_COLORS: Swatch[] = [
   { id: "grey", label: "Grey", color: "#b4b4b4" },
   { id: "blue", label: "Blue", color: "#3b6ae0" },
   { id: "pink", label: "Pink", color: "#e0589a" },
+  { id: "burgundy", label: "Burgundy", color: "#6e1f2e" },
+  { id: "honey", label: "Honey", color: "#b8843a" },
+  { id: "white", label: "White", color: "#ece9e2" },
+  { id: "purple", label: "Purple", color: "#6c3fb0" },
+  { id: "green", label: "Green", color: "#2f9a62" },
 ];
 
 export const EYE_COLORS: Swatch[] = [
@@ -97,6 +107,12 @@ export interface Look {
   shoesColor: string | null;
   topFabric: string;
   bottomFabric: string;
+  /** Glasses, a cap, earrings or a chain (see lab/procedural/accessories.ts), or none. */
+  accessory: string | null;
+  accessoryColor: string;
+  /** Body shape: 0.92 to 1.08 for height, 0.88 to 1.2 for build (width). 1 is average. */
+  height: number;
+  build: number;
 }
 
 export const DEFAULT_LOOK: Look = {
@@ -118,6 +134,10 @@ export const DEFAULT_LOOK: Look = {
   shoesColor: "black",
   topFabric: "plain",
   bottomFabric: "plain",
+  accessory: null,
+  accessoryColor: "black",
+  height: 1,
+  build: 1,
 };
 
 const LOOK_KEY = "thelife.look.v1";
@@ -141,5 +161,17 @@ export function saveLook(look: Look): void {
     localStorage.setItem(LOOK_KEY, JSON.stringify(look));
   } catch {
     // Storage may be blocked (private mode); the look just won't be remembered.
+  }
+}
+
+/** A look stored with a life (a JSON string from the server): anything missing falls back to the default. */
+export function parseLook(json: string | undefined | null): Look {
+  if (!json) return { ...DEFAULT_LOOK };
+  try {
+    const parsed = JSON.parse(json) as Partial<Look>;
+    const body: BodyId = parsed.body === "female" || parsed.body === "realfemale" ? "realfemale" : parsed.body === "male" || parsed.body === "realmale" ? "realmale" : DEFAULT_LOOK.body;
+    return { ...DEFAULT_LOOK, ...parsed, body };
+  } catch {
+    return { ...DEFAULT_LOOK };
   }
 }

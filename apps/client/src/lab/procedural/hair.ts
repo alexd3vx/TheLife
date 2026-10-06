@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { HAIR_STYLES } from "../../iso/wardrobe";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { createRng, type Rng } from "../../world3d/rng";
 import { jointPos, type BodyRest } from "./bodyRest";
@@ -8,16 +9,7 @@ export interface HairChoice {
   label: string;
 }
 
-export const PROC_HAIR: HairChoice[] = [
-  { id: "p_fade", label: "Low fade" },
-  { id: "p_afro", label: "Afro" },
-  { id: "p_puffs", label: "Afro puffs" },
-  { id: "p_cornrows", label: "Cornrows" },
-  { id: "p_braids", label: "Box braids" },
-  { id: "p_locs", label: "Locs" },
-  { id: "p_bun", label: "Top bun" },
-  { id: "p_wrap", label: "Head wrap" },
-];
+export const PROC_HAIR: HairChoice[] = HAIR_STYLES;
 
 export interface HairResult {
   /** Geometry in the head bone's local space; attach the mesh to the head bone. */
@@ -26,7 +18,7 @@ export interface HairResult {
   repeat: [number, number];
 }
 
-interface Head {
+export interface Head {
   c: THREE.Vector3; // cranium centre
   rx: number;
   ry: number;
@@ -34,7 +26,7 @@ interface Head {
 }
 
 /** The cranium's size and position, measured from the body's own head vertices. */
-function measureHead(rest: BodyRest): Head {
+export function measureHead(rest: BodyRest): Head {
   const headIndex = rest.boneIndex.get("Head");
   const neckY = jointPos(rest, "neck_01").y;
   const pos = rest.geometry.getAttribute("position");
@@ -77,7 +69,7 @@ interface CapOptions {
 }
 
 /** A hair mass covering the cranium, with a cut-out for the face and ears. */
-function cap(h: Head, o: CapOptions): THREE.BufferGeometry {
+export function cap(h: Head, o: CapOptions): THREE.BufferGeometry {
   const nu = 64;
   const nv = 20;
   const positions: number[] = [];
@@ -113,7 +105,7 @@ function cap(h: Head, o: CapOptions): THREE.BufferGeometry {
   return g;
 }
 
-function tube(points: THREE.Vector3[], radius: number, radial: number, segments: number, uvLength: number): THREE.BufferGeometry {
+export function tube(points: THREE.Vector3[], radius: number, radial: number, segments: number, uvLength: number): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.4);
   const g = new THREE.TubeGeometry(curve, segments, radius, radial, false);
   const uv = g.getAttribute("uv");
@@ -121,7 +113,7 @@ function tube(points: THREE.Vector3[], radius: number, radial: number, segments:
   return g;
 }
 
-function sphere(centre: THREE.Vector3, r: [number, number, number], bump = 0): THREE.BufferGeometry {
+export function sphere(centre: THREE.Vector3, r: [number, number, number], bump = 0): THREE.BufferGeometry {
   const g = new THREE.SphereGeometry(1, 32, 20);
   const pos = g.getAttribute("position");
   for (let i = 0; i < pos.count; i++) {
@@ -278,6 +270,75 @@ export function buildHair(rest: BodyRest, id: string, seed = 5): HairResult | nu
       const base = cap(h, { scale: [1.04, 1.08, 1.05], front: 0.82, side: 0.4, back: 0.05, bump: 0.001 });
       const bun = sphere(new THREE.Vector3(h.c.x, h.c.y + h.ry * 1.18, h.c.z - h.rz * 0.25), [h.rx * 0.45, h.ry * 0.4, h.rz * 0.45], 0.08);
       geometry = mergeGeometries([base, bun], false) ?? base;
+      break;
+    }
+    case "p_buzz":
+      geometry = cap(h, { scale: [1.02, 1.04, 1.03], front: 0.9, side: 0.55, back: 0.2, bump: 0.0006 });
+      break;
+    case "p_taper":
+      geometry = cap(h, { scale: [1.06, 1.18, 1.07], front: 0.8, side: 0.62, back: 0.3, bump: 0.002, lift: h.ry * 0.04 });
+      break;
+    case "p_waves":
+      geometry = cap(h, { scale: [1.035, 1.06, 1.04], front: 0.84, side: 0.5, back: 0.15, bump: 0.003, uRepeat: 14 });
+      texture = "strand";
+      repeat = [1, 1];
+      break;
+    case "p_twists": {
+      const under = cap(h, { scale: [1.04, 1.06, 1.05], front: 0.8, side: 0.35, back: 0.0, bump: 0.002 });
+      const tw = strands(h, rng, { count: 120, length: 0.13, radius: 0.0085, wave: 1.6, spread: 1.4, radial: 5 });
+      geometry = mergeGeometries([under, tw], false) ?? under;
+      break;
+    }
+    case "p_shortlocs": {
+      const under = cap(h, { scale: [1.03, 1.05, 1.04], front: 0.86, side: 0.4, back: 0.0, bump: 0 });
+      const locs = strands(h, rng, { count: 90, length: 0.15, radius: 0.0095, wave: 0.6, spread: 1.1, radial: 6 });
+      geometry = mergeGeometries([under, locs], false) ?? under;
+      texture = "strand";
+      repeat = [1, 1];
+      break;
+    }
+    case "p_bantu": {
+      const base = cap(h, { scale: [1.025, 1.04, 1.03], front: 0.84, side: 0.45, back: 0.05, bump: 0.0005 });
+      const knots: THREE.BufferGeometry[] = [base];
+      for (let i = 0; i < 11; i++) {
+        const u = (i / 11) * Math.PI * 2;
+        const v = 0.78 + (i % 2) * 0.28;
+        const p = scalp(h, u, v, [1.08, 1.08, 1.08]);
+        knots.push(sphere(p, [h.rx * 0.2, h.ry * 0.2, h.rz * 0.2], 0.05));
+      }
+      geometry = mergeGeometries(knots, false) ?? base;
+      break;
+    }
+    case "p_pony": {
+      const base = cap(h, { scale: [1.04, 1.08, 1.05], front: 0.82, side: 0.4, back: 0.05, bump: 0.001 });
+      const root = scalp(h, Math.PI, 0.55, [1.05, 1.05, 1.05]);
+      const tail = tube([root, new THREE.Vector3(root.x, root.y - 0.05, root.z - 0.06), new THREE.Vector3(root.x + 0.01, root.y - 0.16, root.z - 0.09), new THREE.Vector3(root.x, root.y - 0.3, root.z - 0.08)], 0.034, 8, 20, 4);
+      geometry = mergeGeometries([base, tail], false) ?? base;
+      break;
+    }
+    case "p_bob": {
+      const under = cap(h, { scale: [1.05, 1.08, 1.06], front: 0.8, side: 0.15, back: -0.2, bump: 0.001 });
+      const curtain = strands(h, rng, { count: 130, length: 0.2, radius: 0.0085, wave: 0.05, spread: 1.6, radial: 4 });
+      geometry = mergeGeometries([under, curtain], false) ?? under;
+      texture = "strand";
+      repeat = [1, 1];
+      break;
+    }
+    case "p_long": {
+      const under = cap(h, { scale: [1.05, 1.08, 1.06], front: 0.8, side: 0.1, back: -0.25, bump: 0.001 });
+      const long = strands(h, rng, { count: 150, length: 0.46, radius: 0.0085, wave: 0.08, spread: 1.7, radial: 4 });
+      geometry = mergeGeometries([under, long], false) ?? under;
+      texture = "strand";
+      repeat = [1, 1];
+      break;
+    }
+    case "p_durag": {
+      const base = cap(h, { scale: [1.05, 1.07, 1.06], front: 0.76, side: 0.25, back: -0.05, bump: 0.0008, uRepeat: 3 });
+      const knot = scalp(h, Math.PI, 0.35, [1.06, 1.06, 1.06]);
+      const tails = [-0.05, 0.05].map((dx) => tube([knot, new THREE.Vector3(knot.x + dx, knot.y - 0.04, knot.z - 0.06), new THREE.Vector3(knot.x + dx * 2.4, knot.y - 0.15, knot.z - 0.09), new THREE.Vector3(knot.x + dx * 3, knot.y - 0.27, knot.z - 0.08)], 0.012, 6, 16, 3));
+      geometry = mergeGeometries([base, ...tails], false) ?? base;
+      texture = "wrap";
+      repeat = [1, 1];
       break;
     }
     case "p_wrap":

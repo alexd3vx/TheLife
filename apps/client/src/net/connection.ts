@@ -1,4 +1,4 @@
-import { loadSavedLook } from "../lab/looks";
+import { DEFAULT_LOOK } from "../lab/looks";
 import { getSettings, updateSettings } from "../settings/settings";
 import { playerKey } from "./identity";
 import { getToken } from "./tokenBridge";
@@ -76,7 +76,7 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.tries = 0;
-      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()), key: playerKey(), where: this.where(), ...(token ? { token } : {}) } satisfies ClientMessage));
+      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(DEFAULT_LOOK), key: playerKey(), where: this.where(), ...(token ? { token } : {}) } satisfies ClientMessage));
     };
     ws.onmessage = (e) => {
       let message: ServerMessage;

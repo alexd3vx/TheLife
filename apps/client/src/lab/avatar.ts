@@ -7,12 +7,13 @@ import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./proce
 import { fabricTexture, type FabricId } from "./procedural/fabrics";
 import { buildGarment, isProceduralGarment } from "./procedural/garments";
 import { buildHair } from "./procedural/hair";
+import { buildAccessory } from "./procedural/accessories";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
-type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment";
+type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment" | "proc-acc";
 
 /** Body areas (by bone) that a garment covers; those triangles are removed from the skin mesh so skin never pokes through. */
 const COVERED_BONES: Record<string, string[]> = {
@@ -158,6 +159,8 @@ export class Avatar {
     if (patch.skinTone !== undefined) await this.applySkin();
     if (patch.eyeColor !== undefined) this.applyEyes();
     if (patch.hairColor !== undefined) this.applyHairColor();
+    if (patch.accessoryColor !== undefined) this.applyAccessoryColor();
+    if (patch.height !== undefined || patch.build !== undefined) this.applyShape();
     if (patch.brows !== undefined) this.applyBuiltInBrows();
     if (patch.outfitVariant !== undefined || patch.topColor !== undefined || patch.bottomColor !== undefined || patch.shoesColor !== undefined) {
       await this.applyOutfitTextures();
@@ -349,6 +352,7 @@ export class Avatar {
       shoes: clothing(shoes, "shoes"),
       hood: hood ? clothing("ranger", "hood") : null,
       acc: pauldrons ? clothing("ranger", "acc") : null,
+      accessory: this.look.accessory ? { id: this.look.accessory, kind: "proc-acc" as const } : null,
     };
   }
 
@@ -369,6 +373,8 @@ export class Avatar {
       this.partRoots.set(slot, part);
     }
     this.applyHairColor();
+    this.applyAccessoryColor();
+    this.applyShape();
     await this.applyOutfitTextures();
     this.applyProceduralMaterials();
     this.updateBodyMask();
@@ -378,6 +384,7 @@ export class Avatar {
     if (!this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
     if (kind === "proc-hair") return this.buildProceduralHair(id);
     if (kind === "proc-garment") return this.buildProceduralGarment(id);
+    if (kind === "proc-acc") return this.buildProceduralAccessory(id);
     const record = this.asset(id);
     const gltf = await loadGLTF(assetUrl(record.file));
     const clone = SkeletonUtils.clone(gltf.scene);
@@ -465,6 +472,44 @@ export class Avatar {
     return group;
   }
 
+  /** Glasses, caps and jewellery: rigid parts that ride on the head or neck bone. */
+  private buildProceduralAccessory(id: string): THREE.Object3D | null {
+    const rest = this.bodyRest;
+    if (!rest || !this.skeleton) return null;
+    const result = buildAccessory(rest, id);
+    if (!result) return null;
+    const boneName = id === "a_chain" ? "neck_01" : "Head";
+    const bone = this.skeleton.bones.find((b) => b.name === boneName);
+    if (!bone) return null;
+    const material = new THREE.MeshStandardMaterial({ roughness: result.roughness, metalness: result.metalness, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(result.geometry, material);
+    mesh.castShadow = true;
+    mesh.frustumCulled = false;
+    const group = new THREE.Group();
+    group.userData.assetId = id;
+    group.userData.kind = "proc-acc";
+    group.userData.fixedColour = result.fixedColour ?? null;
+    group.add(mesh);
+    bone.add(group);
+    return group;
+  }
+
+  private applyAccessoryColor(): void {
+    const colour = CLOTH_COLORS.find((c) => c.id === this.look.accessoryColor)?.color ?? "#26262a";
+    for (const part of this.partRoots.values()) {
+      if (part.userData.kind !== "proc-acc") continue;
+      const fixed = part.userData.fixedColour as string | null;
+      eachMaterial(part, (m) => m.color.set(fixed ?? colour));
+    }
+  }
+
+  /** Height and build: a plain scale of the whole body (the animations still fit). */
+  private applyShape(): void {
+    const h = Math.max(0.85, Math.min(1.12, this.look.height ?? 1));
+    const b = Math.max(0.85, Math.min(1.25, this.look.build ?? 1));
+    this.root.scale.set(b, h, b);
+  }
+
   /** A garment cut from the body mesh, so it shares the body's skeleton and deforms with it. */
   private buildProceduralGarment(id: string): THREE.Object3D | null {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
@@ -549,6 +594,52 @@ export class Avatar {
     if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, fade, false);
     this.currentAction = next;
     return true;
+  }
+
+  /**
+   * For the sprite baker: which parts of the body are drawn. "skin" is just the body; "details" is the face (eyes, brows) over an
+   * invisible body that still hides what is behind it; "layer" is the clothes, hair and accessories over that same invisible body.
+   */
+  setBakeMode(mode: "skin" | "details" | "layer"): void {
+    const body = this.bodyMesh;
+    if (!body || !this.bodyScene) return;
+    for (const material of Array.isArray(body.material) ? body.material : [body.material]) {
+      material.colorWrite = mode === "skin";
+      material.depthWrite = true;
+    }
+    this.bodyScene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || mesh === body) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const face = mats.some((m) => /eye|teeth|tongue|brow|lash/i.test(m.name));
+      if (face) mesh.visible = mode === "details";
+    });
+    for (const brow of this.builtInBrows) brow.visible = mode === "details" && this.look.brows === null;
+    for (const [slot, part] of this.partRoots) part.visible = mode === "layer" || (mode === "details" && slot === "brows");
+  }
+
+  /** For the sprite baker: plain white skin and cloth with the shading kept, so colours can be applied afterwards. */
+  neutraliseForBaking(): void {
+    const body = this.bodyMesh;
+    if (body) {
+      for (const material of materialsOf(body)) {
+        material.map = null;
+        material.normalMap = null;
+        material.color.set("#ffffff");
+        material.needsUpdate = true;
+      }
+    }
+    for (const part of this.partRoots.values()) {
+      if (part.userData.kind === "proc-acc") {
+        if (!part.userData.fixedColour) eachMaterial(part, (m) => m.color.set("#ffffff"));
+        continue;
+      }
+      eachMaterial(part, (m) => {
+        m.color.set("#ffffff");
+        if (part.userData.kind === "proc-garment" || part.userData.kind === "clothing") m.map = null;
+        m.needsUpdate = true;
+      });
+    }
   }
 
   /** Length of a clip in seconds (0 if there is none). */

@@ -131,7 +131,7 @@ describe("game server", () => {
     const rich = BACKGROUNDS.find((b) => b.tier === "nepo")!;
     a.send({ t: "create", profile: { ...CHOICE, backgroundId: "does_not_exist" } });
     expect((await a.next("error")).reason).toMatch(/isn't valid/);
-    a.send({ t: "create", profile: { ...CHOICE, startingMoney: 999_999_999, rentPerWeek: 0, tier: "nepo" } });
+    a.send({ t: "create", profile: { ...CHOICE, startingMoney: 999_999_999, rentPerWeek: 0, tier: "nepo" } as never });
     const life = await a.next("life");
     const accounts = (life.state as { ledger: { accounts: Record<string, number> } }).ledger.accounts;
     expect(accounts.player).toBe(BG.money[1]); // clamped to the background's own range

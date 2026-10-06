@@ -135,12 +135,19 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       }
       switch (message.t) {
         case "create": {
-          const made = room.createLife(me, message.profile, now, message.replace === true);
+          const made = room.createLife(me, message.profile, now, message.replace === true, message.look);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
           sendHome(me, me.where === "world");
+          return;
+        }
+        case "look": {
+          if (!room.allow(me, "rpc", now)) return;
+          room.setLook(me, message.look);
+          sendLife(me);
+          if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // others see the new look
           return;
         }
         case "place": {
