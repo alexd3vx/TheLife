@@ -1,6 +1,6 @@
 .map-stats {
   position: absolute; z-index: 2; left: 12px; top: 64px; display: grid; gap: 4px; padding: 10px 12px; max-width: 330px;
-  border-radius: 14px; background: rgba(20, 17, 15, .72); backdrop-filter: blur(8px); font-size: .78rem; pointer-events: none;
+  border-radius: 14px; background: rgba(20, 17, 15, .82); font-size: .78rem; pointer-events: none;
   font-variant-numeric: tabular-nums; color: var(--text);
 }
 .map-stats b { color: var(--accent-strong); }
@@ -15,7 +15,7 @@
 .map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 118px; height: 118px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }
 .map-mini .dmap { pointer-events: none; }
 .map-big { position: absolute; z-index: 5; inset: 56px 12px 72px; border-radius: 18px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .9); background: #d9e6c6; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
-.map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(20, 17, 15, .92); backdrop-filter: blur(10px); display: grid; gap: 8px; }
+.map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(20, 17, 15, .92); display: grid; gap: 8px; }
 .map-sheet strong { font-size: 1rem; }
 .map-sheet span { color: var(--text-muted); font-size: .82rem; }
 .map-sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -83,7 +83,7 @@ const TAP_MAX_TIME = 450;
 export async function startMap(container: HTMLElement, manifest: AssetManifest, events: MapEvents): Promise<MapRuntime | null> {
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer = new THREE.WebGLRenderer({ antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" });
   } catch {
     return null;
   }
@@ -93,7 +93,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (container.clientWidth) renderer.setSize(container.clientWidth, container.clientHeight, false);
   });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
   container.appendChild(renderer.domElement);
@@ -110,7 +110,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   const sun = new THREE.DirectionalLight("#fff0d6", 2.6);
   const SUN_OFFSET = new THREE.Vector3(-30, 50, 36);
   sun.castShadow = true;
-  const shadowSize = small ? 1024 : 2048;
+  const shadowSize = 1024;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
   const span = 46; // shadows cover this far around the player
   Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 5, far: 140 });

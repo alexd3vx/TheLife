@@ -1,4 +1,5 @@
 import type { FaName } from "../ui/icons";
+import { LightBudget } from "./lightBudget";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { isFree } from "@thelife/shared";
@@ -84,7 +85,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : HOUSE_LAYOUT;
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer = new THREE.WebGLRenderer({ antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" });
   } catch {
     return null;
   }
@@ -96,7 +97,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   });
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.domElement.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
   container.appendChild(renderer.domElement);
@@ -306,6 +307,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     for (const link of placedById.get(id)?.def.link ?? []) set.add(link);
     return set;
   }
+  const lightBudget = new LightBudget(world.scene);
   let renderEvery = 1;
   let frameNo = 0;
   let lowFor = 0;
@@ -331,6 +333,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     controller.update(dt);
     avatar.update(dt);
     world.updateFurniture(dt, elapsed, usingSet());
+    lightBudget.update(controller.position);
     hudClock += dt;
     if (session && hudClock > 0.2) {
       hudClock = 0;

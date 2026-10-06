@@ -1,4 +1,4 @@
-// Graphics quality. "Auto" keeps the picture sharp (at least one pixel per screen pixel) and gives up shadow refreshes first
+// Graphics quality. "Auto" favours a smooth frame rate: it gives up shadow refreshes first, then resolution (down to 0.7x),
 // when the frame rate drops; "High" never trades anything away; "Low" renders at three quarters resolution with cheap shadows.
 
 export type Quality = "auto" | "high" | "low";
@@ -58,8 +58,10 @@ export class AdaptiveQuality {
       this.base = this.floor = 0.75;
       this.shadowEvery = 4;
     } else {
-      this.base = Math.min(dpr, 2);
-      this.floor = Math.min(this.base, 1); // auto never drops below one pixel per screen pixel
+      // Auto starts at no more than 1.5x (phones report 3x, which is nine times the pixels for little visible gain) and can
+      // go down to 0.7x if the device struggles; High keeps up to 2x and never trades anything away.
+      this.base = Math.min(dpr, this.quality === "high" ? 2 : 1.5);
+      this.floor = this.quality === "high" ? this.base : Math.min(this.base, 0.7);
       this.shadowEvery = 1;
     }
     this.ratio = this.base;
@@ -69,7 +71,7 @@ export class AdaptiveQuality {
   /** Call about twice a second with the measured frame rate. */
   update(fps: number): void {
     if (this.quality !== "auto" || document.hidden) return;
-    if (fps < 45) {
+    if (fps < 40) {
       this.highFor = 0;
       if (++this.lowFor >= 2) {
         this.lowFor = 0;
