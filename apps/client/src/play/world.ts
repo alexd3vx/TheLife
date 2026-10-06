@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { blockOutside, blockRect, createNavGrid, findPath, isFree, type NavGrid } from "@thelife/shared";
+import { blockOutside, blockRect, createNavGrid, findPath, isFree, nearestFree, type NavGrid } from "@thelife/shared";
 import { furnitureById, type FurnitureDef } from "@thelife/game-core";
 import { createFurniture, type FurnitureInstance } from "../furniture/instance";
 import type { AssetManifest } from "../lab/manifest";
@@ -42,6 +42,14 @@ export interface World {
   updateWalls(camera: THREE.Camera, delta: number): void;
   /** Sun, sky and house lights for a time of day (hours, 0-24). */
   setTimeOfDay(hour: number): void;
+  /** Puts the furniture where a changed layout says (pieces moved, sold or bought), keeping the pieces that didn't change. */
+  relayout(next: Layout): Promise<void>;
+  /** Can this piece (a placed one by id, or a new one of this furniture and size) stand here? Inside the walls, clear of other furniture, and not shutting anything in. */
+  fits(selfId: string | null, furniture: string, size: THREE.Vector3, x: number, z: number, rotDeg: number, why?: { r: string }): boolean;
+  /** The size of a piece of furniture in metres. */
+  sizeOf(furniture: string): Promise<THREE.Vector3>;
+  /** The free spot nearest the middle of the house for a piece of furniture. */
+  findSpot(furniture: string, size: THREE.Vector3): { x: number; z: number } | null;
   /** 0 (day) to 1 (night), as last set. */
   readonly night: number;
   dispose(): void;
@@ -269,28 +277,28 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   }
 
   // ---- navigation grid: walls and furniture block, the play area edge blocks
-  const nav = createNavGrid(layout.area, NAV_CELL);
-  blockOutside(nav, layout.area, 0.4);
-  for (const wall of layout.walls) {
-    const t = wallThickness / 2;
-    blockRect(
-      nav,
-      { minX: Math.min(wall.a[0], wall.b[0]) - t, maxX: Math.max(wall.a[0], wall.b[0]) + t, minZ: Math.min(wall.a[1], wall.b[1]) - t, maxZ: Math.max(wall.a[1], wall.b[1]) + t },
-      CHARACTER_RADIUS,
-    );
+  function makeBaseNav(): NavGrid {
+    const grid = createNavGrid(layout.area, NAV_CELL);
+    blockOutside(grid, layout.area, 0.4);
+    for (const wall of layout.walls) {
+      const t = wallThickness / 2;
+      blockRect(
+        grid,
+        { minX: Math.min(wall.a[0], wall.b[0]) - t, maxX: Math.max(wall.a[0], wall.b[0]) + t, minZ: Math.min(wall.a[1], wall.b[1]) - t, maxZ: Math.max(wall.a[1], wall.b[1]) + t },
+        CHARACTER_RADIUS,
+      );
+    }
+    return grid;
   }
 
   // ---- furniture
   const items: PlacedItem[] = [];
-  const built = await Promise.all(
-    layout.items.map(async (def) => {
-      const catalog = furnitureById(def.furniture);
-      if (!catalog) throw new Error(`Layout item "${def.id}" uses unknown furniture "${def.furniture}"`);
-      const instance = await createFurniture(def.furniture, manifest);
-      return { def, catalog, instance };
-    }),
-  );
-  for (const { def, catalog, instance } of built) {
+
+  /** Builds one piece (its model, placed and turned) and adds it to the scene. */
+  async function makeItem(def: Placement): Promise<PlacedItem> {
+    const catalog = furnitureById(def.furniture);
+    if (!catalog) throw new Error(`Layout item "${def.id}" uses unknown furniture "${def.furniture}"`);
+    const instance = await createFurniture(def.furniture, manifest);
     const group = instance.object;
     group.userData.itemId = def.id;
     group.rotation.y = ((def.rot ?? 0) * Math.PI) / 180;
@@ -313,58 +321,81 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     });
     scene.add(group);
     group.updateMatrixWorld(true);
-    items.push({ def, catalog, instance, group, materials, bounds: new THREE.Box3().setFromObject(group) });
+    return { def, catalog, instance, group, materials, bounds: new THREE.Box3().setFromObject(group) };
   }
+  items.push(...(await Promise.all(layout.items.map(makeItem))));
 
-  // Items that rest on others take their height from the item below (resolved in dependency order).
-  const byId = new Map(items.map((i) => [i.def.id, i]));
-  const settled = new Set(items.filter((i) => !i.def.onTopOf).map((i) => i.def.id));
-  let remaining = items.filter((i) => i.def.onTopOf);
-  for (let pass = 0; pass < 4 && remaining.length; pass++) {
-    const next: PlacedItem[] = [];
-    for (const item of remaining) {
-      const base = byId.get(item.def.onTopOf!);
-      if (!base || !settled.has(base.def.id)) {
-        next.push(item);
-        continue;
-      }
-      item.group.position.y = base.bounds.max.y + (item.def.y ?? 0);
-      item.group.updateMatrixWorld(true);
-      item.bounds = new THREE.Box3().setFromObject(item.group);
-      settled.add(item.def.id);
-    }
-    remaining = next;
-  }
-
-  // Small things (cups, lamps, plants' leaves, books) barely show a shadow, so they skip the shadow pass: fewer draw calls per frame.
-  for (const item of items) {
-    const size = item.bounds.getSize(new THREE.Vector3());
-    if (Math.max(size.x, size.y, size.z) < 0.45) item.group.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = false) : undefined));
-  }
-
-  // Only things you'd bump into block walking: not rugs, wall-hung pieces, fans or things on tables.
-  for (const item of items) {
-    const b = item.bounds;
-    if (item.def.onTopOf || b.max.y - b.min.y < 0.12 || b.min.y > 0.7) continue;
-    blockRect(nav, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z }, CHARACTER_RADIUS);
-  }
-
-  // ---- what you can do with each piece, worked out from its shape
-  const derived: DerivedItem[] = items.map((item) => {
-    const base = item.def.onTopOf ? byId.get(item.def.onTopOf) : undefined;
-    return { def: item.def, category: item.catalog.category, action: item.catalog.action, toggle: item.catalog.toggle, meta: item.instance.meta, group: item.group, box: item.bounds, reach: base?.bounds ?? item.bounds };
-  });
+  let nav: NavGrid = makeBaseNav();
+  let byId = new Map<string, PlacedItem>();
+  let interactions = new Map<string, Interaction[]>();
+  let pickables: THREE.Object3D[] = [];
+  /** The ways of using things that could be reached when the room was last settled: rearranging must not cut any of them off. */
+  let reachableUses = new Set<string>();
   const start = { x: layout.start.x, z: layout.start.z };
-  const reachable = (x: number, z: number) => isFree(nav, x, z) && findPath(nav, start, { x, z }) !== null;
-  const interactions = deriveInteractions(derived, reachable, (id) => byId.get(id)?.bounds);
 
-  // Interaction spots must always be reachable, even if furniture padding covered them.
-  for (const list of interactions.values()) {
-    for (const interaction of list) {
-      const [x, z] = interaction.approach;
-      const cellX = Math.floor((x - nav.minX) / nav.cell);
-      const cellZ = Math.floor((z - nav.minZ) / nav.cell);
-      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) nav.blocked[(cellZ + dz) * nav.width + (cellX + dx)] = 0;
+  /** Works out everything that depends on where the furniture is: heights, the walkable floor, what each piece can be used for. */
+  function settle() {
+    byId = new Map(items.map((i) => [i.def.id, i]));
+    // Items that rest on others take their height from the item below (resolved in dependency order).
+    const settled = new Set(items.filter((i) => !i.def.onTopOf).map((i) => i.def.id));
+    let remaining = items.filter((i) => i.def.onTopOf);
+    for (let pass = 0; pass < 4 && remaining.length; pass++) {
+      const next: PlacedItem[] = [];
+      for (const item of remaining) {
+        const base = byId.get(item.def.onTopOf!);
+        if (!base || !settled.has(base.def.id)) {
+          next.push(item);
+          continue;
+        }
+        item.group.position.set(item.def.x, base.bounds.max.y + (item.def.y ?? 0), item.def.z);
+        item.group.updateMatrixWorld(true);
+        item.bounds = new THREE.Box3().setFromObject(item.group);
+        settled.add(item.def.id);
+      }
+      remaining = next;
+    }
+
+    // Small things (cups, lamps, plants' leaves, books) barely show a shadow, so they skip the shadow pass: fewer draw calls per frame.
+    for (const item of items) {
+      const size = item.bounds.getSize(new THREE.Vector3());
+      if (Math.max(size.x, size.y, size.z) < 0.45) item.group.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = false) : undefined));
+    }
+
+    // Only things you'd bump into block walking: not rugs, wall-hung pieces, fans or things on tables.
+    nav = makeBaseNav();
+    for (const item of items) {
+      const b = item.bounds;
+      if (item.def.onTopOf || b.max.y - b.min.y < 0.12 || b.min.y > 0.7) continue;
+      blockRect(nav, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z }, CHARACTER_RADIUS);
+    }
+
+    // ---- what you can do with each piece, worked out from its shape
+    const derived: DerivedItem[] = items.map((item) => {
+      const base = item.def.onTopOf ? byId.get(item.def.onTopOf) : undefined;
+      return { def: item.def, category: item.catalog.category, action: item.catalog.action, toggle: item.catalog.toggle, meta: item.instance.meta, group: item.group, box: item.bounds, reach: base?.bounds ?? item.bounds };
+    });
+    const reachable = (x: number, z: number) => isFree(nav, x, z) && findPath(nav, start, { x, z }) !== null;
+    interactions = deriveInteractions(derived, reachable, (id) => byId.get(id)?.bounds);
+
+    // Interaction spots must always be reachable, even if furniture padding covered them.
+    for (const list of interactions.values()) {
+      for (const interaction of list) {
+        const [x, z] = interaction.approach;
+        const cellX = Math.floor((x - nav.minX) / nav.cell);
+        const cellZ = Math.floor((z - nav.minZ) / nav.cell);
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) nav.blocked[(cellZ + dz) * nav.width + (cellX + dx)] = 0;
+      }
+    }
+    pickables = items.filter((i) => interactionsFor(i.def.id).length > 0).map((i) => i.group);
+    reachableUses = new Set();
+    const from = nearestFree(nav, start.x, start.z, 1.5);
+    if (from) {
+      for (const list of interactions.values()) {
+        for (const it of list) {
+          const goal = nearestFree(nav, it.approach[0], it.approach[1], 0.6);
+          if (goal && findPath(nav, from, goal)) reachableUses.add(`${it.itemId}:${it.id}`);
+        }
+      }
     }
   }
 
@@ -374,7 +405,112 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     const via = byId.get(itemId)?.def.via;
     return via ? (interactions.get(via) ?? []) : [];
   }
-  const pickables = items.filter((i) => interactionsFor(i.def.id).length > 0).map((i) => i.group);
+  settle();
+
+
+  // ---- rearranging the home
+  const FLAT_PIECES = new Set(["p_rug", "p_doormat"]);
+  const sizes = new Map<string, THREE.Vector3>();
+  async function sizeOf(furniture: string): Promise<THREE.Vector3> {
+    const known = sizes.get(furniture);
+    if (known) return known;
+    const inst = await createFurniture(furniture, manifest);
+    const size = inst.size.clone();
+    sizes.set(furniture, size);
+    return size;
+  }
+  for (const i of items) sizes.set(i.def.furniture, i.instance.size.clone());
+
+  function fits(selfId: string | null, furniture: string, size: THREE.Vector3, x: number, z: number, rotDeg: number, why?: { r: string }): boolean {
+    const no = (r: string) => {
+      if (why) why.r = r;
+      return false;
+    };
+    const quarter = (((Math.round(rotDeg / 90) % 2) + 2) % 2) === 1;
+    const hx = (quarter ? size.z : size.x) / 2, hz = (quarter ? size.x : size.z) / 2;
+    const r = { minX: x - hx + 0.03, maxX: x + hx - 0.03, minZ: z - hz + 0.03, maxZ: z + hz - 0.03 };
+    const hit = (a: { minX: number; maxX: number; minZ: number; maxZ: number }) => r.minX < a.maxX && r.maxX > a.minX && r.minZ < a.maxZ && r.maxZ > a.minZ;
+    const t = wallThickness / 2;
+    const b = house?.bounds ?? layout.area;
+    if (r.minX < b.minX + t || r.maxX > b.maxX - t || r.minZ < b.minZ + t || r.maxZ > b.maxZ - t) return no("outside");
+    for (const w of layout.walls) {
+      if (hit({ minX: Math.min(w.a[0], w.b[0]) - t, maxX: Math.max(w.a[0], w.b[0]) + t, minZ: Math.min(w.a[1], w.b[1]) - t, maxZ: Math.max(w.a[1], w.b[1]) + t })) return no("wall");
+    }
+    const flat = FLAT_PIECES.has(furniture);
+    const kids = new Set(items.filter((o) => selfId && o.def.onTopOf === selfId).map((o) => o.def.id));
+    const others = items.filter((o) => o.def.id !== selfId && !kids.has(o.def.id));
+    if (!flat) {
+      for (const o of others) {
+        if (o.def.onTopOf || o.def.y || FLAT_PIECES.has(o.def.furniture) || o.instance.meta.ceiling) continue;
+        const ob = o.bounds;
+        if (ob.max.y - ob.min.y < 0.12 || ob.min.y > 0.7) continue;
+        if (hit({ minX: ob.min.x, maxX: ob.max.x, minZ: ob.min.z, maxZ: ob.max.z })) return no("item " + o.def.id);
+      }
+    }
+    if (flat) return true;
+    // never wall yourself in: everything you could reach before must stay reachable
+    const test = makeBaseNav();
+    for (const o of others) {
+      const ob = o.bounds;
+      if (o.def.onTopOf || ob.max.y - ob.min.y < 0.12 || ob.min.y > 0.7) continue;
+      blockRect(test, { minX: ob.min.x, maxX: ob.max.x, minZ: ob.min.z, maxZ: ob.max.z }, CHARACTER_RADIUS);
+    }
+    blockRect(test, { minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz }, CHARACTER_RADIUS);
+    // like the real floor, the spots where things are used stay open even where furniture padding covers them
+    for (const list of interactions.values()) {
+      for (const it of list) {
+        if (selfId && it.itemId === selfId) continue;
+        const cellX = Math.floor((it.approach[0] - test.minX) / test.cell);
+        const cellZ = Math.floor((it.approach[1] - test.minZ) / test.cell);
+        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) test.blocked[(cellZ + dz) * test.width + (cellX + dx)] = 0;
+      }
+    }
+    const from = nearestFree(test, start.x, start.z, 1.5);
+    if (!from) return no("start blocked");
+    for (const list of interactions.values()) {
+      for (const it of list) {
+        if ((selfId && it.itemId === selfId) || !reachableUses.has(`${it.itemId}:${it.id}`)) continue;
+        const [ax, az] = it.approach;
+        const goal = nearestFree(test, ax, az, 0.6);
+        if (!goal || !findPath(test, from, goal)) return no("unreachable " + it.itemId);
+      }
+    }
+    return true;
+  }
+
+  function findSpot(furniture: string, size: THREE.Vector3): { x: number; z: number } | null {
+    const b = house?.bounds ?? layout.area;
+    const cxh = (b.minX + b.maxX) / 2, czh = (b.minZ + b.maxZ) / 2;
+    const cands: { x: number; z: number; d: number }[] = [];
+    for (let x = b.minX; x <= b.maxX; x += 0.25) for (let z = b.minZ; z <= b.maxZ; z += 0.25) cands.push({ x, z, d: Math.hypot(x - cxh, z - czh) });
+    cands.sort((p, q) => p.d - q.d);
+    for (const c of cands) if (fits(null, furniture, size, c.x, c.z, 0)) return { x: c.x, z: c.z };
+    return null;
+  }
+
+  let currentLayout = layout;
+  async function relayout(next: Layout): Promise<void> {
+    const old = new Map(items.map((i) => [i.def.id, i]));
+    const out: PlacedItem[] = [];
+    for (const def of next.items) {
+      const have = old.get(def.id);
+      if (have && have.def.furniture === def.furniture) {
+        old.delete(def.id);
+        have.def = def;
+        have.group.rotation.y = ((def.rot ?? 0) * Math.PI) / 180;
+        const ceiling = have.instance.meta.ceiling;
+        have.group.position.set(def.x, FLOOR_Y + (def.y ?? 0) + (ceiling ? wallHeight - have.instance.size.y : 0), def.z);
+        have.group.updateMatrixWorld(true);
+        have.bounds = new THREE.Box3().setFromObject(have.group);
+        out.push(have);
+      } else out.push(await makeItem(def));
+    }
+    for (const gone of old.values()) scene.remove(gone.group);
+    items.length = 0;
+    items.push(...out);
+    currentLayout = next;
+    settle();
+  }
 
   // ---- furniture reactions and hover
   function updateFurniture(dt: number, t: number, using: ReadonlySet<string>) {
@@ -491,13 +627,25 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   return {
     scene,
     sun,
-    layout,
+    get layout() {
+      return currentLayout;
+    },
     prewarm,
-    nav,
+    get nav() {
+      return nav;
+    },
     items,
-    pickables,
-    interactions,
+    get pickables() {
+      return pickables;
+    },
+    get interactions() {
+      return interactions;
+    },
     ground,
+    relayout,
+    fits,
+    sizeOf,
+    findSpot,
     interactionsFor,
     updateFurniture,
     highlight,

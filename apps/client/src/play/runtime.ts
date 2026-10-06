@@ -15,7 +15,9 @@ import { GameSession, type HudSnapshot } from "./gameSession";
 import { markRestart } from "./pendingLife";
 import type { SimEvent } from "@thelife/game-core";
 import { buildShowroomLayout, type Layout } from "./layout";
-import { layoutForTier } from "./layouts";
+import { layoutForTier, layoutWithHome } from "./layouts";
+import { homeMove, homeSell, homeBuy } from "../phone/remote";
+import { furnitureById } from "@thelife/game-core";
 import { FURNITURE } from "@thelife/game-core";
 import { buildWorld, type PlacedItem } from "./world";
 import type { Interaction } from "./interactions";
@@ -33,6 +35,8 @@ export interface RuntimeEvents {
   onMenu?(menu: TapMenu | null): void;
   /** The fridge, the stove or the table was tapped: open the kitchen on this tab. */
   onKitchen?(tab: "fridge" | "cook" | "eat"): void;
+  /** Home editing: what is picked up now (null = nothing). */
+  onEditSelect?(info: { id: string; furniture: string; name: string; bought: boolean; price: number } | null): void;
 }
 
 export interface TapMenu {
@@ -53,6 +57,8 @@ export interface PlayRuntime {
   /** The running game, for the phone screen. Null in the showroom. */
   session: GameSession | null;
   newGame(): void;
+  /** Rearranging the home: pick up, move, turn, sell and buy furniture. */
+  edit: { start(): void; stop(): void; rotate(): void; sell(): void; buy(furniture: string): Promise<string | null> };
   setFollow(on: boolean): void;
   resetView(): void;
   /** For tests and debugging. */
@@ -80,6 +86,9 @@ export interface PlayRuntime {
     canReach(interactionId: string): boolean;
     teleport(x: number, z: number): void;
     setView(azimuthDeg: number, polarDeg: number, distance: number): void;
+    /** Where a point in the world is on the screen (pixels), for tests. */
+    screenOf(x: number, y: number, z: number): [number, number];
+    world: { items: PlacedItem[]; layout: Layout; fits: (id: string | null, f: string, size: THREE.Vector3, x: number, z: number, rot: number, why?: { r: string }) => boolean };
   };
 }
 
@@ -90,7 +99,8 @@ export type PlayMode = "house" | "showroom";
 
 export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode; session?: GameSession } = {}): Promise<PlayRuntime | null> {
   const showroom = options.mode === "showroom";
-  const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : layoutForTier((options.session ?? undefined)?.sim.state.profile?.tier);
+  const tierLayout = layoutForTier((options.session ?? undefined)?.sim.state.profile?.tier);
+  const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : layoutWithHome(tierLayout, options.session?.sim.state.home);
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: getSettings().antialias, powerPreference: "high-performance" });
@@ -235,7 +245,71 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     return raycaster.ray.intersectPlane(plane, hit) ? hit.clone() : null;
   }
 
+  // ---- rearranging the home
+  let editing = false;
+  let selected: PlacedItem | null = null;
+  let appliedHome = JSON.stringify(options.session?.sim.state.home ?? null);
+  const editMarker = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: "#6fe29a", transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
+  editMarker.rotation.x = -Math.PI / 2;
+  editMarker.visible = false;
+  editMarker.renderOrder = 2;
+  world.scene.add(editMarker);
+  const movable = (i: PlacedItem) => !i.def.onTopOf && !i.def.y && !i.instance.meta.ceiling;
+  const bought = (id: string) => /^n\d+$/.test(id);
+  function placeMarker() {
+    if (!selected || !editing) {
+      editMarker.visible = false;
+      return;
+    }
+    const b = selected.bounds;
+    editMarker.scale.set(b.max.x - b.min.x + 0.1, b.max.z - b.min.z + 0.1, 1);
+    editMarker.position.set((b.min.x + b.max.x) / 2, 0.02, (b.min.z + b.max.z) / 2);
+    editMarker.visible = true;
+  }
+  function select(item: PlacedItem | null) {
+    selected = item && movable(item) ? item : null;
+    world.highlight(selected?.def.id ?? null);
+    placeMarker();
+    const sel = selected;
+    events.onEditSelect?.(sel ? { id: sel.def.id, furniture: sel.def.furniture, name: sel.catalog.name, bought: bought(sel.def.id), price: sel.catalog.price } : null);
+  }
+  const snap = (v: number) => Math.round(v * 4) / 4;
+  async function refreshLayout(keepId: string | null) {
+    const st = options.session!.sim.state;
+    appliedHome = JSON.stringify(st.home ?? null);
+    await world.relayout(layoutWithHome(tierLayout, st.home));
+    controller.setNav(world.nav);
+    placedById.clear();
+    for (const i of world.items) placedById.set(i.def.id, i);
+    select(keepId ? (placedById.get(keepId) ?? null) : null);
+  }
+  async function commitMove(item: PlacedItem, x: number, z: number, rot: number) {
+    const st = options.session!.sim.state;
+    const r = homeMove(st, item.def.id, x, z, rot);
+    if (!r.ok) return options.session!.notice(r.reason);
+    await refreshLayout(item.def.id);
+  }
+  function editTap(clientX: number, clientY: number) {
+    pointerRay(clientX, clientY);
+    const hits = raycaster.intersectObjects(world.items.map((i) => i.group), true);
+    for (const h of hits) {
+      let o: THREE.Object3D | null = h.object;
+      while (o && !o.userData.itemId) o = o.parent;
+      const item = world.items.find((i) => i.group === o);
+      if (item && movable(item)) return select(item === selected ? null : item);
+      if (item) return;
+    }
+    const it = selected;
+    if (!it) return;
+    const at = groundAt(clientX, clientY);
+    if (!at) return;
+    const x = snap(at.x), z = snap(at.z), rot = it.def.rot ?? 0;
+    if (!world.fits(it.def.id, it.def.furniture, it.instance.size, x, z, rot)) return options.session!.notice("That doesn't fit there.");
+    void commitMove(it, x, z, rot);
+  }
+
   function handleTap(clientX: number, clientY: number) {
+    if (editing) return editTap(clientX, clientY);
     const rect = renderer.domElement.getBoundingClientRect();
     const at = { x: clientX - rect.left, y: clientY - rect.top };
     const close = () => events.onMenu?.(null);
@@ -281,7 +355,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   const onMove = (e: PointerEvent) => {
     const d = down.get(e.pointerId);
     if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > TAP_MAX_MOVE) d.moved = true;
-    if (e.pointerType === "mouse" && down.size === 0) {
+    if (e.pointerType === "mouse" && down.size === 0 && !editing) {
       const picked = interactiveAt(e.clientX, e.clientY);
       canvas.style.cursor = picked ? "pointer" : "crosshair";
       world.highlight(picked?.item.def.id ?? null);
@@ -323,6 +397,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   let frames = 0;
   let acc = 0;
   let hudClock = 1;
+  let syncClock = 0;
+  let relayouting = false;
   const followTarget = new THREE.Vector3();
   let elapsed = 0;
   let timeScale = 1;
@@ -395,6 +471,15 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     blob.visible = avatar.root.position.y < 0.6; // not while lying in bed
     world.updateFurniture(dt, elapsed, usingSet());
     lightBudget.update(controller.position);
+    syncClock += dt;
+    if (session && syncClock > 1.5) {
+      syncClock = 0;
+      // the server has the final word on the home: if its version differs from what is drawn, draw that
+      if (!relayouting && JSON.stringify(session.sim.state.home ?? null) !== appliedHome) {
+        relayouting = true;
+        void refreshLayout(selected?.def.id ?? null).finally(() => (relayouting = false));
+      }
+    }
     hudClock += dt;
     if (session && hudClock > 0.2) {
       hudClock = 0;
@@ -461,6 +546,47 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       }
       if (!best) return false;
       return controller.tapInteraction(best.i, "auto");
+    },
+    edit: {
+      start() {
+        if (!options.session) return;
+        editing = true;
+        events.onMenu?.(null);
+      },
+      stop() {
+        editing = false;
+        select(null);
+      },
+      rotate() {
+        const it = selected;
+        if (!it) return;
+        const rot = (((it.def.rot ?? 0) + 90) % 360 + 360) % 360;
+        if (!world.fits(it.def.id, it.def.furniture, it.instance.size, it.def.x, it.def.z, rot)) return options.session!.notice("There isn't room to turn it.");
+        void commitMove(it, it.def.x, it.def.z, rot);
+      },
+      sell() {
+        const it = selected;
+        if (!it || !options.session) return;
+        const r = homeSell(options.session.sim.state, it.def.id, bought(it.def.id) ? undefined : it.def.furniture);
+        if (!r.ok) return options.session.notice(r.reason);
+        options.session.notice(r.text);
+        void refreshLayout(null);
+      },
+      async buy(furniture: string) {
+        const session = options.session;
+        if (!session) return "Not available here.";
+        const def = furnitureById(furniture);
+        if (!def) return "The shop doesn't have that.";
+        const size = await world.sizeOf(furniture);
+        const spot = world.findSpot(furniture, size);
+        if (!spot) return "There's no free space for that. Sell or move something first.";
+        const r = homeBuy(session.sim.state, furniture, spot.x, spot.z, 0);
+        if (!r.ok) return r.reason;
+        session.notice(r.text);
+        const id = session.sim.state.home!.added[session.sim.state.home!.added.length - 1]!.id;
+        await refreshLayout(id);
+        return null;
+      },
     },
     newGame() {
       markRestart();
@@ -539,6 +665,12 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       scene: world.scene,
       state: () => controller.state,
       free: (x, z) => isFree(world.nav, x, z),
+      screenOf(x, y, z) {
+        const v = new THREE.Vector3(x, y, z).project(camera);
+        const rect = renderer.domElement.getBoundingClientRect();
+        return [(v.x * 0.5 + 0.5) * rect.width + rect.left, (-v.y * 0.5 + 0.5) * rect.height + rect.top];
+      },
+      world: world as never,
       get session() {
         return session;
       },

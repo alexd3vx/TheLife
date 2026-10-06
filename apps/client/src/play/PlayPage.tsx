@@ -14,6 +14,8 @@ import type { Status } from "./controller";
 import type { HudSnapshot } from "./gameSession";
 import PhoneUI from "../phone/PhoneUI";
 import SettingsPanel from "../settings/SettingsPanel";
+import HomeShop from "../iso/HomeShop";
+import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
@@ -71,6 +73,9 @@ export default function PlayPage() {
   const [bagOpen, setBagOpen] = useState(false);
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [sel, setSel] = useState<{ id: string; furniture: string; name: string; bought: boolean; price: number } | null>(null);
 
   const pushToasts = useCallback((events: SimEvent[]) => {
     const fresh = events.map((e) => ({ id: ++toastId.current, kind: e.kind, text: e.text }));
@@ -84,7 +89,7 @@ export default function PlayPage() {
     let disposed = false;
     loadManifest()
       .then((manifest) =>
-        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu, onKitchen: setKitchen }, { session: life.session! }),
+        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu, onKitchen: setKitchen, onEditSelect: setSel }, { session: life.session! }),
       )
       .then((runtime) => {
         if (disposed) {
@@ -238,7 +243,27 @@ export default function PlayPage() {
         </div>
       )}
 
-      <div className="play-controls">
+      {editing && (
+        <>
+          <div className="home-hint" style={{ top: "calc(max(12px, env(safe-area-inset-top)) + 182px)" }}>{sel ? "Tap the floor to put it there." : "Tap a piece of furniture to pick it up."}</div>
+          <div className="home-bar">
+            <button disabled={!sel} onClick={() => runtimeRef.current?.edit.rotate()}>Turn</button>
+            <button className="danger" disabled={!sel} onClick={() => runtimeRef.current?.edit.sell()}>
+              {sel ? `Sell ₦${Math.floor(sel.price * (sel.bought ? 0.6 : 0.25)).toLocaleString()}` : "Sell"}
+            </button>
+            <button onClick={() => setShopOpen(true)}>Shop</button>
+            <button className="primary" onClick={() => { runtimeRef.current?.edit.stop(); setEditing(false); setShopOpen(false); }}>Done</button>
+          </div>
+        </>
+      )}
+      {editing && shopOpen && runtimeRef.current?.session && (
+        <HomeShop
+          session={runtimeRef.current.session}
+          onClose={() => setShopOpen(false)}
+          onBuy={(f) => void runtimeRef.current?.edit.buy(f).then((err) => (err ? runtimeRef.current?.session?.notice(err) : setShopOpen(false)))}
+        />
+      )}
+      {!editing && <div className="play-controls">
         <button aria-pressed={follow} onClick={() => setFollow((v) => !v)}>
           Follow
         </button>
@@ -254,7 +279,8 @@ export default function PlayPage() {
         >
           New game
         </button>
-      </div>
+        <button onClick={() => { runtimeRef.current?.edit.start(); setEditing(true); }}>Edit home</button>
+      </div>}
 
       {menu && (
         <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (containerRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, Math.min(menu.y + 10, (containerRef.current?.clientHeight ?? 600) - 60 - menu.options.length * 46)) }}>
@@ -268,7 +294,7 @@ export default function PlayPage() {
         </div>
       )}
 
-      {hud && !phoneOpen && (
+      {hud && !phoneOpen && !editing && (
         <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => { setPhoneApp(null); setPhoneOpen(true); }} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
           <span className="play-phone-body">
             <GameIcon name="phone" size={22} />
@@ -280,7 +306,7 @@ export default function PlayPage() {
         </button>
       )}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-      {hud && !phoneOpen && !bagOpen && (
+      {hud && !phoneOpen && !bagOpen && !editing && (
         <button className="play-bag" onClick={() => setBagOpen(true)} aria-label="Open your bag">
           <GameIcon name="bag" size={22} />
         </button>
