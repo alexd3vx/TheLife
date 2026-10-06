@@ -310,11 +310,11 @@ export function mealById(id: string): Meal | undefined {
 }
 
 export const DIARY_MOODS = [
-  { id: 1, label: "Rough", face: "😞" },
-  { id: 2, label: "Low", face: "😕" },
-  { id: 3, label: "Okay", face: "😐" },
-  { id: 4, label: "Good", face: "🙂" },
-  { id: 5, label: "Great", face: "😄" },
+  { id: 1, label: "Rough" },
+  { id: 2, label: "Low" },
+  { id: 3, label: "Okay" },
+  { id: 4, label: "Good" },
+  { id: 5, label: "Great" },
 ];
 
 // ---------------------------------------------------------------- more apps

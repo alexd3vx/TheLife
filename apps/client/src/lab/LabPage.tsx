@@ -207,7 +207,7 @@ export default function LabPage() {
           </a>
           <strong className="lab-title">Asset Lab</strong>
           <a className="lab-back" href="#/play">
-            Try walking ▶
+            Try walking
           </a>
           <button className="lab-panel-toggle" onClick={() => setPanelOpen((v) => !v)} aria-expanded={panelOpen}>
             {panelOpen ? "Hide panel" : "Show panel"}
@@ -332,7 +332,7 @@ function CharacterControls(props: CharacterControlsProps) {
           ))}
         </div>
         <button className="lab-wide" onClick={onRandom}>
-          🎲 Randomise
+          Randomise
         </button>
       </section>
 

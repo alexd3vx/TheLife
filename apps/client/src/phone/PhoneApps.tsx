@@ -420,7 +420,7 @@ export function Jobs({ state, act }: { state: GameState; act: Act }) {
               <span className="pa-row-main">
                 <strong>{job.title}</strong>
                 <small>{job.employer} · {naira(job.retainer)} a week</small>
-                <small className={ok ? "pa-in" : "pa-out"}>Needs {job.requires.skill} {job.requires.level}{ok ? " ✓" : ` (you have ${have})`}</small>
+                <small className={ok ? "pa-in" : "pa-out"}>Needs {job.requires.skill} {job.requires.level}{ok ? " (met)" : ` (you have ${have})`}</small>
               </span>
               <Btn disabled={phone.job === job.id || !!phone.application} onClick={() => act((s) => applyForJob(s, job.id))}>
                 {phone.job === job.id ? "Hired" : "Apply"}

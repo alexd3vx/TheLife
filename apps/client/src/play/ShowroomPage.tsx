@@ -1,3 +1,4 @@
+import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ACTIONS, FURNITURE, type FurnitureCategory, type FurnitureDef } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
@@ -180,10 +181,10 @@ export default function ShowroomPage() {
           {panelOpen ? "Hide list" : "Show list"}
         </button>
         <button className="play-chip" onClick={() => setNight((v) => !v)}>
-          {night ? "🌙 Night" : "☀️ Day"}
+          <><GameIcon name={night ? "moon" : "sun"} /> {night ? "Night" : "Day"}</>
         </button>
         <button className="play-chip showroom-run" disabled={loading || !!running} onClick={runAll}>
-          {running ? `Testing… ${FURNITURE.find((f) => f.id === running)?.name ?? ""}` : "▶ Run all tests"}
+          {running ? `Testing… ${FURNITURE.find((f) => f.id === running)?.name ?? ""}` : <><GameIcon name="play" /> Run all tests</>}
         </button>
         {running && (
           <button
@@ -197,7 +198,7 @@ export default function ShowroomPage() {
         )}
         {(passed > 0 || failed > 0) && (
           <span className="play-chip" role="status">
-            ✓ {passed} · ✗ {failed}
+            <GameIcon name="check" /> {passed} · <GameIcon name="close" /> {failed}
           </span>
         )}
       </div>
@@ -223,7 +224,7 @@ export default function ShowroomPage() {
                     <li key={f.id} className={selected === f.id ? "is-selected" : ""}>
                       <button className="showroom-name" onClick={() => show(f.id)}>
                         <span className={`showroom-dot showroom-${result?.status ?? "none"}`} aria-hidden="true">
-                          {result?.status === "pass" ? "✓" : result?.status === "fail" ? "✗" : result?.status === "info" ? "·" : ""}
+                          {result?.status === "pass" ? <GameIcon name="check" /> : result?.status === "fail" ? <GameIcon name="close" /> : result?.status === "info" ? "·" : ""}
                         </span>
                         <span>
                           {f.name}

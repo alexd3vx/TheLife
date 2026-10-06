@@ -374,7 +374,7 @@ function StatusBar(p: { clock: string; battery: number; plugged: string | null; 
             <span style={{ width: `${Math.round(p.battery)}%` }} />
           </span>
           {Math.round(p.battery)}
-          {p.plugged ? (p.plugged === "wall" && !p.wall ? "!" : "⚡") : ""}
+          {p.plugged ? (p.plugged === "wall" && !p.wall ? "!" : <Icon name="bolt" size={11} />) : ""}
         </span>
       </span>
     </div>

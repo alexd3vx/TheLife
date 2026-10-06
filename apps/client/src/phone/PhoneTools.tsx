@@ -1,3 +1,4 @@
+import { GameIcon, type FaName } from "../ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AJO_AMOUNT, AJO_MEMBERS, COURSES, DIARY_MOODS, EATS_MENU, HEALTH_TIPS, LANGS, LESSON_XP, PHRASES, PRAYER_TIMES, STATIONS, STOCKS, VERSES,
@@ -58,7 +59,7 @@ export function Calendar({ state }: P) {
   );
 }
 
-const SKY_ICON: Record<string, string> = { sunny: "☀️", cloudy: "⛅", rain: "🌧️", storm: "⛈️" };
+const SKY_ICON: Record<string, FaName> = { sunny: "sunny", cloudy: "cloudy", rain: "rain", storm: "storm" };
 export function Weather({ state }: P) {
   const day = dayOf(state);
   const today = weatherFor(day);
@@ -66,13 +67,13 @@ export function Weather({ state }: P) {
     <div className="pa-page">
       <div className="pa-card-soft">
         <span>Today</span>
-        <strong>{SKY_ICON[today.sky]} {today.highC}°C</strong>
+        <strong><GameIcon name={SKY_ICON[today.sky]!} size={26} /> {today.highC}°C</strong>
         <small>{today.label} · low {today.lowC}° · {today.rainChance}% chance of rain</small>
       </div>
       <div className="pa-group">
         {[1, 2, 3, 4, 5].map((i) => {
           const w = weatherFor(day + i);
-          return <Row key={i} title={`${WEEKDAYS[(day + i - 1) % 7]} · ${SKY_ICON[w.sky]} ${w.highC}° / ${w.lowC}°`} sub={`${w.label} · ${w.rainChance}% rain`} />;
+          return <Row key={i} icon="cloud" title={`${WEEKDAYS[(day + i - 1) % 7]} · ${w.highC}° / ${w.lowC}°`} sub={`${w.label} · ${w.rainChance}% rain`} />;
         })}
       </div>
     </div>
@@ -188,7 +189,7 @@ export function Rates({ state }: P) {
       <div className="pa-group">
         {ratesFor(day).map((r) => {
           const y = ratesFor(day - 1).find((x) => x.code === r.code)!.naira;
-          return <Row key={r.code} icon="swap" tone="#2f9e44" title={`${r.code} · ${naira(r.naira)}`} sub={`${r.name} · ${r.naira >= y ? "▲" : "▼"} ${Math.abs(r.naira - y)} since yesterday`} />;
+          return <Row key={r.code} icon="swap" tone="#2f9e44" title={`${r.code} · ${naira(r.naira)}`} sub={`${r.name} · ${r.naira >= y ? "Up" : "Down"} ${Math.abs(r.naira - y)} since yesterday`} />;
         })}
       </div>
       <p className="pa-section">Convert</p>
@@ -420,7 +421,7 @@ export function Invest({ state, act }: P) {
           const own = state.phone.holdings[s.symbol] ?? 0;
           return (
             <div key={s.symbol} className="pa-row">
-              <span className="pa-row-main"><strong>{s.symbol} · {naira(price)}</strong><small>{s.name} · <b className={price >= y ? "pa-in" : "pa-out"}>{price >= y ? "▲" : "▼"} {Math.abs(((price - y) / y) * 100).toFixed(1)}%</b> · you own {own}</small></span>
+              <span className="pa-row-main"><strong>{s.symbol} · {naira(price)}</strong><small>{s.name} · <b className={price >= y ? "pa-in" : "pa-out"}>{price >= y ? "Up" : "Down"} {Math.abs(((price - y) / y) * 100).toFixed(1)}%</b> · you own {own}</small></span>
               <Btn kind="soft" onClick={() => act((st) => buyShares(st, s.symbol, 1))}>Buy</Btn>
               <Btn kind="soft" disabled={own === 0} onClick={() => act((st) => sellShares(st, s.symbol, 1))}>Sell</Btn>
             </div>
@@ -518,7 +519,7 @@ export function Diary({ state, act }: P) {
       {!written ? (
         <>
           <div className="pa-chips">
-            {DIARY_MOODS.map((m) => <button key={m.id} className={`pa-chip${moodPick === m.id ? " is-accent" : ""}`} onClick={() => setMoodPick(m.id)}>{m.face} {m.label}</button>)}
+            {DIARY_MOODS.map((m) => <button key={m.id} className={`pa-chip${moodPick === m.id ? " is-accent" : ""}`} onClick={() => setMoodPick(m.id)}><GameIcon name={`m${m.id}` as FaName} /> {m.label}</button>)}
           </div>
           <textarea className="pa-textarea" rows={3} maxLength={160} value={text} onChange={(e) => setText(e.target.value)} placeholder="One line about today…" aria-label="Diary entry" />
           <Btn onClick={() => act((s) => diaryCheckIn(s, moodPick, text))}>Save today</Btn>
@@ -526,7 +527,7 @@ export function Diary({ state, act }: P) {
       ) : <div className="pa-note">You've written today. See you tomorrow.</div>}
       <div className="pa-group">
         {state.phone.diary.length === 0 && <p className="pa-empty">Your entries will show here.</p>}
-        {[...state.phone.diary].reverse().map((d, i) => <Row key={i} title={`${DIARY_MOODS.find((m) => m.id === d.mood)?.face ?? ""} Day ${d.day}`} sub={d.text || "—"} />)}
+        {[...state.phone.diary].reverse().map((d, i) => <Row key={i} title={`Day ${d.day} · ${DIARY_MOODS.find((m) => m.id === d.mood)?.label ?? ""}`} sub={d.text || "—"} />)}
       </div>
     </div>
   );

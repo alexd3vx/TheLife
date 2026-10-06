@@ -1,3 +1,4 @@
+import { GameIcon } from "../ui/icons";
 import { useState } from "react";
 import {
   HOME_PLANS, STORAGE_MB, PHONE_MODELS, compatibleTiers, STORE_APPS, STORE_CATEGORIES, buyHomePlan, cancelDownload, clockOf, connection, hasApp, homePlanById, homeWifiWorks, modelOf, setMobileData, setWifi,
@@ -27,7 +28,7 @@ export function Ring({ value, size = 36, paused = false }: { value: number; size
         <circle cx={size / 2} cy={size / 2} r={r} className="pa-ring-track" />
         <circle cx={size / 2} cy={size / 2} r={r} className="pa-ring-fill" strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0.02, Math.min(1, value)))} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </svg>
-      <i>{paused ? "⏸" : `${Math.round(value * 100)}`}</i>
+      <i>{paused ? <GameIcon name="pause" size={10} /> : `${Math.round(value * 100)}`}</i>
     </span>
   );
 }
@@ -151,7 +152,7 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
                   <span className="pa-row-main">
                     <strong>{a.name}</strong>
                     <small>{a.blurb}</small>
-                    <small className={tierAtLeast(p.model, a.minTier) ? "" : "pa-bad"}>{MB(a.sizeMB)}{a.dataMB === 0 ? " · works offline" : ""} · {tierAtLeast(p.model, a.minTier) ? "✓ Compatible" : `Needs ${TIER_SHORT[a.minTier]} or newer`}</small>
+                    <small className={tierAtLeast(p.model, a.minTier) ? "" : "pa-bad"}>{MB(a.sizeMB)}{a.dataMB === 0 ? " · works offline" : ""} · {tierAtLeast(p.model, a.minTier) ? "Compatible" : `Needs ${TIER_SHORT[a.minTier]} or newer`}</small>
                   </span>
                   <span onClick={(e) => e.stopPropagation()}>{button(a.id)}</span>
                 </div>
@@ -222,7 +223,7 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
               <div className="ps-compat">
                 {(["basic", "mid", "flagship"] as const).map((t) => (
                   <span key={t} className={`${compatibleTiers(a).includes(t) ? "is-yes" : "is-no"}${p.model === t ? " is-you" : ""}`}>
-                    {compatibleTiers(a).includes(t) ? "✓" : "✕"} {PHONE_MODELS[t].name.replace("LifePhone ", "")}{p.model === t ? " (yours)" : ""}
+                    <GameIcon name={compatibleTiers(a).includes(t) ? "check" : "close"} size={12} /> {PHONE_MODELS[t].name.replace("LifePhone ", "")}{p.model === t ? " (yours)" : ""}
                   </span>
                 ))}
               </div>

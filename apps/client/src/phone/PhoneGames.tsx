@@ -1,3 +1,4 @@
+import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { quizRound, recordScore, clockOf, type GameState, type StoreAppId } from "@thelife/game-core";
 import { Btn, type Act } from "./PhoneApps";
@@ -84,10 +85,10 @@ export function Snake({ state, act }: P) {
         }}
       />
       <div className="pa-dpad">
-        <button className="up" onClick={() => turn(0, -1)} aria-label="Up">▲</button>
-        <button className="left" onClick={() => turn(-1, 0)} aria-label="Left">◀</button>
-        <button className="down" onClick={() => turn(0, 1)} aria-label="Down">▼</button>
-        <button className="right" onClick={() => turn(1, 0)} aria-label="Right">▶</button>
+        <button className="up" onClick={() => turn(0, -1)} aria-label="Up"><GameIcon name="up" size={20} /></button>
+        <button className="left" onClick={() => turn(-1, 0)} aria-label="Left"><GameIcon name="left" size={20} /></button>
+        <button className="down" onClick={() => turn(0, 1)} aria-label="Down"><GameIcon name="down" size={20} /></button>
+        <button className="right" onClick={() => turn(1, 0)} aria-label="Right"><GameIcon name="right" size={20} /></button>
       </div>
       {over && <Btn onClick={() => setRound((r) => r + 1)}>Play again</Btn>}
     </div>
@@ -176,10 +177,10 @@ export function Game2048({ state, act }: P) {
         ))}
       </div>
       <div className="pa-dpad">
-        <button className="up" onClick={() => play("up")} aria-label="Up">▲</button>
-        <button className="left" onClick={() => play("left")} aria-label="Left">◀</button>
-        <button className="down" onClick={() => play("down")} aria-label="Down">▼</button>
-        <button className="right" onClick={() => play("right")} aria-label="Right">▶</button>
+        <button className="up" onClick={() => play("up")} aria-label="Up"><GameIcon name="up" size={20} /></button>
+        <button className="left" onClick={() => play("left")} aria-label="Left"><GameIcon name="left" size={20} /></button>
+        <button className="down" onClick={() => play("down")} aria-label="Down"><GameIcon name="down" size={20} /></button>
+        <button className="right" onClick={() => play("right")} aria-label="Right"><GameIcon name="right" size={20} /></button>
       </div>
       {over && <div className="pa-note">No moves left.</div>}
       <Btn kind="soft" onClick={reset}>New game</Btn>
@@ -233,11 +234,11 @@ export function TicTac({ state, act }: P) {
 
 // ------------------------------------------------------------------ Match Pairs
 
-const FACES = ["🍚", "🍗", "🥭", "🍌", "🌶️", "🍍", "🥥", "🍉"];
-const deal = () => [...FACES, ...FACES].map((f, i) => ({ f, k: Math.random() + i * 1e-9 })).sort((a, b) => a.k - b.k).map((x) => x.f);
+const FACES: FaName[] = ["apple", "lemon", "carrot", "pepper", "fish", "egg", "cookie", "seed"];
+const deal = (): FaName[] => [...FACES, ...FACES].map((f, i) => ({ f, k: Math.random() + i * 1e-9 })).sort((a, b) => a.k - b.k).map((x) => x.f);
 
 export function MatchPairs({ state, act }: P) {
-  const [cards, setCards] = useState<string[]>(deal);
+  const [cards, setCards] = useState<FaName[]>(deal);
   const [up, setUp] = useState<number[]>([]);
   const [done, setDone] = useState<Set<number>>(new Set());
   const [moves, setMoves] = useState(0);
@@ -268,7 +269,7 @@ export function MatchPairs({ state, act }: P) {
       <div className="pa-board pa-memory">
         {cards.map((f, i) => {
           const shown = up.includes(i) || done.has(i);
-          return <button key={i} className={done.has(i) ? "is-done" : shown ? "is-up" : ""} onClick={() => flip(i)} aria-label={shown ? f : "Hidden card"}>{shown ? f : "?"}</button>;
+          return <button key={i} className={done.has(i) ? "is-done" : shown ? "is-up" : ""} onClick={() => flip(i)} aria-label={shown ? f : "Hidden card"}>{shown ? <GameIcon name={f} size={26} /> : "?"}</button>;
         })}
       </div>
       {won && <div className="pa-note" role="status">All pairs found in {moves} moves!</div>}

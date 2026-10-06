@@ -1,3 +1,4 @@
+import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
 import { Avatar } from "../lab/avatar";
@@ -287,7 +288,7 @@ export default function CreatorPage() {
 
               {!profile && !rolling && (
                 <button className="btn btn-primary creator-dice" onClick={roll} disabled={busy}>
-                  🎲 Roll my background
+                  <GameIcon name="dice" /> Roll my background
                 </button>
               )}
               {rolling && <p className="creator-rolling">Rolling…</p>}

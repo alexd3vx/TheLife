@@ -1,3 +1,4 @@
+import { GameIcon, type FaName } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
@@ -14,12 +15,12 @@ interface Toast {
   text: string;
 }
 
-const NEED_META: { id: NeedId; icon: string; label: string }[] = [
-  { id: "hunger", icon: "🍽️", label: "Hunger" },
-  { id: "energy", icon: "⚡", label: "Energy" },
-  { id: "hygiene", icon: "🚿", label: "Hygiene" },
-  { id: "bladder", icon: "🚽", label: "Bladder" },
-  { id: "fun", icon: "🎵", label: "Fun" },
+const NEED_META: { id: NeedId; icon: FaName; label: string }[] = [
+  { id: "hunger", icon: "hunger", label: "Hunger" },
+  { id: "energy", icon: "energy", label: "Energy" },
+  { id: "hygiene", icon: "hygiene", label: "Hygiene" },
+  { id: "bladder", icon: "bladder", label: "Bladder" },
+  { id: "fun", icon: "fun", label: "Fun" },
 ];
 
 const naira = (n: number) => `₦${n.toLocaleString()}`;
@@ -110,7 +111,7 @@ export default function PlayPage() {
     lastNote.current = latest.id;
     if (phoneOpen) return;
     setBuzz(true);
-    pushToasts([{ kind: "info", text: `📱 ${latest.title}: ${latest.text}`, minute: 0 }]);
+    pushToasts([{ kind: "info", text: `${latest.title}: ${latest.text}`, minute: 0 }]);
     const t = window.setTimeout(() => setBuzz(false), 1600);
     return () => window.clearTimeout(t);
   }, [latest, phoneOpen, pushToasts]);
@@ -126,14 +127,14 @@ export default function PlayPage() {
           ←<span className="play-chip-label"> Back</span>
         </a>
         <a className="play-chip" href="#/map" aria-label="Map test">
-          🗺️<span className="play-chip-label"> Map test</span>
+          <GameIcon name="map" /><span className="play-chip-label"> Map test</span>
         </a>
         <a className="play-chip" href="#/lab" aria-label="Customise your character">
-          🎨<span className="play-chip-label"> Customise</span>
+          <GameIcon name="palette" /><span className="play-chip-label"> Customise</span>
         </a>
         {hud && (
           <div className="play-clock" aria-label="Time and money">
-            <span>{isNight(hud.hourFloat) ? "🌙" : "☀️"}</span>
+            <span><GameIcon name={isNight(hud.hourFloat) ? "moon" : "sun"} /></span>
             <strong>Day {hud.day}</strong>
             <span>{hud.time}</span>
             <span className="play-money">{naira(hud.money)}</span>
@@ -152,7 +153,7 @@ export default function PlayPage() {
           {NEED_META.map((need) => (
             <div key={need.id} className="play-need" title={`${need.label}: ${hud.needs[need.id]}`}>
               <span className="play-need-icon" aria-hidden="true">
-                {need.icon}
+                <GameIcon name={need.icon} />
               </span>
               <span className="play-need-bar">
                 <span style={{ width: `${hud.needs[need.id]}%`, background: needColour(hud.needs[need.id]) }} />
@@ -170,15 +171,15 @@ export default function PlayPage() {
 
       {hud && (
         <div className="play-info">
-          <span>🛒 {hud.portions} {hud.portions === 1 ? "portion" : "portions"}</span>
-          <span>🍲 {hud.meals} {hud.meals === 1 ? "meal" : "meals"}</span>
+          <span><GameIcon name="cart" /> {hud.portions} {hud.portions === 1 ? "portion" : "portions"}</span>
+          <span><GameIcon name="meal" /> {hud.meals} {hud.meals === 1 ? "meal" : "meals"}</span>
           <span className={hud.rentOwed > 0 ? "play-bad" : ""}>
-            🏠 {hud.rentPerWeek === 0 ? "Family house, no rent" : hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
+            <GameIcon name="home" /> {hud.rentPerWeek === 0 ? "Family house, no rent" : hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
           </span>
-          {hud.allowance > 0 && <span>💸 {naira(hud.allowance)} a week from {hud.profile?.allowanceFrom || "family"}</span>}
+          {hud.allowance > 0 && <span><GameIcon name="money" /> {naira(hud.allowance)} a week from {hud.profile?.allowanceFrom || "family"}</span>}
           {hud.skills.map((skill) => (
             <span key={skill.id}>
-              🎓 {skill.id} {skill.level}
+              <GameIcon name="skill" /> {skill.id} {skill.level}
             </span>
           ))}
         </div>
@@ -237,7 +238,7 @@ export default function PlayPage() {
           {menu.title && <div className="play-menu-title">{menu.title}</div>}
           {menu.options.map((o, i) => (
             <button key={i} role="menuitem" onClick={() => { o.run(); setMenu(null); }}>
-              <span aria-hidden="true">{o.icon}</span>
+              <GameIcon name={o.icon} />
               {o.label}
             </button>
           ))}
@@ -247,11 +248,11 @@ export default function PlayPage() {
       {hud && !phoneOpen && (
         <button className={`play-phone${buzz ? " is-buzz" : ""}`} onClick={() => { setPhoneApp(null); setPhoneOpen(true); }} aria-label={`Phone, ${hud.phone.battery}% battery${hud.phone.unread ? `, ${hud.phone.unread} new` : ""}`}>
           <span className="play-phone-body">
-            📱
+            <GameIcon name="phone" size={22} />
             {hud.phone.unread > 0 && <span className="phone-dot">{hud.phone.unread}</span>}
           </span>
           <span className={`play-phone-battery${hud.phone.battery <= 20 && !hud.phone.charging ? " is-low" : ""}`}>
-            {hud.phone.dead ? "🪫 0%" : `${hud.phone.charging ? "⚡" : "🔋"} ${hud.phone.battery}%`}
+            <GameIcon name={hud.phone.dead ? "batteryEmpty" : hud.phone.charging ? "charging" : "batteryFull"} /> {hud.phone.dead ? 0 : hud.phone.battery}%
           </span>
         </button>
       )}

@@ -1,19 +1,20 @@
 import * as THREE from "three";
 import type { LandmarkKind } from "@thelife/game-core";
+import { iconPath, type FaName } from "../ui/icons";
 
 /** Map pin look for each named place: a colour and a symbol. Used by the 3D pins and the 2D map. */
-export const PIN_STYLE: Record<LandmarkKind, { colour: string; glyph: string; label: string }> = {
-  airport: { colour: "#2f7bff", glyph: "✈", label: "Airport" },
-  police: { colour: "#2f5fa8", glyph: "★", label: "Police" },
-  hospital: { colour: "#d9363e", glyph: "✚", label: "Hospital" },
-  school: { colour: "#2f8a4f", glyph: "✎", label: "School" },
-  church: { colour: "#8a5fd1", glyph: "✝", label: "Church" },
-  mosque: { colour: "#1f8a86", glyph: "☪", label: "Mosque" },
-  fire: { colour: "#e0592b", glyph: "♨", label: "Fire station" },
-  bank: { colour: "#b58a1f", glyph: "₦", label: "Bank" },
-  fuel: { colour: "#e0a82e", glyph: "⛽", label: "Fuel" },
-  hotel: { colour: "#c0507a", glyph: "♛", label: "Hotel" },
-  market: { colour: "#d97b2f", glyph: "🛒", label: "Market" },
+export const PIN_STYLE: Record<LandmarkKind, { colour: string; icon: FaName; label: string }> = {
+  airport: { colour: "#2f7bff", icon: "airport", label: "Airport" },
+  police: { colour: "#2f5fa8", icon: "police", label: "Police" },
+  hospital: { colour: "#d9363e", icon: "hospital", label: "Hospital" },
+  school: { colour: "#2f8a4f", icon: "school", label: "School" },
+  church: { colour: "#8a5fd1", icon: "church", label: "Church" },
+  mosque: { colour: "#1f8a86", icon: "mosque", label: "Mosque" },
+  fire: { colour: "#e0592b", icon: "fire", label: "Fire station" },
+  bank: { colour: "#b58a1f", icon: "bank", label: "Bank" },
+  fuel: { colour: "#e0a82e", icon: "fuel", label: "Fuel" },
+  hotel: { colour: "#c0507a", icon: "hotel", label: "Hotel" },
+  market: { colour: "#d97b2f", icon: "market", label: "Market" },
 };
 
 const cache = new Map<string, THREE.CanvasTexture>();
@@ -49,10 +50,16 @@ export function pinTexture(kind: LandmarkKind): THREE.CanvasTexture {
   ctx.arc(cx, r + 8, r - 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = style.colour;
-  ctx.font = "700 34px system-ui, 'Segoe UI Symbol', 'Noto Sans Symbols2', sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(style.glyph, cx, r + 10);
+  const glyph = iconPath(style.icon);
+  if (glyph) {
+    const size = 30; // the icon is drawn inside the white disc
+    const k = size / Math.max(glyph.box[0], glyph.box[1]);
+    ctx.save();
+    ctx.translate(cx - (glyph.box[0] * k) / 2, r + 8 - (glyph.box[1] * k) / 2);
+    ctx.scale(k, k);
+    ctx.fill(new Path2D(glyph.d));
+    ctx.restore();
+  }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;

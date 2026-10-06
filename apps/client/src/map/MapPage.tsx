@@ -1,3 +1,4 @@
+import { GameIcon } from "../ui/icons";
 import { useEffect, useRef, useState } from "react";
 import { loadManifest } from "../lab/manifest";
 import type { TapMenu } from "../play/runtime";
@@ -125,7 +126,7 @@ export default function MapPage() {
         <div className="play-menu" role="menu" style={{ left: Math.max(8, Math.min(menu.x, (containerRef.current?.clientWidth ?? 600) - 220)), top: Math.max(8, menu.y + 10) }}>
           {menu.options.map((o, i) => (
             <button key={i} role="menuitem" onClick={() => o.run()}>
-              <span aria-hidden="true">{o.icon}</span>
+              <GameIcon name={o.icon} />
               {o.label}
             </button>
           ))}

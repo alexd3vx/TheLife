@@ -315,8 +315,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         y: clientY - rect.top,
         title: lm.name,
         options: [
-          { label: "Walk there", icon: "🚶", run: () => { events.onMenu(null); goTo(lm.id, "walk"); } },
-          { label: "Run there", icon: "🏃", run: () => { events.onMenu(null); goTo(lm.id, "run"); } },
+          { label: "Walk there", icon: "walk", run: () => { events.onMenu(null); goTo(lm.id, "walk"); } },
+          { label: "Run there", icon: "run", run: () => { events.onMenu(null); goTo(lm.id, "run"); } },
         ],
       });
       return;
@@ -332,8 +332,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       y: clientY - rect.top,
       title: null,
       options: [
-        { label: "Walk here", icon: "🚶", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
-        { label: "Run here", icon: "🏃", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "run")); } },
+        { label: "Walk here", icon: "walk", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
+        { label: "Run here", icon: "run", run: () => { events.onMenu(null); showMarker(x, z, controller.tapGround(x, z, "run")); } },
       ],
     });
   }

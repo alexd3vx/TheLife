@@ -1,4 +1,6 @@
 import type { ReactElement } from "react";
+import { FaArrowDown, FaArrowRightArrowLeft, FaArrowUp, FaBagShopping, FaBatteryHalf, FaBell, FaBolt, FaBomb, FaBook, FaBookOpen, FaBriefcase, FaBuildingColumns, FaBullseye, FaCalculator, FaCalendarDays, FaChartLine, FaCheck, FaChevronLeft, FaCirclePlay, FaCircleQuestion, FaClock, FaClockRotateLeft, FaClone, FaCloudSun, FaCodeBranch, FaComment, FaCreditCard, FaDice, FaDove, FaDownload, FaDroplet, FaDumbbell, FaEllipsis, FaFilm, FaFont, FaGamepad, FaGasPump, FaGear, FaGrip, FaHandsPraying, FaHeart, FaHeartPulse, FaHouse, FaImage, FaKitchenSet, FaLanguage, FaLightbulb, FaListCheck, FaLocationDot, FaLock, FaMagnifyingGlass, FaMicrophone, FaMoon, FaMusic, FaNewspaper, FaNoteSticky, FaPaperPlane, FaPause, FaPen, FaPhone, FaPiggyBank, FaPlug, FaPlus, FaRadio, FaReceipt, FaRuler, FaSignal, FaSpellCheck, FaStar, FaStore, FaTableCells, FaTicket, FaTrash, FaTruck, FaUserGroup, FaUtensils, FaWallet, FaWifi, FaXmarksLines } from "react-icons/fa6";
+import type { IconType } from "react-icons";
 
 // One consistent set of line icons for the phone (24px grid, rounded strokes), so apps look designed, not emoji-dressed.
 const PATHS: Record<string, ReactElement> = {
@@ -288,7 +290,94 @@ const PATHS: Record<string, ReactElement> = {
 
 export type IconName = keyof typeof PATHS;
 
+/** Font Awesome versions of the icons (react-icons); the hand-drawn paths above remain as the fallback. */
+const FA: Partial<Record<string, IconType>> = {
+  chat: FaComment,
+  pay: FaCreditCard,
+  shop: FaBagShopping,
+  jobs: FaBriefcase,
+  news: FaNewspaper,
+  maps: FaLocationDot,
+  power: FaBatteryHalf,
+  back: FaChevronLeft,
+  send: FaPaperPlane,
+  call: FaPhone,
+  save: FaPiggyBank,
+  loan: FaBuildingColumns,
+  topup: FaWifi,
+  history: FaClockRotateLeft,
+  home: FaHouse,
+  truck: FaTruck,
+  bell: FaBell,
+  lock: FaLock,
+  plug: FaPlug,
+  bolt: FaBolt,
+  check: FaCheck,
+  arrowIn: FaArrowDown,
+  arrowOut: FaArrowUp,
+  plus: FaPlus,
+  star: FaStar,
+  people: FaUserGroup,
+  swap: FaArrowRightArrowLeft,
+  signal: FaSignal,
+  more: FaEllipsis,
+  note: FaNoteSticky,
+  calendar: FaCalendarDays,
+  cloud: FaCloudSun,
+  torch: FaLightbulb,
+  calc: FaCalculator,
+  clock: FaClock,
+  translate: FaLanguage,
+  photo: FaImage,
+  bird: FaDove,
+  heart: FaHeart,
+  play: FaCirclePlay,
+  music: FaMusic,
+  radio: FaRadio,
+  film: FaFilm,
+  ticket: FaTicket,
+  food: FaUtensils,
+  chart: FaChartLine,
+  book: FaBook,
+  cross: FaHeartPulse,
+  faith: FaHandsPraying,
+  moon: FaMoon,
+  pen: FaPen,
+  game: FaGamepad,
+  grid: FaTableCells,
+  xo: FaXmarksLines,
+  cards: FaClone,
+  quiz: FaCircleQuestion,
+  settings: FaGear,
+  store: FaStore,
+  wifi: FaWifi,
+  trash: FaTrash,
+  download: FaDownload,
+  search: FaMagnifyingGlass,
+  pause: FaPause,
+  mic: FaMicrophone,
+  ruler: FaRuler,
+  split: FaCodeBranch,
+  todo: FaListCheck,
+  wallet: FaWallet,
+  dice: FaDice,
+  target: FaBullseye,
+  drop: FaDroplet,
+  bookopen: FaBookOpen,
+  pot: FaKitchenSet,
+  dumbbell: FaDumbbell,
+  receipt: FaReceipt,
+  fuel: FaGasPump,
+  briefcase: FaBriefcase,
+  hang: FaSpellCheck,
+  dots: FaGrip,
+  word: FaFont,
+  mine: FaBomb,
+};
+
 export function Icon({ name, size = 24, className }: { name: IconName; size?: number; className?: string }) {
+  const Fa = FA[name];
+  if (Fa) return <Fa size={Math.round(size * 0.92)} className={className} aria-hidden="true" style={{ flex: "none" }} />;
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {PATHS[name]}

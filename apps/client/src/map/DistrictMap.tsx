@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { District } from "@thelife/game-core";
 import { PIN_STYLE } from "./pins";
+import { iconPath } from "../ui/icons";
 
 interface Props {
   district: District;
@@ -92,9 +93,12 @@ export default function DistrictMap({ district, player = null, home = null, sele
             >
               {on && <circle r={r * 1.7} fill={s.colour} opacity={0.25} />}
               <circle r={r} fill={s.colour} stroke="#fff" strokeWidth={r * 0.14} />
-              <text textAnchor="middle" dominantBaseline="central" fontSize={r * 1.05} fill="#fff" fontWeight={700} style={{ pointerEvents: "none" }}>
-                {s.glyph}
-              </text>
+              {(() => {
+                const g = iconPath(s.icon);
+                if (!g) return null;
+                const k = (r * 1.1) / Math.max(g.box[0], g.box[1]);
+                return <path d={g.d} fill="#fff" transform={`translate(${(-g.box[0] * k) / 2} ${(-g.box[1] * k) / 2}) scale(${k})`} style={{ pointerEvents: "none" }} />;
+              })()}
               {!compact && span < 300 && (
                 <text y={r * 1.9} textAnchor="middle" fontSize={r * 0.82} fill={col.text} stroke={dark ? "#0b0f17" : "#ffffff"} strokeWidth={r * 0.2} paintOrder="stroke" style={{ pointerEvents: "none" }}>
                   {l.name}

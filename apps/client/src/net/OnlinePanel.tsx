@@ -1,3 +1,4 @@
+import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { PlayerView, ServerMessage } from "@thelife/shared";
 import type { MapRuntime } from "../map/runtime";
@@ -201,7 +202,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
                       <span className="net-pay">
                         ₦<input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} aria-label="Amount" />
                         <button onClick={() => pay(p.id)}>Send</button>
-                        <button className="is-ghost" onClick={() => setPaying(null)} aria-label="Cancel">✕</button>
+                        <button className="is-ghost" onClick={() => setPaying(null)} aria-label="Cancel"><GameIcon name="close" size={12} /></button>
                       </span>
                     ) : (
                       <button onClick={() => setPaying(p.id)}>Pay</button>

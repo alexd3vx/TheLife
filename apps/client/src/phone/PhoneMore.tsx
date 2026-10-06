@@ -1,3 +1,4 @@
+import { GameIcon, type FaName } from "../ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FILMS, GIGS, GIG_GAP_MINUTES, HANG_WORDS, PLAYER, PODCASTS, RECIPES, STORIES, WATER_GOAL, WORKOUTS, addFun, addTodo, balance, billPerWeek, buyTicket, clockOf, deleteTodo,
@@ -112,7 +113,7 @@ export function Dice() {
   return (
     <div className="pa-page">
       <div className="pa-chips">{[1, 2, 3, 4].map((n) => <button key={n} className={`pa-chip${count === n ? " is-accent" : ""}`} onClick={() => setCount(n)}>{n} dice</button>)}</div>
-      <div className="pa-big" style={{ fontSize: "3rem", letterSpacing: ".2em" }}>{dice.length ? dice.map((d) => "⚀⚁⚂⚃⚄⚅"[d - 1]).join(" ") : "🎲"}</div>
+      <div className="pa-big" style={{ fontSize: "3rem", letterSpacing: ".2em" }}>{dice.length ? dice.map((d, i) => <GameIcon key={i} name={`d${d}` as FaName} size={44} />) : <GameIcon name="dice" size={44} />}</div>
       {dice.length > 0 && <p className="pa-fine center">Total {dice.reduce((a, b) => a + b, 0)}</p>}
       <Btn onClick={roll}>Roll</Btn>
     </div>
@@ -265,7 +266,7 @@ export function Fuel({ state }: P) {
       <div className="pa-group">
         {fuelPrices(day).map((f) => {
           const y = fuelPrices(day - 1).find((x) => x.id === f.id)!.naira;
-          return <Row key={f.id} icon="fuel" tone="#c92a2a" title={`${f.name}: ${naira(f.naira)}`} sub={f.naira >= y ? `▲ up ${naira(f.naira - y)} since yesterday` : `▼ down ${naira(y - f.naira)} since yesterday`} />;
+          return <Row key={f.id} icon="fuel" tone="#c92a2a" title={`${f.name}: ${naira(f.naira)}`} sub={f.naira >= y ? `Up ${naira(f.naira - y)} since yesterday` : `Down ${naira(y - f.naira)} since yesterday`} />;
         })}
       </div>
       <p className="pa-fine center">Prices move with the day. Fuel will matter when you can drive.</p>
@@ -439,12 +440,12 @@ export function Minesweeper({ state, act }: P) {
         {Array.from({ length: N * N }, (_, i) => {
           const isOpen = open.has(i);
           const show = dead && mines.has(i);
-          return <button key={i} onClick={() => tap(i)} aria-label={`Cell ${i + 1}`} style={{ all: "unset", cursor: "pointer", aspectRatio: "1", display: "grid", placeItems: "center", borderRadius: 5, fontWeight: 800, fontSize: ".85rem", background: isOpen ? "var(--card)" : "var(--accent-soft)", border: "1px solid var(--line)" }}>{show ? "💣" : flag.has(i) ? "🚩" : isOpen ? (count(i) || "") : ""}</button>;
+          return <button key={i} onClick={() => tap(i)} aria-label={`Cell ${i + 1}`} style={{ all: "unset", cursor: "pointer", aspectRatio: "1", display: "grid", placeItems: "center", borderRadius: 5, fontWeight: 800, fontSize: ".85rem", background: isOpen ? "var(--card)" : "var(--accent-soft)", border: "1px solid var(--line)" }}>{show ? <GameIcon name="bomb" size={16} /> : flag.has(i) ? <GameIcon name="flag" size={16} /> : isOpen ? (count(i) || "") : ""}</button>;
         })}
       </div>
       {(dead || won) && <div className="pa-note" role="status">{won ? "Board cleared!" : "Boom."}</div>}
       <div className="pa-split">
-        <Btn kind={flagMode ? "solid" : "soft"} onClick={() => setFlagMode((f) => !f)}>{flagMode ? "Flagging 🚩" : "Digging ⛏"}</Btn>
+        <Btn kind={flagMode ? "solid" : "soft"} onClick={() => setFlagMode((f) => !f)}>{flagMode ? "Flagging" : "Digging"}</Btn>
         <Btn kind="soft" onClick={() => { setMines(make()); setOpen(new Set()); setFlag(new Set()); setDead(false); }}>New board</Btn>
       </div>
     </div>

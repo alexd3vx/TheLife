@@ -1,3 +1,4 @@
+import type { FaName } from "../ui/icons";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { isFree } from "@thelife/shared";
@@ -30,7 +31,7 @@ export interface TapMenu {
   x: number;
   y: number;
   title: string | null;
-  options: { label: string; icon: string; run(): void }[];
+  options: { label: string; icon: FaName; run(): void }[];
 }
 
 export interface PlayRuntime {
@@ -217,8 +218,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         const menu: TapMenu["options"] = [];
         options.slice(0, 3).forEach((interaction, i) => {
           const label = interaction.hint;
-          menu.push({ label, icon: i === 0 ? "✋" : "▫️", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "walk")); } });
-          if (i === 0) menu.push({ label: `Run there: ${label.charAt(0).toLowerCase()}${label.slice(1)}`, icon: "🏃", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "run")); } });
+          menu.push({ label, icon: i === 0 ? "hand" : "spot", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "walk")); } });
+          if (i === 0) menu.push({ label: `Run there: ${label.charAt(0).toLowerCase()}${label.slice(1)}`, icon: "run", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "run")); } });
         });
         present({ ...at, title: picked.item.catalog.name, options: menu });
         return;
@@ -234,8 +235,8 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       ...at,
       title: null,
       options: [
-        { label: "Walk here", icon: "🚶", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
-        { label: "Run here", icon: "🏃", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "run")); } },
+        { label: "Walk here", icon: "walk", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "walk")); } },
+        { label: "Run here", icon: "run", run: () => { close(); showMarker(x, z, controller.tapGround(x, z, "run")); } },
       ],
     });
   }
