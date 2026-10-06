@@ -117,3 +117,10 @@ Needs from the owner: a Fly.io account (or permission for me to prepare the conf
 4. GTA-style third-person controls (WASD / joystick, bindable keys, PWA), then vehicles (cars, danfo, okada), then voice (calls, proximity, radio) and roleplay roles.
 5. Interiors one at a time in a hidden admin Playground; the airport arrivals hall and a real shop are the first two.
 Decided: real Lagos clock; slow real-time needs; social apps are separate apps that look like the real ones (LifeGram, LifeChat, Chirp, LifeTok), photos only from the in-game camera, Supabase storage, report/block + word filter + admin panel.
+
+## Decisions, round 1 (inventory, shops, objects)
+- Inventory: a grid by item size, like Project Zomboid / Tarkov. Every object has a width x height (cells), a weight, and containers (pockets, bag, backpack, fridge, wardrobe) each have their own grid.
+- Shops: a shop counter screen in the world (walk up, tap the counter/trader), one screen reused by every shop, with prices and stock.
+- Objects: real sizes in metres; furniture is placed on a grid with rotate in an edit mode; big items can block doors.
+- Build order for the screens: inventory + bag, fridge and cooking, shop counter / buy screen, wardrobe and clothes.
+- Also done on request: no game state is saved on the device (server only); the phone charges only beside a socket.
