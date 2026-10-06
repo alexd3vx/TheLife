@@ -25,6 +25,17 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
   useEffect(() => {
     let session: GameSession | null = null;
     let replaceSent = false;
+    let createdWithLook = false;
+    let lastSnap: LifeSnapshot | null = null;
+    let fallback: ReturnType<typeof setTimeout> | null = null;
+    // The server could not (or did not) start the new life: carry on with the life it already has rather than waiting forever.
+    const useExisting = () => {
+      if (session || !lastSnap) return;
+      clearPending();
+      session = new GameSession(false, lastSnap);
+      setTransport((fn, args) => world.rpc(fn, args));
+      set({ phase: "ready", session, detail: "" });
+    };
     const set = (patch: Partial<OnlineLife>) => setState((s) => ({ ...s, ...patch }));
     const offMessage = world.onMessage((m) => {
       if (m.t === "needsLife") {
@@ -35,9 +46,12 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
           return;
         }
         world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: pending?.replace === true, ...(pending?.look ? { look: pending.look } : {}) });
+        createdWithLook = !!pending?.look;
         set({ phase: "creating", justArrived: true });
       } else if (m.t === "life") {
         const snap = m as unknown as LifeSnapshot;
+        lastSnap = snap;
+        if (fallback) clearTimeout(fallback);
         // "New game" on an account that already has a life: the character just made replaces it. The server answers with the new
         // life, and that is the one this page starts from.
         const waiting = getPending();
@@ -46,6 +60,7 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
           const p = waiting.profile;
           world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits }, replace: true, ...(waiting.look ? { look: waiting.look } : {}) });
           set({ phase: "creating", justArrived: true });
+          fallback = setTimeout(useExisting, 10000);
           return;
         }
         clearPending();
@@ -57,7 +72,13 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
       } else if (m.t === "done" && !m.ok) {
         session?.notice(m.reason ?? "That didn't work.");
       } else if (m.t === "error" && !session) {
-        set({ detail: m.reason });
+        if (replaceSent && lastSnap) useExisting();
+        else if (createdWithLook && getPending()) {
+          // An older server that doesn't understand the look: make the life without it (it falls back to the default look).
+          createdWithLook = false;
+          const p = getPending()!.profile;
+          world.send({ t: "create", profile: { backgroundId: p.backgroundId, sex: p.sex, firstName: p.firstName, surname: p.surname, hometown: p.hometown, startingMoney: p.startingMoney, traits: p.traits } });
+        } else set({ detail: m.reason });
       }
     });
     const offStatus = world.onStatus(() => {
@@ -70,6 +91,7 @@ export function useOnlineLife(where: "home" | "world" = "world"): OnlineLife {
     world.setPlace(where);
     world.connect();
     return () => {
+      if (fallback) clearTimeout(fallback);
       offMessage();
       offStatus();
       setTransport(null);

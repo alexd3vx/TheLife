@@ -71,6 +71,13 @@ export default function IsoPage() {
   const arriving = life.justArrived || !!pendingLife;
   const filmShowing = arriving && !filmDone;
   const filmTier = (session?.sim.state.profile?.tier ?? pendingLife?.profile.tier ?? "middle") as Tier;
+  // The opening scene must never hold the screen forever: if the home still isn't ready well after the film, say so.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (ready || !(arriving && filmDone)) return setStuck(false);
+    const t = setTimeout(() => setStuck(true), 20000);
+    return () => clearTimeout(t);
+  }, [ready, arriving, filmDone]);
   const offline = life.phase === "offline" && !session;
   useEffect(() => {
     if (!ready || !session || filmShowing || welcome.showing || introStarted.current) return;
@@ -99,7 +106,13 @@ export default function IsoPage() {
       )}
       {filmShowing && <ArrivalFilm tier={filmTier} onDone={() => setFilmDone(true)} />}
       {/* the film ended before the room was ready: the opening scene holds the screen until it is */}
-      {arriving && filmDone && !ready && <WelcomeBack tier={filmTier} hour={new Date().getUTCHours() + 1} awayCount={0} ready={false} onDone={() => undefined} />}
+      {arriving && filmDone && !ready && !stuck && <WelcomeBack tier={filmTier} hour={new Date().getUTCHours() + 1} awayCount={0} ready={false} onDone={() => undefined} />}
+      {arriving && filmDone && !ready && stuck && (
+        <div className="play-loading" role="status" style={{ zIndex: 60 }}>
+          <span>{error || life.detail || "Your home is taking too long to open."}</span>
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>Try again</button>
+        </div>
+      )}
       {welcome.node}
       {offline && (
         <div className="play-loading" role="status" style={{ zIndex: 60 }}>
