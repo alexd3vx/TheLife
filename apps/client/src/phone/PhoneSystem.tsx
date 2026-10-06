@@ -1,3 +1,4 @@
+import { useBackHandler } from "./active";
 import { GameIcon } from "../ui/icons";
 import { useState } from "react";
 import {
@@ -110,6 +111,7 @@ export function LifeStore({ state, act, onOpen }: { state: GameState; act: Act; 
   const [cat, setCat] = useState<StoreCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState<StoreAppId | null>(null);
+  useBackHandler(detail ? () => setDetail(null) : null);
   const p = state.phone;
   const link = connection(state);
   const list = STORE_APPS.filter((a) => (cat === "all" || a.category === cat) && (!query || `${a.name} ${a.blurb}`.toLowerCase().includes(query.toLowerCase())));

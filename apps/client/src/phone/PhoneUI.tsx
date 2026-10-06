@@ -10,7 +10,7 @@ import { ExtraApp } from "./PhoneExtras";
 import { LifeStore, Ring, Settings } from "./PhoneSystem";
 import { Icon } from "./icons";
 import { nameOf, styleOf, type ClientApp } from "./appStyle";
-import { AppActive } from "./active";
+import { AppActive, AppBack } from "./active";
 import "./phone.css";
 
 /** Each model has its own look (CSS class). */
@@ -137,6 +137,21 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     setDrawer(false);
     setSwitcher(false);
   };
+  // Each app can register what "back" does inside it; one back arrow serves the header, the Android key and the edge swipe.
+  const backs = useRef(new Map<ClientApp, () => void>());
+  const setters = useRef(new Map<ClientApp, (h: (() => void) | null) => void>());
+  const setterFor = (app: ClientApp) => {
+    let f = setters.current.get(app);
+    if (!f) setters.current.set(app, (f = (h) => void (h ? backs.current.set(app, h) : backs.current.delete(app))));
+    return f;
+  };
+  const goBack = () => {
+    const h = current ? backs.current.get(current) : undefined;
+    if (h) {
+      h();
+      refresh();
+    } else home();
+  };
   const closeApp = (app: ClientApp) => {
     setRunning((list) => list.filter((a) => a !== app));
     setCurrent((c) => (c === app ? null : c));
@@ -179,7 +194,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
     if (g?.id !== e.pointerId) return;
     gesture.current = null;
     setDragX(null);
-    if (g.kind === "edge" && e.clientX - g.x > 90) home();
+    if (g.kind === "edge" && e.clientX - g.x > 90) goBack();
     if (g.kind === "top" && e.clientY - g.y > 50) setDrawer(true);
   };
 
@@ -254,12 +269,13 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                     style={app === current && dragX !== null ? { transform: `translateX(${dragX}px)`, transition: "none" } : undefined}
                   >
                     <header className="phone-head" style={{ ["--app-from" as string]: styleOf(app).from, ["--app-to" as string]: styleOf(app).to }}>
-                      <button className="phone-back" onClick={home} aria-label="Minimise">
+                      <button className="phone-back" onClick={app === current ? goBack : home} aria-label="Back">
                         <Icon name="back" size={22} />
                       </button>
                       <h1>{APP_NAME(app)}</h1>
                     </header>
                     <div className="phone-app-body">
+                      <AppBack.Provider value={setterFor(app)}>
                       <AppActive.Provider value={app === current && !switcher}>
                       <AppBoundary name={APP_NAME(app)}>
                       {app === "chat" && <Chat state={state} act={act} startCall={startCall} refresh={refresh} />}
@@ -274,6 +290,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       {storeAppById(app) && <ExtraApp id={app as StoreAppId} state={state} act={act} />}
                       </AppBoundary>
                       </AppActive.Provider>
+                      </AppBack.Provider>
                     </div>
                   </section>
                 ))}
@@ -328,7 +345,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
             )}
             {model.tier === "basic" ? (
               <nav className="phone-nav-3" aria-label="Phone buttons">
-                <button onClick={() => (drawer ? setDrawer(false) : switcher ? setSwitcher(false) : current ? home() : close())} aria-label="Back">
+                <button onClick={() => (drawer ? setDrawer(false) : switcher ? setSwitcher(false) : current ? goBack() : close())} aria-label="Back">
                   <i className="nav-back" />
                 </button>
                 <button onClick={goHomeButton} aria-label="Home">

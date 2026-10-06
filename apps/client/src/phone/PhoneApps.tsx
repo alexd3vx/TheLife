@@ -1,3 +1,4 @@
+import { useBackHandler } from "./active";
 import { useEffect, useRef, useState } from "react";
 import {
   BILL_PER_WEEK, CHARGERS, JOBS, POWER_BANK, SHOP_ITEMS, TOPUPS, SAVINGS,
@@ -80,6 +81,7 @@ function Amount({ value, onChange, quick }: { value: string; onChange(v: string)
 
 export function Chat({ state, act, startCall, refresh }: { state: GameState; act: Act; startCall(id: string): void; refresh(): void }) {
   const [current, setCurrent] = useState<string | null>(null);
+  useBackHandler(current ? () => setCurrent(null) : null);
   const contacts = contactsFor(state.profile);
   const endRef = useRef<HTMLDivElement>(null);
   const t = current ? state.phone.threads[current] : undefined;
@@ -129,9 +131,6 @@ export function Chat({ state, act, startCall, refresh }: { state: GameState; act
   return (
     <div className="pa-thread">
       <div className="pa-thread-head">
-        <button className="pa-icon-btn" onClick={() => setCurrent(null)} aria-label="All chats">
-          <Icon name="back" size={20} />
-        </button>
         <span className={`pa-avatar sm tone-${who.id.length % 5}`}>{who.name[0]}</span>
         <span className="pa-row-main">
           <strong>{who.name}</strong>
@@ -465,6 +464,7 @@ export function News({ state }: { state: GameState }) {
 export function Maps({ state }: { state: GameState }) {
   const district = getDistrict();
   const [pick, setPick] = useState<string | null>(null);
+  useBackHandler(pick ? () => setPick(null) : null);
   const home = { x: district.spawn.x, z: district.spawn.z };
   const dark = state.phone.model === "flagship";
   const walk = (lm: { entrance: { x: number; z: number } }) => Math.round(Math.hypot(lm.entrance.x - home.x, lm.entrance.z - home.z));
@@ -482,7 +482,6 @@ export function Maps({ state }: { state: GameState }) {
             <span>{PIN_STYLE[chosen.kind].label}</span>
             <strong>{chosen.name}</strong>
             <small>{walk(chosen)} m from home · about {Math.max(1, Math.round(walk(chosen) / 90))} min on foot</small>
-            <Btn kind="soft" onClick={() => setPick(null)}>Back to places</Btn>
           </div>
         ) : (
           <>

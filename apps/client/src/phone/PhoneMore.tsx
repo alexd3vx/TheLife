@@ -7,7 +7,7 @@ import {
 } from "@thelife/game-core";
 import { Btn, Row, naira, type Act } from "./PhoneApps";
 import { Icon } from "./icons";
-import { useAppActive } from "./active";
+import { useAppActive, useBackHandler } from "./active";
 
 type P = { state: GameState; act: Act };
 const dayOf = (s: GameState) => clockOf(s.minute).day;
@@ -165,13 +165,13 @@ export function Water({ state, act }: P) {
 
 export function Books({ state, act }: P) {
   const [open, setOpen] = useState<string | null>(null);
+  useBackHandler(open ? () => setOpen(null) : null);
   const story = STORIES.find((s) => s.id === open);
   void state; void act;
   return (
     <div className="pa-page">
       {story ? (
         <>
-          <Btn kind="soft" onClick={() => setOpen(null)}>← All stories</Btn>
           <h2 style={{ margin: 0 }}>{story.title}</h2>
           <p style={{ lineHeight: 1.6 }}>{story.text}</p>
         </>
@@ -215,12 +215,12 @@ export function Nolly({ state, act }: P) {
 
 export function Recipes() {
   const [open, setOpen] = useState<string | null>(null);
+  useBackHandler(open ? () => setOpen(null) : null);
   const r = RECIPES.find((x) => x.id === open);
   return (
     <div className="pa-page">
       {r ? (
         <>
-          <Btn kind="soft" onClick={() => setOpen(null)}>← All recipes</Btn>
           <h2 style={{ margin: 0 }}>{r.name}</h2>
           <small className="pa-fine">{r.time}</small>
           <ol style={{ paddingLeft: 20, lineHeight: 1.55 }}>{r.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
