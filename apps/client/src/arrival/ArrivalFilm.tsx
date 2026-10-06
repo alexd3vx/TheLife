@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LagosScene } from "../ui/LagosScene";
+import { FilmRenderer, type FilmBeat } from "./filmCanvas";
 import "./arrival.css";
 
 type Tier = "lapo" | "middle" | "nepo";
@@ -7,16 +7,16 @@ type Tier = "lapo" | "middle" | "nepo";
 interface Beat {
   /** Seconds this part lasts. */
   secs: number;
-  kind: "title" | "flight" | "approach" | "landed" | "ride" | "home";
+  kind: "title" | FilmBeat;
 }
 
 const TIMELINE: Beat[] = [
-  { secs: 3.6, kind: "title" },
-  { secs: 6.5, kind: "flight" },
-  { secs: 5.5, kind: "approach" },
-  { secs: 5, kind: "landed" },
-  { secs: 6, kind: "ride" },
-  { secs: 3, kind: "home" },
+  { secs: 3.4, kind: "title" },
+  { secs: 5.5, kind: "flight" },
+  { secs: 8.2, kind: "landing" },
+  { secs: 4, kind: "taxi" },
+  { secs: 7.5, kind: "ride" },
+  { secs: 3.8, kind: "home" },
 ];
 
 const WORDS: Record<Tier, { flight: string; flightSub: string; landed: string; landedSub: string; ride: string; rideSub: string; home: string }> = {
@@ -49,17 +49,17 @@ const WORDS: Record<Tier, { flight: string; flightSub: string; landed: string; l
   },
 };
 
-const PLANE = "M0 14 L58 10 Q74 8 92 12 L96 14 Q74 18 60 18 L40 18 L18 36 L8 36 L22 18 L6 18 L2 28 L-4 28 L0 14Z";
-const JET = "M0 12 L40 9 Q52 8 62 11 L64 12 Q52 15 42 15 L28 15 L12 28 L6 28 L16 15 L4 15 L0 22 L-4 22 L-2 12Z";
-
 /**
- * The opening film, played once when a new character is made: the flight into Lagos, the landing, the ride to the front door. It
- * is drawn with vectors and CSS (no download, no heavy 3D), tinted differently for each background. Tap to skip.
+ * The opening film, played once when a new character is made: the flight into Lagos, a real landing (glide, touchdown, tyre smoke, roll-out),
+ * the taxi to the terminal, the ride to the front door in a vehicle that matches the person's background, and the door itself. It is drawn
+ * on one canvas from a few pre-painted layers, so it runs smoothly on weak phones. Tap to skip.
  */
 export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): void }) {
   const [i, setI] = useState(0);
   const beat = TIMELINE[i]!;
   const words = WORDS[tier];
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderer = useRef<FilmRenderer | null>(null);
 
   // The page around the film redraws all the time; the film's own clock must not restart each time it does.
   const done = useRef(onDone);
@@ -69,10 +69,31 @@ export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): vo
     return () => window.clearTimeout(t);
   }, [i, beat.secs]);
 
+  // One drawing loop for the whole film.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const r = new FilmRenderer(canvas, tier);
+    renderer.current = r;
+    let raf = 0;
+    let last = performance.now();
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      r.draw(dt);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [tier]);
+  useEffect(() => {
+    if (beat.kind !== "title") renderer.current?.setBeat(beat.kind);
+  }, [beat.kind]);
+
   return (
     <div className={`film film-${tier} beat-${beat.kind}`} role="presentation" onPointerDown={onDone}>
-      {beat.kind !== "title" && <LagosScene />}
-      <div className="film-tint" />
+      <canvas ref={canvasRef} className={`film-canvas${beat.kind === "title" ? " is-hidden" : ""}`} />
+      <div className="film-vignette" />
       <div className="film-bars top" />
       <div className="film-bars bottom" />
 
@@ -86,45 +107,20 @@ export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): vo
       )}
 
       {beat.kind === "flight" && (
-        <>
-          <svg className="film-plane" viewBox="-10 0 110 40" aria-hidden="true">
-            <path d={tier === "nepo" ? JET : PLANE} fill="#0e0a18" />
-            <circle cx={tier === "nepo" ? 62 : 90} cy="13" r="1.8" fill="#ff5a4a" className="film-blink" />
-            <circle cx="8" cy="30" r="1.2" fill="#6bf0b0" className="film-blink" />
-          </svg>
-          <div className="film-caption">
-            <small>{words.flight}</small>
-            <p>{words.flightSub}</p>
-          </div>
-        </>
+        <div className="film-caption">
+          <small>{words.flight}</small>
+          <p>{words.flightSub}</p>
+        </div>
       )}
 
-      {beat.kind === "approach" && (
-        <>
-          <svg className="film-runway" viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="rw" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#0a0714" />
-                <stop offset="1" stopColor="#1a1426" />
-              </linearGradient>
-            </defs>
-            <path d="M170 120 L230 120 L400 300 L0 300Z" fill="url(#rw)" />
-            {Array.from({ length: 14 }, (_, k) => (
-              <g key={k} className="rw-light" style={{ animationDelay: `${-k * 0.22}s` }}>
-                <circle cx={176 - k * 12} cy={126 + k * 12.5} r={1 + k * 0.28} fill="#ffe9a8" />
-                <circle cx={224 + k * 12} cy={126 + k * 12.5} r={1 + k * 0.28} fill="#ffe9a8" />
-              </g>
-            ))}
-            <path d="M200 124 L200 300" stroke="#e8e0c8" strokeWidth="3" strokeDasharray="10 14" className="rw-centre" />
-          </svg>
-          <div className="film-caption">
-            <small>Lagos, evening</small>
-            <p>Wheels down in a moment.</p>
-          </div>
-        </>
+      {beat.kind === "landing" && (
+        <div className="film-caption">
+          <small>Lagos, evening</small>
+          <p>Lights below. Wheels down in a moment.</p>
+        </div>
       )}
 
-      {beat.kind === "landed" && (
+      {beat.kind === "taxi" && (
         <div className="film-landed">
           <small>{words.landed}</small>
           <h2>Murtala Muhammed International</h2>
@@ -133,19 +129,10 @@ export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): vo
       )}
 
       {beat.kind === "ride" && (
-        <>
-          <div className="film-road">
-            <div className="film-car">
-              <span className="film-car-body" />
-              <span className="film-car-lamp" />
-            </div>
-            <div className="film-lane" />
-          </div>
-          <div className="film-caption">
-            <small>{words.ride}</small>
-            <p>{words.rideSub}</p>
-          </div>
-        </>
+        <div className="film-caption">
+          <small>{words.ride}</small>
+          <p>{words.rideSub}</p>
+        </div>
       )}
 
       {beat.kind === "home" && (

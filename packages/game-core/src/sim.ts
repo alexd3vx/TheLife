@@ -3,10 +3,18 @@ import { MINT, PLAYER, SINK, balance, createLedger, transfer } from "./ledger";
 import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./needs";
 import type { Profile } from "./profile";
 import { createPhone, groceriesFor, jobPayBoost, notify, startLateFeeClock, tickPhone } from "./phone";
+import { lagosMinuteNow } from "./lagosClock";
 import { combineTraits, type TraitEffects } from "./traits";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
-const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped"
+const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped" (the fast test clock)
+/** On the real clock, needs fall this many times faster than a plain real-time pace (still slow: hunger lasts about half a day). */
+export const REAL_CLOCK_NEEDS_SPEED = 2;
+
+export interface SimOptions {
+  /** Follow the real Lagos clock: time passes one second per second, and needs fall slowly. */
+  realClock?: boolean;
+}
 
 const WARNINGS: Record<NeedId, string> = {
   hunger: "You're getting hungry.",
@@ -83,8 +91,14 @@ export class Sim {
   /** Offline catch-up softens decay and removes accidents; see simulateAbsence. */
   offline = false;
 
-  constructor(state?: GameState) {
+  readonly realClock: boolean;
+  private readonly needsSpeed: number;
+
+  constructor(state?: GameState, options: SimOptions = {}) {
     this.state = state ?? createGameState();
+    this.realClock = !!options.realClock;
+    this.needsSpeed = this.realClock ? REAL_CLOCK_NEEDS_SPEED : 1;
+    if (this.realClock) this.state.minute = lagosMinuteNow();
   }
 
   get clock(): ClockInfo {
@@ -162,25 +176,34 @@ export class Sim {
 
   /** Advance by real seconds of play. Returns the game minutes that passed and any action that finished. */
   step(realSeconds: number): StepResult {
-    const rate = this.active ? this.active.def.minutesPerSecond : FREE_MINUTES_PER_SECOND;
+    const act = this.active;
+    // Real clock: the wall clock always runs at real speed. A long action still gets all its game minutes of effect, squeezed into
+    // a few seconds, but the time of day does not jump.
+    const rate = act ? act.def.minutesPerSecond : this.realClock ? 1 / 60 : FREE_MINUTES_PER_SECOND;
     let minutes = realSeconds * rate;
     let finished: ActiveAction | null = null;
-    if (this.active) {
-      const remaining = this.active.def.minutes - this.active.done;
+    if (act) {
+      const remaining = act.def.minutes - act.done;
       if (minutes >= remaining) minutes = remaining;
     }
-    if (minutes > 0) finished = this.advance(minutes);
+    const clockRatio = this.realClock && act ? 1 / (60 * act.def.minutesPerSecond) : 1;
+    if (minutes > 0) finished = this.advance(minutes, clockRatio);
+    // Whatever happened, keep the clock on the true time of day in Lagos (a hidden tab or a slow frame can leave it behind).
+    if (this.realClock) {
+      const now = lagosMinuteNow();
+      if (Math.abs(now - this.state.minute) > 1) this.state.minute = now;
+    }
     return { minutes, finished };
   }
 
   /** Advance by game minutes (in small slices so rent, warnings and needs stay accurate). */
-  advance(gameMinutes: number): ActiveAction | null {
+  advance(gameMinutes: number, clockRatio = 1): ActiveAction | null {
     let left = gameMinutes;
     let finished: ActiveAction | null = null;
     while (left > 1e-9) {
       const slice = Math.min(left, 10);
       left -= slice;
-      this.applySlice(slice);
+      this.applySlice(slice, slice * clockRatio);
       const done = this.checkFinished();
       if (done) {
         finished = done;
@@ -205,14 +228,14 @@ export class Sim {
     return act;
   }
 
-  private applySlice(minutes: number) {
+  private applySlice(minutes: number, clockMinutes: number) {
     const s = this.state;
     const act = this.active;
     const hours = minutes / 60;
 
     for (const id of NEED_IDS) {
       const decayScale = (act?.def.decay?.[id] ?? 1) * (this.offline ? 0.5 : 1) * this.traits.decay[id];
-      let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale;
+      let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale * this.needsSpeed;
       if (act) perHour += ((act.def.needs[id] ?? 0) / act.def.minutes) * 60;
       if (id === "energy" && s.needs.hunger <= 0) perHour -= 3; // starving drains energy
       s.needs[id] = clampNeed(s.needs[id] + perHour * hours);
@@ -230,12 +253,12 @@ export class Sim {
     }
 
     const previousDay = Math.floor(s.minute / DAY_MINUTES);
-    s.minute += minutes;
+    s.minute += clockMinutes;
     if (Math.floor(s.minute / DAY_MINUTES) > previousDay) s.stats.daysSurvived += 1;
 
     this.checkNeeds();
     this.checkRent();
-    tickPhone(s, minutes); // after rent, so rent is paid before the weekly bill
+    tickPhone(s, clockMinutes); // after rent, so rent is paid before the weekly bill
   }
 
   private earn(amount: number) {

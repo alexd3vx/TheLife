@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { lagosDateLabel, lagosMinuteNow } from "./lagosClock.js";
 import { ACTIONS, BILL_PER_WEEK, ECONOMY, Sim, balance, createGameState, createLedger, ledgerTotal, mood, parseGameState, performance, simulateAbsence, transfer, MINT, PLAYER, SINK } from "./index.js";
 
 const run = (sim: Sim, actionId: string) => {
@@ -254,5 +255,17 @@ describe("furniture catalog", () => {
       if (f.action) expect(ACTIONS[f.action], `${f.id} action ${f.action}`).toBeDefined();
     }
     expect(FURNITURE.length).toBeGreaterThan(60);
+  });
+});
+
+describe("the real Lagos clock", () => {
+  it("sits on the Lagos time of day and lets needs fall slowly", () => {
+    const sim = new Sim(createGameState(), { realClock: true });
+    expect(Math.abs(sim.state.minute - lagosMinuteNow())).toBeLessThan(1);
+    const before = sim.state.needs.hunger;
+    for (let i = 0; i < 600; i++) sim.step(1); // ten real minutes of play
+    expect(Math.abs(sim.state.minute - lagosMinuteNow())).toBeLessThan(2);
+    expect(before - sim.state.needs.hunger).toBeLessThan(2); // a little over a point, not a collapse
+    expect(lagosDateLabel(1)).toBe("Thu 1 Jan");
   });
 });

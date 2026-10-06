@@ -104,7 +104,7 @@ export class Room {
     const state = structuredClone(saved.state);
     const away = simulateAbsence(state, (now - saved.savedAt) / 60000);
     player.away = away.lines.length ? away.lines : null;
-    player.life = new Sim(state);
+    player.life = new Sim(state, { realClock: true });
     player.lastStepAt = now;
     this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
@@ -117,7 +117,7 @@ export class Room {
     player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
-    player.life = new Sim(createGameState(profile));
+    player.life = new Sim(createGameState(profile), { realClock: true });
     player.lastStepAt = now;
     this.assignHome(player);
     player.away = null;

@@ -29,13 +29,14 @@
 .has-touch .play-need { grid-template-columns: 1fr; justify-items: center; gap: 3px; }
 .has-touch .play-need-bar { width: 30px; height: 6px; }
 .has-touch .play-mood { display: none; }
-.has-touch .map-mini { width: 96px; height: 96px; }
-.has-touch .net-chip { top: 64px; right: 120px; padding: 5px 10px; font-size: .78rem; }
-.has-touch .play-info { top: 64px; right: 12px; }
+.has-touch .map-mini { width: 84px; height: 84px; top: 58px; opacity: .92; }
+.has-touch .net-chip { top: 58px; right: 106px; padding: 5px 10px; font-size: .78rem; }
+.has-touch .play-info { top: 108px; left: 12px; right: 112px; justify-content: flex-start; font-size: .74rem; padding: 6px 10px; }
+.has-touch .map-mini-zoom { display: none; }
 
 .has-touch .play-top .play-chip:nth-child(3) { display: none; }
 @media (orientation: portrait) {
-  .has-touch .net-chip { top: 168px; right: 12px; }
+  .has-touch .net-chip { top: 148px; right: 12px; }
   .has-touch .play-needs { top: 58px; gap: 5px; padding: 6px 7px; max-width: calc(100% - 130px); }
   .has-touch .play-need-bar { width: 22px; }
 }

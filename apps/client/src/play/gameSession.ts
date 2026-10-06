@@ -17,6 +17,7 @@ import {
   type Profile,
   type ActiveAction,
   type SimEvent,
+  lagosDateLabel,
 } from "@thelife/game-core";
 import type { GameBridge } from "./controller";
 import { rotateKey } from "../net/identity";
@@ -27,6 +28,8 @@ const SAVE_KEY = "thelife.game.v1";
 
 export interface HudSnapshot {
   day: number;
+  /** "Tue 6 Oct": the real date in Lagos. */
+  date: string;
   time: string;
   hourFloat: number;
   money: number;
@@ -130,7 +133,7 @@ export class GameSession implements GameBridge {
     this.online = !!server;
     const saved = fresh || server ? null : readSave();
     if (server) {
-      this.sim = new Sim(server.state as GameState);
+      this.sim = new Sim(server.state as GameState, { realClock: true });
       this.sim.active = activeFrom(server.active);
       if (server.away?.length) this.awaySummary.push(...server.away);
     } else if (saved) {
@@ -212,6 +215,7 @@ export class GameSession implements GameBridge {
     const daysToRent = (ECONOMY.rentDay - (clock.day % ECONOMY.rentDay)) % ECONOMY.rentDay;
     return {
       day: clock.day,
+      date: lagosDateLabel(clock.day),
       time: clock.label,
       hourFloat: clock.hourFloat,
       money: sim.money,

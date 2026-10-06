@@ -210,3 +210,10 @@ Chronological record of decisions and changes. Newest first.
 - Touch layout editor (Settings → Controls → Edit layout): drag, resize, hide or reset each control; opacity and vibration settings. On phones the HUD tucks away to keep the screen clear.
 - PWA: manifest, icons (any + maskable + Apple), service worker (app files cached; play still needs internet), install button + Add-to-Home-Screen hint and Full screen toggle in Settings → Display.
 - Creator: Start/Back buttons on the traits page now pinned to the bottom of the screen.
+
+## Street life, sky, weather, real Lagos clock, arrival film
+- Real world time: the game clock now follows Lagos time (UTC+1) for online lives (`lagosClock.ts`, `Sim` option `realClock`). The HUD shows the real date and time; needs fall slowly (about half a day from full to empty); long actions still give their effect but no longer jump the clock. Day 1 = 1 Jan 2026. Existing test lives jump to today's date on first load.
+- Sky: gradient dome with a moving sun, stars, clouds and a colour palette by hour; weather from the forecast (`weatherFor(day)`): cloud cover, rain showers, thunderstorms with lightning; fog closes in with rain; birds circle on fair days.
+- Traffic: cars, SUVs, danfo buses, keke and okada on the real streets (right-hand traffic), some parked, lamps at night and in rain, they stop for you. Instanced meshes (a few draw calls).
+- Arrival film rebuilt on one canvas (runs at 60 fps on software rendering): flight, a real landing (glide, flare, touchdown, tyre smoke, roll-out), taxi to the terminal, ride in a vehicle that matches the background (SUV + escort, yellow taxi, keke + danfo), arrival at the door. Dev preview: `#/filmtest?tier=nepo|middle|lapo`.
+- Controls: stick/buttons clamp to the screen on portrait phones, run button hidden by default (push the stick all the way to run), tidier HUD on phones.

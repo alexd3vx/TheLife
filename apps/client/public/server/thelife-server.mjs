@@ -1539,6 +1539,13 @@ function startLateFeeClock(state) {
   if (state.phone.lateFeeAt === null) state.phone.lateFeeAt = state.minute + DAY_MINUTES;
 }
 
+// packages/game-core/src/lagosClock.ts
+var EPOCH = Date.UTC(2026, 0, 1);
+var LAGOS_OFFSET_MS = 60 * 60 * 1e3;
+function lagosMinuteNow(nowMs = Date.now()) {
+  return (nowMs + LAGOS_OFFSET_MS - EPOCH) / 6e4;
+}
+
 // packages/game-core/src/traits.ts
 var TRAITS = [
   { id: "hustler", label: "Hustler", kind: "strength", text: "Earns 10% more from work.", effect: { workPay: 1.1 } },
@@ -1590,6 +1597,7 @@ function combineTraits(ids) {
 
 // packages/game-core/src/sim.ts
 var FREE_MINUTES_PER_SECOND = 1;
+var REAL_CLOCK_NEEDS_SPEED = 2;
 var WARNINGS = {
   hunger: "You're getting hungry.",
   energy: "You're getting tired.",
@@ -1636,8 +1644,13 @@ var Sim = class {
   events = [];
   /** Offline catch-up softens decay and removes accidents; see simulateAbsence. */
   offline = false;
-  constructor(state) {
+  realClock;
+  needsSpeed;
+  constructor(state, options = {}) {
     this.state = state ?? createGameState();
+    this.realClock = !!options.realClock;
+    this.needsSpeed = this.realClock ? REAL_CLOCK_NEEDS_SPEED : 1;
+    if (this.realClock) this.state.minute = lagosMinuteNow();
   }
   get clock() {
     return clockOf(this.state.minute);
@@ -1701,24 +1714,30 @@ var Sim = class {
   // -------------------------------------------------------------- time
   /** Advance by real seconds of play. Returns the game minutes that passed and any action that finished. */
   step(realSeconds) {
-    const rate = this.active ? this.active.def.minutesPerSecond : FREE_MINUTES_PER_SECOND;
+    const act = this.active;
+    const rate = act ? act.def.minutesPerSecond : this.realClock ? 1 / 60 : FREE_MINUTES_PER_SECOND;
     let minutes = realSeconds * rate;
     let finished = null;
-    if (this.active) {
-      const remaining = this.active.def.minutes - this.active.done;
+    if (act) {
+      const remaining = act.def.minutes - act.done;
       if (minutes >= remaining) minutes = remaining;
     }
-    if (minutes > 0) finished = this.advance(minutes);
+    const clockRatio = this.realClock && act ? 1 / (60 * act.def.minutesPerSecond) : 1;
+    if (minutes > 0) finished = this.advance(minutes, clockRatio);
+    if (this.realClock) {
+      const now = lagosMinuteNow();
+      if (Math.abs(now - this.state.minute) > 1) this.state.minute = now;
+    }
     return { minutes, finished };
   }
   /** Advance by game minutes (in small slices so rent, warnings and needs stay accurate). */
-  advance(gameMinutes) {
+  advance(gameMinutes, clockRatio = 1) {
     let left = gameMinutes;
     let finished = null;
     while (left > 1e-9) {
       const slice = Math.min(left, 10);
       left -= slice;
-      this.applySlice(slice);
+      this.applySlice(slice, slice * clockRatio);
       const done3 = this.checkFinished();
       if (done3) {
         finished = done3;
@@ -1741,13 +1760,13 @@ var Sim = class {
     this.active = null;
     return act;
   }
-  applySlice(minutes) {
+  applySlice(minutes, clockMinutes) {
     const s = this.state;
     const act = this.active;
     const hours = minutes / 60;
     for (const id of NEED_IDS) {
       const decayScale = (act?.def.decay?.[id] ?? 1) * (this.offline ? 0.5 : 1) * this.traits.decay[id];
-      let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale;
+      let perHour = -BASE_DECAY_PER_HOUR[id] * decayScale * this.needsSpeed;
       if (act) perHour += (act.def.needs[id] ?? 0) / act.def.minutes * 60;
       if (id === "energy" && s.needs.hunger <= 0) perHour -= 3;
       s.needs[id] = clampNeed(s.needs[id] + perHour * hours);
@@ -1763,11 +1782,11 @@ var Sim = class {
       }
     }
     const previousDay = Math.floor(s.minute / DAY_MINUTES);
-    s.minute += minutes;
+    s.minute += clockMinutes;
     if (Math.floor(s.minute / DAY_MINUTES) > previousDay) s.stats.daysSurvived += 1;
     this.checkNeeds();
     this.checkRent();
-    tickPhone(s, minutes);
+    tickPhone(s, clockMinutes);
   }
   earn(amount) {
     const s = this.state;
@@ -3589,7 +3608,7 @@ var Room = class {
     const state = structuredClone(saved.state);
     const away = simulateAbsence(state, (now - saved.savedAt) / 6e4);
     player.away = away.lines.length ? away.lines : null;
-    player.life = new Sim(state);
+    player.life = new Sim(state, { realClock: true });
     player.lastStepAt = now;
     this.assignHome(player);
     this.rename(player, `${state.profile?.firstName ?? player.name} ${state.profile?.surname ?? ""}`.trim());
@@ -3601,7 +3620,7 @@ var Room = class {
     player.lastCreateAt = now;
     const profile = buildProfile(choice);
     if (!profile) return { ok: false, reason: "That character isn't valid." };
-    player.life = new Sim(createGameState(profile));
+    player.life = new Sim(createGameState(profile), { realClock: true });
     player.lastStepAt = now;
     this.assignHome(player);
     player.away = null;

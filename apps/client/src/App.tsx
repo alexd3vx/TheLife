@@ -11,6 +11,7 @@ const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
 const PhoneTestPage = lazy(() => import("./phone/PhoneTestPage"));
 const MapPage = lazy(() => import("./map/MapPage"));
 const CreatorPage = lazy(() => import("./creator/CreatorPage"));
+const ArrivalFilm = lazy(() => import("./arrival/ArrivalFilm"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -32,6 +33,14 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <LabPage />
+      </Suspense>
+    );
+  }
+  if (import.meta.env.DEV && hash.startsWith("#/filmtest")) {
+    const tier = (hash.split("tier=")[1] ?? "middle") as "lapo" | "middle" | "nepo";
+    return (
+      <Suspense fallback={null}>
+        <ArrivalFilm tier={tier} onDone={() => (window.location.hash = "#/")} />
       </Suspense>
     );
   }

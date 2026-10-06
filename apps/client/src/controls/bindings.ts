@@ -47,7 +47,7 @@ export const TOUCH_LABEL: Record<TouchId, string> = { stick: "Move stick", inter
 export const DEFAULT_TOUCH: Record<TouchId, TouchSpot> = {
   stick: { x: 0.14, y: 0.24, s: 1 },
   interact: { x: 0.9, y: 0.27, s: 1 },
-  run: { x: 0.78, y: 0.14, s: 0.9 },
+  run: { x: 0.76, y: 0.14, s: 0.9, hidden: true },
   phone: { x: 0.92, y: 0.52, s: 0.8, hidden: true },
   camera: { x: 0.8, y: 0.38, s: 0.7, hidden: true },
 };
