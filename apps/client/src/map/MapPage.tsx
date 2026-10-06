@@ -22,6 +22,8 @@ export default function MapPage() {
   const [touring, setTouring] = useState<number | null>(null);
   const [result, setResult] = useState<TourResult | null>(null);
   const [night, setNight] = useState(false);
+  const [place, setPlace] = useState<string | null>(null);
+  const [placeShown, setPlaceShown] = useState<string | null>(null);
   const [bigMap, setBigMap] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
   const [quality, setQuality] = useState<Quality>(loadQuality());
@@ -32,7 +34,7 @@ export default function MapPage() {
     if (!container) return;
     let disposed = false;
     loadManifest()
-      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu }))
+      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu, onPlace: setPlace }))
       .then((runtime) => {
         if (disposed) {
           runtime?.dispose();
@@ -56,6 +58,14 @@ export default function MapPage() {
     };
   }, []);
 
+  // A banner for a few seconds when you walk into a named place.
+  useEffect(() => {
+    if (!place) return;
+    setPlaceShown(place);
+    const t = window.setTimeout(() => setPlaceShown(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [place]);
+
   const runTour = async () => {
     const rt = runtimeRef.current;
     if (!rt || touring !== null) return;
@@ -78,6 +88,7 @@ export default function MapPage() {
         {stats && <span className="play-fps">{Math.round(stats.fps)} fps</span>}
       </div>
 
+      {placeShown && <div className="map-place" role="status">{placeShown}</div>}
       {!loading && !error && <OnlinePanel runtime={runtimeRef} />}
 
       {stats && (
@@ -95,13 +106,13 @@ export default function MapPage() {
 
       {stats && !bigMap && (
         <button className="map-mini" onClick={() => setBigMap(true)} aria-label="Open the map">
-          <DistrictMap district={district} player={stats.position} compact />
+          <DistrictMap district={district} player={stats.position} others={runtimeRef.current?.online.remotes.list() ?? []} compact />
         </button>
       )}
       {bigMap && (
         <>
           <div className="map-big">
-            <DistrictMap district={district} player={stats?.position ?? null} selected={picked} onSelect={setPicked} />
+            <DistrictMap district={district} player={stats?.position ?? null} others={runtimeRef.current?.online.remotes.list() ?? []} selected={picked} onSelect={setPicked} />
           </div>
           <button className="map-close" onClick={() => setBigMap(false)}>Close map</button>
           {picked && (() => {

@@ -59,6 +59,17 @@ describe("game server", () => {
     expect((await a.next("leave")).id).toBe(wb.id);
   });
 
+  it("passes a cleaned look on to the other players", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    await a.next("welcome");
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+    sockets.push(ws);
+    await new Promise((r) => ws.once("open", r));
+    ws.send(JSON.stringify({ t: "hello", name: "Bayo", protocol: PROTOCOL_VERSION, look: JSON.stringify({ body: "realfemale", junk: "x" }) }));
+    expect(JSON.parse((await a.next("join")).player.look!)).toEqual({ body: "realfemale" });
+  });
+
   it("rejects an out-of-date client", async () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Old", PROTOCOL_VERSION + 1);

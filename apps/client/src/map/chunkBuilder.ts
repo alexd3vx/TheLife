@@ -95,9 +95,10 @@ function addBuilding(b: MeshBuilder, cap: MeshBuilder, lot: Lot, lod: Lod) {
   if (lod === 0 && hasInterior(lot)) {
     // A real interior: ground floor in the chunk mesh, upper floors and roof in the hideable cap.
     const lotNo = Number(lot.id.slice(1));
-    addInterior(b, cap, lot, generatePlan(lot), WALLS[lot.colour % WALLS.length]!, lotNo);
+    addInterior(b, cap, lot, generatePlan(lot), lot.landmark ? LANDMARK_WALL[lot.landmark] : WALLS[lot.colour % WALLS.length]!, lotNo);
     cap.setLot(lotNo * 8 + lot.floors); // the roof counts as the floor above the top storey
     addRoof(cap, lot, height, lod);
+    if (lot.landmark) addLandmark(cap, lot, lot.landmark, true); // signs and domes go with the roof, so they lift off when you walk in
     return;
   }
   const wall = lot.landmark ? LANDMARK_WALL[lot.landmark] : lot.kind === "terminal" ? C("#d9dde0") : lot.kind === "hangar" ? C("#9aa3ab") : WALLS[lot.colour % WALLS.length]!;

@@ -1,12 +1,14 @@
 import { useMemo, useRef, useState } from "react";
 import type { District } from "@thelife/game-core";
 import { PIN_STYLE } from "./pins";
-import { iconPath } from "../ui/icons";
+import { GameIcon, iconPath } from "../ui/icons";
 
 interface Props {
   district: District;
   /** Where the player is (a blue dot), if known. */
   player?: { x: number; z: number } | null;
+  /** Other players online (green dots). */
+  others?: { id: string; name: string; x: number; z: number }[];
   home?: { x: number; z: number } | null;
   selected?: string | null;
   onSelect?(id: string | null): void;
@@ -19,7 +21,7 @@ const LIGHT = { land: "#d9e6c6", road: "#ffffff", roadEdge: "#b8b3a6", block: "#
 const DARK = { land: "#1a2230", road: "#33425a", roadEdge: "#22304a", block: "#202a3a", lot: "#2e3b52", paving: "#2b3446", field: "#2a3a2c", water: "#14304a", runway: "#3a414d", park: "#1f3a2a", text: "#e8edf5" };
 
 /** A drawn map of the neighbourhood from the same data the 3D world is built from: roads, blocks, buildings, and a pin on every named place. */
-export default function DistrictMap({ district, player = null, home = null, selected = null, onSelect, dark = false, compact = false }: Props) {
+export default function DistrictMap({ district, player = null, others = [], home = null, selected = null, onSelect, dark = false, compact = false }: Props) {
   const col = dark ? DARK : LIGHT;
   const H = district.bounds.maxX;
   const [view, setView] = useState({ cx: 0, cz: 0, span: H * 2 });
@@ -113,6 +115,12 @@ export default function DistrictMap({ district, player = null, home = null, sele
             <text textAnchor="middle" dominantBaseline="central" fontSize={pin * 0.95} fill="#fff">⌂</text>
           </g>
         )}
+        {others.map((o) => (
+          <g key={o.id} transform={`translate(${o.x} ${o.z})`} style={{ pointerEvents: "none" }}>
+            <circle r={pin * 0.42} fill="#2fbf71" stroke="#fff" strokeWidth={pin * 0.1} />
+            {!compact && span < 300 && <text y={-pin * 0.7} textAnchor="middle" fontSize={pin * 0.6} fill="#0b3d22" stroke="#fff" strokeWidth={pin * 0.14} paintOrder="stroke">{o.name}</text>}
+          </g>
+        ))}
         {player && (
           <g transform={`translate(${player.x} ${player.z})`} style={{ pointerEvents: "none" }}>
             <circle r={pin * 1.5} fill="#2f7bff" opacity={0.22} />
@@ -124,7 +132,7 @@ export default function DistrictMap({ district, player = null, home = null, sele
         <div className="dmap-tools">
           <button onClick={() => zoom(0.7)} aria-label="Zoom in">+</button>
           <button onClick={() => zoom(1 / 0.7)} aria-label="Zoom out">−</button>
-          <button onClick={() => centreOn(player ?? home)} aria-label="Centre on me">⌖</button>
+          <button onClick={() => centreOn(player ?? home)} aria-label="Centre on me"><GameIcon name="spot" size={16} /></button>
         </div>
       )}
     </div>

@@ -14,6 +14,7 @@ import { buildGroundDetail, capHideLevel, capHideLot } from "./chunkBuilder";
 import { AdaptiveQuality, type Quality } from "../graphics";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 import { RemotePlayers } from "./remotePlayers";
+import { DoorManager } from "./doors";
 
 export interface MapStats {
   fps: number;
@@ -75,6 +76,8 @@ export interface MapRuntime {
 export interface MapEvents {
   onStats(stats: MapStats): void;
   onMenu(menu: TapMenu | null): void;
+  /** Walking into or out of a named place (null = outside). */
+  onPlace?(name: string | null): void;
 }
 
 const TAP_MAX_MOVE = 8;
@@ -148,7 +151,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
 
   const streamer = new ChunkStreamer(district);
   scene.add(streamer.root);
-  const remotes = new RemotePlayers();
+  const remotes = new RemotePlayers(manifest);
   scene.add(remotes.root);
 
   // Walking: a 1 m navigation grid from the same data the server will have.
@@ -180,6 +183,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     if (!p) planCache.set(lot.id, (p = generatePlan(lot)));
     return p;
   };
+  const doors = new DoorManager(scene, interiorLots, planOf);
+  let placeName: string | null = null;
   const levelGrids = new Map<string, NavGrid>();
   const levelGrid = (lot: Lot, level: number): NavGrid => {
     const key = `${lot.id}:${level}`;
@@ -408,6 +413,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const dt = Math.min(rawDt, 0.1);
     if (document.hidden) return;
     controller.update(dt);
+    remotes.focus.copy(controller.position);
     remotes.update(dt);
     localSpeed += (Math.hypot(controller.position.x - lastX, controller.position.z - lastZ) / Math.max(dt, 0.001) - localSpeed) * Math.min(1, dt * 8);
     lastX = controller.position.x;
@@ -416,6 +422,12 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     streamer.update(controller.position.x, controller.position.z);
     // Take the roof (and any floors above the player's) off the building they are standing in, and follow the stairs up and down.
     controller.position.y = updateFloor();
+    doors.update(controller.position.x, controller.position.z, dt);
+    const here = floorLot?.landmark ? (district.landmarks.find((l) => l.lotId === floorLot!.id)?.name ?? null) : null;
+    if (here !== placeName) {
+      placeName = here;
+      events.onPlace?.(here);
+    }
 
     // Shadows follow the player, snapped to the shadow-map texels so they don't shimmer.
     const texel = (span * 2) / shadowSize;
@@ -532,13 +544,14 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         y: controller.position.y,
         z: controller.position.z,
         yaw: controller.yaw,
-        clip: localSpeed > 2.6 ? "Run_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
+        clip: localSpeed > 2.6 ? "Jog_Fwd_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
         level: floorLevel,
       }),
       correct: (x, z) => controller.place(x, z, controller.yaw),
     },
     dispose() {
       remotes.dispose();
+      doors.dispose();
       stopped = true;
       tourCancel = true;
       cancelAnimationFrame(raf);

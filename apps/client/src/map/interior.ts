@@ -7,6 +7,8 @@ const INNER = C("#efe9dd");
 const GLASS = C("#3a5068");
 const FLOOR: Record<string, THREE.Color> = {
   living: C("#b98d5e"), kitchen: C("#d8d4c8"), bedroom: C("#c9a678"), bath: C("#a9cde0"), garage: C("#8d8b86"), hall: C("#c0a07a"), shop: C("#cfc6b4"), store: C("#a9a395"),
+  lobby: C("#cfc9bb"), office: C("#b9a98c"), ward: C("#dbe9ee"), cell: C("#8c9096"), classroom: C("#cdb67e"), vault: C("#7d8288"), prayer: C("#6f9d8f"), nave: C("#b08a5a"),
+  pharmacy: C("#e3ecef"), guestroom: C("#c7a98a"), engine: C("#8d8b86"), crew: C("#c9a678"), dining: C("#cdb899"),
 };
 const WOOD = C("#8a6a46");
 const FABRIC = C("#5f6f8a");
@@ -14,6 +16,7 @@ const WHITE = C("#f3f3f1");
 const DARK = C("#2f3338");
 const METAL = C("#9aa1a8");
 const CAR = C("#9aa5b2");
+const GOLD = C("#d8b24a");
 
 /** One wall piece (a box): along x or z, between s0 and s1 from the wall's start, between heights y0 and y1, `lo..hi` across its thickness. */
 function piece(b: MeshBuilder, w: PlanWall, s0: number, s1: number, y0: number, y1: number, lo: number, hi: number, color: THREE.Color) {
@@ -111,6 +114,42 @@ function addFurniture(b: MeshBuilder, item: PlanFurniture, y: number) {
     case "car":
       b.box(r.minX, y + 0.3, r.minZ, r.maxX, y + 0.95, r.maxZ, CAR, 0.85);
       b.box(r.minX + 0.15, y + 0.95, r.minZ + (r.maxZ - r.minZ) * 0.25, r.maxX - 0.15, y + 1.5, r.maxZ - (r.maxZ - r.minZ) * 0.25, GLASS, 0.9);
+      return;
+    case "bench":
+    case "pew": {
+      const alongX = r.maxX - r.minX >= r.maxZ - r.minZ;
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 0.45, item.kind === "pew" ? C("#7a5230") : C("#6b7480"));
+      if (alongX) box(r.minX, r.maxZ - 0.12, r.maxX, r.maxZ, 0.45, 0.95, item.kind === "pew" ? C("#7a5230") : C("#6b7480"));
+      else box(r.maxX - 0.12, r.minZ, r.maxX, r.maxZ, 0.45, 0.95, item.kind === "pew" ? C("#7a5230") : C("#6b7480"));
+      return;
+    }
+    case "bunk":
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 0.4, METAL);
+      box(r.minX + 0.05, r.minZ + 0.05, r.maxX - 0.05, r.maxZ - 0.05, 0.4, 0.55, C("#8a8f6a"));
+      box(r.minX, r.minZ, r.minX + 0.05, r.maxZ, 0.55, 1.5, METAL);
+      box(r.maxX - 0.05, r.minZ, r.maxX, r.maxZ, 0.55, 1.5, METAL);
+      return;
+    case "board":
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0.8, 2.0, C("#2c4a3a"));
+      return;
+    case "safe":
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 1.4, C("#5b6169"));
+      box(r.minX + 0.1, r.minZ + 0.1, r.maxX - 0.1, r.maxZ - 0.1, 1.4, 1.5, GOLD);
+      return;
+    case "truck": {
+      const alongX = r.maxX - r.minX >= r.maxZ - r.minZ;
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0.25, 1.7, C("#c8322d"));
+      if (alongX) box(r.minX + 0.1, r.minZ + 0.05, r.minX + (r.maxX - r.minX) * 0.3, r.maxZ - 0.05, 1.7, 2.0, GLASS);
+      else box(r.minX + 0.05, r.minZ + 0.1, r.maxX - 0.05, r.minZ + (r.maxZ - r.minZ) * 0.3, 1.7, 2.0, GLASS);
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 0.25, DARK);
+      return;
+    }
+    case "altar":
+      box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 0.9, WHITE);
+      box(r.minX + 0.1, r.minZ + 0.1, r.maxX - 0.1, r.maxZ - 0.1, 0.9, 1.0, GOLD);
+      return;
+    case "drip":
+      box(r.minX + 0.1, r.minZ + 0.1, r.maxX - 0.1, r.maxZ - 0.1, 0, 1.8, METAL);
       return;
     case "tv":
       box(r.minX, r.minZ, r.maxX, r.maxZ, 0, 0.4, WOOD);

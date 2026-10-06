@@ -61,7 +61,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           send(ws, { t: "error", reason: "Your game is out of date. Reload the page to update." });
           return ws.close(4002, "protocol");
         }
-        const joined = room.join(message.name, now);
+        const joined = room.join(message.name, now, message.look);
         if (!joined.ok) {
           send(ws, { t: "error", reason: joined.reason });
           return ws.close(4003, "full");

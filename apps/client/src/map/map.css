@@ -22,3 +22,6 @@
 .map-sheet-actions button { font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 12px; min-height: 40px; padding: 0 14px; background: var(--accent); color: var(--accent-ink); }
 .map-sheet-actions button.is-ghost { background: rgba(255, 255, 255, .14); color: var(--text); }
 .map-close { position: absolute; z-index: 7; right: 20px; top: 64px; font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer; background: rgba(20, 17, 15, .88); color: var(--text); }
+.map-place { position: absolute; z-index: 6; left: 50%; top: 18%; transform: translateX(-50%); padding: 12px 26px; border-radius: 999px; background: rgba(20, 17, 15, .86); color: #fff; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: place-in 3.2s both; }
+.map-place::before { content: "Entering "; font-weight: 500; opacity: .75; }
+@keyframes place-in { 0% { opacity: 0; transform: translate(-50%, -10px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }

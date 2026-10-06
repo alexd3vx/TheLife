@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import type { PlayerView } from "@thelife/shared";
+import { Avatar } from "../lab/avatar";
+import { DEFAULT_LOOK, type Look } from "../lab/looks";
+import type { AssetManifest } from "../lab/manifest";
 
 /** How far behind the newest news we draw other players, so their movement stays smooth between snapshots. */
 const DELAY = 0.13;
@@ -22,6 +25,10 @@ interface Remote {
   tag: THREE.Sprite;
   samples: Sample[];
   phase: number;
+  /** The real character, once it has loaded; until then the simple figure stands in. */
+  avatar: Avatar | null;
+  clip: string;
+  figure: THREE.Object3D[];
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -54,10 +61,14 @@ function nameTag(name: string): THREE.Sprite {
 export class RemotePlayers {
   readonly root = new THREE.Group();
   private readonly players = new Map<string, Remote>();
+  private readonly queue: (() => Promise<void>)[] = [];
+  private loading = false;
   private readonly shared = {
     box: new THREE.BoxGeometry(1, 1, 1),
     head: new THREE.SphereGeometry(0.115, 12, 10),
   };
+
+  constructor(private readonly manifest: AssetManifest) {}
 
   get count(): number {
     return this.players.size;
@@ -103,17 +114,58 @@ export class RemotePlayers {
     group.add(torso, head);
     const legs = [limb(trousers, 0.17, 0.9, -0.1, 0.9), limb(trousers, 0.17, 0.9, 0.1, 0.9)];
     const arms = [limb(shirt, 0.12, 0.55, -0.27, 1.45), limb(shirt, 0.12, 0.55, 0.27, 1.45)];
+    const figure = [...group.children];
     const tag = nameTag(view.name);
     group.add(tag);
     group.position.set(view.x, view.y, view.z);
     group.rotation.y = view.yaw;
     this.root.add(group);
-    this.players.set(view.id, { view: { ...view }, group, legs, arms, tag, samples: [{ t: performance.now() / 1000, x: view.x, y: view.y, z: view.z, yaw: view.yaw }], phase: 0 });
+    this.players.set(view.id, { view: { ...view }, group, legs, arms, tag, samples: [{ t: performance.now() / 1000, x: view.x, y: view.y, z: view.z, yaw: view.yaw }], phase: 0, avatar: null, clip: "", figure });
+    this.loadAvatar(view);
+  }
+
+  /** Loads the player's real character one at a time, so a crowd arriving does not freeze the game. */
+  private loadAvatar(view: PlayerView): void {
+    let look: Look = { ...DEFAULT_LOOK };
+    try {
+      if (view.look) look = { ...DEFAULT_LOOK, ...(JSON.parse(view.look) as Partial<Look>) };
+    } catch {
+      /* keep the default look */
+    }
+    this.queue.push(async () => {
+      const r = this.players.get(view.id);
+      if (!r) return;
+      const avatar = new Avatar(this.manifest, look);
+      try {
+        await avatar.load();
+      } catch {
+        return; // the simple figure stays
+      }
+      const again = this.players.get(view.id);
+      if (!again) {
+        avatar.dispose();
+        return;
+      }
+      again.avatar = avatar;
+      for (const part of again.figure) part.visible = false;
+      again.group.add(avatar.root);
+      avatar.play("Idle_Loop", 0);
+      again.clip = "Idle_Loop";
+    });
+    void this.drain();
+  }
+
+  private async drain(): Promise<void> {
+    if (this.loading) return;
+    this.loading = true;
+    while (this.queue.length) await this.queue.shift()!();
+    this.loading = false;
   }
 
   remove(id: string): void {
     const r = this.players.get(id);
     if (!r) return;
+    r.avatar?.dispose();
     this.root.remove(r.group);
     r.group.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -140,6 +192,9 @@ export class RemotePlayers {
     }
   }
 
+  /** Where the local player is, so far-away characters are not animated. */
+  readonly focus = new THREE.Vector3();
+
   update(dt: number): void {
     const render = performance.now() / 1000 - DELAY;
     for (const r of this.players.values()) {
@@ -157,6 +212,15 @@ export class RemotePlayers {
       const px = r.group.position.x, pz = r.group.position.z;
       r.group.position.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
       r.group.rotation.y = a.yaw + wrap(b.yaw - a.yaw) * k;
+      if (r.avatar) {
+        const near = Math.hypot(r.group.position.x - this.focus.x, r.group.position.z - this.focus.z) < 70;
+        r.group.visible = near;
+        if (near) {
+          if (r.view.clip !== r.clip && r.avatar.play(r.view.clip)) r.clip = r.view.clip;
+          r.avatar.update(dt);
+        }
+        continue;
+      }
       // Swing the limbs when they are moving.
       const speed = Math.hypot(r.group.position.x - px, r.group.position.z - pz) / Math.max(dt, 0.001);
       const moving = Math.min(1, speed / 1.2);

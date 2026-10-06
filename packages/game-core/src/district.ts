@@ -262,6 +262,12 @@ export function generateDistrict(seed = 1): District {
   // ---- named places: the widest plot in a chosen block becomes a police station, hospital and so on.
   const landmarks: Landmark[] = [];
   const entranceOf = (lot: Lot) => {
+    if (hasInterior(lot)) {
+      // Stand on the pavement right in front of the real door.
+      const inside = generatePlan(lot).inside;
+      const out = lot.facing === 0 ? { x: 0, z: -1 } : lot.facing === 2 ? { x: 0, z: 1 } : lot.facing === 1 ? { x: 1, z: 0 } : { x: -1, z: 0 };
+      return { x: inside.x + out.x * 2.9, z: inside.z + out.z * 2.9 };
+    }
     const f = lot.footprint;
     const mx = (f.minX + f.maxX) / 2;
     const mz = (f.minZ + f.maxZ) / 2;

@@ -4,7 +4,9 @@
 import type { Facing, Lot, Rect } from "./district.js";
 
 export type OpeningKind = "door" | "window" | "garage";
-export type RoomKind = "living" | "kitchen" | "bedroom" | "bath" | "garage" | "hall" | "shop" | "store";
+export type RoomKind =
+  | "living" | "kitchen" | "bedroom" | "bath" | "garage" | "hall" | "shop" | "store"
+  | "lobby" | "office" | "ward" | "cell" | "classroom" | "vault" | "prayer" | "nave" | "pharmacy" | "guestroom" | "engine" | "crew" | "dining";
 
 export const WALL_THICKNESS = 0.2;
 export const DOOR_WIDTH = 1.2;
@@ -43,7 +45,9 @@ export interface PlanStairs {
 }
 
 export interface PlanFurniture {
-  kind: "sofa" | "table" | "tv" | "bed" | "wardrobe" | "counter" | "fridge" | "stove" | "toilet" | "basin" | "shower" | "shelf" | "crate" | "car" | "desk";
+  kind:
+    | "sofa" | "table" | "tv" | "bed" | "wardrobe" | "counter" | "fridge" | "stove" | "toilet" | "basin" | "shower" | "shelf" | "crate" | "car" | "desk"
+    | "bench" | "pew" | "bunk" | "board" | "safe" | "truck" | "altar" | "bars" | "drip";
   floor: number;
   rect: Rect;
   /** Height in metres. */
@@ -65,10 +69,79 @@ export interface BuildingPlan {
 
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
 
-/** Which lots get a real interior (the named places keep their solid shells for now). */
+/** The named places that have a real inside (the airport, fuel station and market keep their shells for now). */
+const HOLLOW_LANDMARKS = new Set(["police", "hospital", "school", "church", "mosque", "fire", "bank", "hotel"]);
+
+/** Which lots get a real interior. */
 export function hasInterior(lot: Lot): boolean {
-  return !lot.landmark && (lot.kind === "house" || lot.kind === "flats" || lot.kind === "shop");
+  if (lot.landmark) return HOLLOW_LANDMARKS.has(lot.landmark);
+  return lot.kind === "house" || lot.kind === "flats" || lot.kind === "shop";
 }
+
+type FKind = PlanFurniture["kind"];
+
+/**
+ * How a named place re-dresses the house layout (a lobby in front, three rooms behind, a landing and rooms upstairs): what each
+ * room is called, which pieces of furniture become what (null = removed) and a few extras. The walls, doors and stairs stay the
+ * same, so every place is as easy to walk through as a house.
+ */
+interface Theme {
+  ground: Partial<Record<RoomKind, RoomKind>>;
+  upper: Partial<Record<RoomKind, RoomKind>>;
+  f0: Partial<Record<FKind, FKind | null>>;
+  fUp: Partial<Record<FKind, FKind | null>>;
+}
+
+const THEMES: Record<string, Theme> = {
+  police: {
+    ground: { living: "lobby", kitchen: "office", bedroom: "cell", bath: "bath" },
+    upper: { bedroom: "office", hall: "hall" },
+    f0: { sofa: "bench", tv: "counter", table: null, counter: "desk", fridge: "shelf", bed: "bunk", shower: "basin" },
+    fUp: { bed: "desk", wardrobe: "shelf" },
+  },
+  hospital: {
+    ground: { living: "lobby", kitchen: "pharmacy", bedroom: "ward", bath: "bath" },
+    upper: { bedroom: "ward", hall: "hall" },
+    f0: { sofa: "bench", tv: "counter", table: null, counter: "counter", fridge: "shelf", bed: "bed", shower: "basin" },
+    fUp: { bed: "bed", wardrobe: "drip" },
+  },
+  school: {
+    ground: { living: "classroom", kitchen: "office", bedroom: "office", bath: "bath" },
+    upper: { bedroom: "classroom", hall: "hall" },
+    f0: { sofa: "board", tv: "desk", table: "desk", counter: "desk", fridge: "shelf", bed: "desk", shower: "basin" },
+    fUp: { bed: "desk", wardrobe: "board" },
+  },
+  bank: {
+    ground: { living: "lobby", kitchen: "office", bedroom: "vault", bath: "bath" },
+    upper: { bedroom: "office", hall: "hall" },
+    f0: { sofa: "bench", tv: "counter", table: "counter", counter: "desk", fridge: "shelf", bed: "safe", shower: "basin" },
+    fUp: { bed: "desk", wardrobe: "shelf" },
+  },
+  hotel: {
+    ground: { living: "lobby", kitchen: "dining", bedroom: "dining", bath: "bath" },
+    upper: { bedroom: "guestroom", hall: "hall" },
+    f0: { sofa: "sofa", tv: "counter", table: "table", counter: "counter", fridge: "fridge", bed: "table", shower: "basin" },
+    fUp: { bed: "bed", wardrobe: "wardrobe" },
+  },
+  fire: {
+    ground: { living: "engine", kitchen: "crew", bedroom: "crew", bath: "bath" },
+    upper: { bedroom: "crew", hall: "hall" },
+    f0: { sofa: "truck", tv: "shelf", table: null, counter: "counter", fridge: "fridge", bed: "bunk", shower: "basin" },
+    fUp: { bed: "bunk", wardrobe: "shelf" },
+  },
+  church: {
+    ground: { living: "nave", kitchen: "office", bedroom: "office", bath: "bath" },
+    upper: {},
+    f0: { sofa: "pew", tv: "altar", table: "pew", counter: "shelf", fridge: "shelf", bed: "desk", shower: "basin" },
+    fUp: {},
+  },
+  mosque: {
+    ground: { living: "prayer", kitchen: "office", bedroom: "office", bath: "bath" },
+    upper: {},
+    f0: { sofa: null, tv: "shelf", table: null, counter: "shelf", fridge: "shelf", bed: null, shower: "basin" },
+    fUp: {},
+  },
+};
 
 /** Maps building-local coordinates (u across the front, v from the front inward) to the world. */
 function mapper(f: Rect, facing: Facing) {
@@ -210,6 +283,31 @@ export function generatePlan(lot: Lot): BuildingPlan {
       stairs.push({ rect: m.box(hallW + 0.1, hallW + 0.1 + run, vf + 1.6, vf + 2.8), floor: fl, climbs: toRight });
     }
     if (shop) furniture.push({ kind: "desk", floor: fl, rect: m.box(uw - 3.2, uw - 1.6, vf + 2.2, vf + 3), height: 0.75 });
+  }
+
+  const theme = lot.landmark ? THEMES[lot.landmark] : undefined;
+  if (theme) {
+    for (const r of rooms) r.kind = (r.floor === 0 ? theme.ground : theme.upper)[r.kind] ?? r.kind;
+    const mapped: PlanFurniture[] = [];
+    for (const item of furniture) {
+      const to = (item.floor === 0 ? theme.f0 : theme.fUp)[item.kind];
+      if (to === null) continue;
+      mapped.push(to ? { ...item, kind: to } : item);
+    }
+    furniture.length = 0;
+    furniture.push(...mapped);
+  }
+
+  if (theme && !shop) {
+    // Benches between the doors on the lobby's back wall (pews in a church), and a few things that make each place what it is.
+    const seats: FKind = lot.landmark === "church" ? "pew" : lot.landmark === "mosque" ? "shelf" : "bench";
+    const segs: [number, number][] = [[mainW * 0.2 + 0.95, mainW * 0.56 - 0.95], [mainW * 0.56 + 0.95, mainW * 0.86 - 0.95]];
+    for (const [a, c] of segs) if (c - a > 1.4) furniture.push({ kind: seats, floor: 0, rect: m.box(a, c, vf - 0.7, vf - 0.2), height: seats === "shelf" ? 1.8 : 0.9 });
+    if (lot.landmark === "fire") furniture.push({ kind: "truck", floor: 0, rect: m.box(mainW - 3.2, mainW - 0.5, 0.4, 3.2), height: 2 });
+    if (lot.landmark === "school") furniture.push({ kind: "desk", floor: 0, rect: m.box(mainW * 0.64, mainW * 0.64 + 1.1, 1.2, 1.8), height: 0.75 }, { kind: "desk", floor: 0, rect: m.box(mainW * 0.64, mainW * 0.64 + 1.1, 2.4, 3.0), height: 0.75 });
+    if (lot.landmark === "church") furniture.push({ kind: "pew", floor: 0, rect: m.box(mainW * 0.62, mainW * 0.62 + 2.2, 1.2, 1.7), height: 0.9 }, { kind: "pew", floor: 0, rect: m.box(mainW * 0.62, mainW * 0.62 + 2.2, 2.4, 2.9), height: 0.9 });
+    if (lot.landmark === "police") furniture.push({ kind: "board", floor: 0, rect: m.box(mainW * 0.4, mainW * 0.4 + 1.8, 0.2, 0.3), height: 2 });
+    if (lot.landmark === "hospital") furniture.push({ kind: "drip", floor: 0, rect: m.box(mainW * 0.4 + 1.7, mainW * 0.4 + 1.95, D - 1.0, D - 0.75), height: 1.8 });
   }
 
   const inside = m.at(frontDoorU, 1.4);

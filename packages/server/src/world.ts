@@ -43,7 +43,7 @@ export class Room {
     return this.players.size;
   }
 
-  join(rawName: string, now: number): JoinResult {
+  join(rawName: string, now: number, look?: string): JoinResult {
     if (this.players.size >= MAX_ROOM_PLAYERS) return { ok: false, reason: "This world is full. Try again in a moment." };
     const id = `p${this.nextId++}`;
     const spawn = this.district.spawn;
@@ -58,6 +58,7 @@ export class Room {
       yaw: spawn.yaw,
       clip: "Idle_Loop",
       level: 0,
+      look,
       account: `acct:${id}`,
       lastMoveAt: now,
       buckets: { chat: { tokens: LIMITS.chat.burst, at: now }, pay: { tokens: LIMITS.pay.burst, at: now }, move: { tokens: LIMITS.move.burst, at: now }, rtc: { tokens: LIMITS.rtc.burst, at: now } },
@@ -137,6 +138,6 @@ export class Room {
   }
 
   view(p: Player): PlayerView {
-    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level };
+    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look };
   }
 }

@@ -1,3 +1,4 @@
+import { loadSavedLook } from "../lab/looks";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
 
 export type NetStatus = "offline" | "connecting" | "online";
@@ -54,7 +55,7 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.tries = 0;
-      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION } satisfies ClientMessage));
+      ws.send(JSON.stringify({ t: "hello", name: this.name, protocol: PROTOCOL_VERSION, look: JSON.stringify(loadSavedLook()) } satisfies ClientMessage));
     };
     ws.onmessage = (e) => {
       let message: ServerMessage;
