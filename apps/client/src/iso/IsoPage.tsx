@@ -10,6 +10,7 @@ import { world } from "../net/world";
 import { layoutForTier } from "../play/layouts";
 import { IsoRoom, type IsoGame, type Tier } from "./IsoRoom";
 import { PaperDoll } from "./paperdoll";
+import { LiveChar } from "./livechar";
 import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
@@ -43,10 +44,30 @@ export default function IsoPage() {
     };
     let gone = false;
     let detach: (() => void) | null = null;
+    let liveRef: LiveChar | null = null;
     (async () => {
       // The character is stacked together from sprite layers in their saved look: no 3D, and it is ready as soon as the pictures load.
-      const char = new PaperDoll(parseLook(session.sim.state.look));
+      const look = parseLook(session.sim.state.look);
+      const char = new PaperDoll(look);
+      // the character is drawn live from the 3D model (sharp at any size); if that can't start, the baked pictures are the fallback
+      let live: LiveChar | null = null;
+      if (!new URLSearchParams(window.location.search).has("sprites")) {
+        try {
+          live = new LiveChar(look);
+          await live.load();
+        } catch (e) {
+          console.warn("live character unavailable, using pictures", e);
+          live?.dispose();
+          live = null;
+        }
+      }
+      if (gone) {
+        live?.dispose();
+        return;
+      }
+      liveRef = live;
       const room = new IsoRoom(canvas, layoutForTier(tier), tier, game, char);
+      room.live = live;
       roomRef.current = room;
       room.onStatus = setStatus;
       room.onMenu = setMenu;
@@ -60,6 +81,7 @@ export default function IsoPage() {
     })().catch((e) => !gone && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       gone = true;
+      liveRef?.dispose();
       detach?.();
       roomRef.current = null;
     };

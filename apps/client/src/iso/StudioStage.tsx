@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { Look } from "../lab/looks";
 import { PaperDoll } from "./paperdoll";
 import { sharpNow } from "./assets";
+import { LiveChar } from "./livechar";
 
 const DIRS = 8;
 
@@ -12,7 +13,9 @@ const DIRS = 8;
 export default function StudioStage({ look, walking, onBusy }: { look: Look; walking: boolean; onBusy?(busy: boolean): void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const doll = useRef<PaperDoll | null>(null);
-  const state = useRef({ dir: 0, walking, spin: 0, turned: 0 });
+  const state = useRef({ dir: 0, yaw: Math.PI / 4, walking, spin: 0, turned: 0 });
+  const live = useRef<LiveChar | null>(null);
+  const liveFailed = useRef(false);
   state.current.walking = walking;
   const lookRef = useRef(look);
   lookRef.current = look;
@@ -23,6 +26,15 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
     if (!d) d = doll.current = new PaperDoll(look);
     onBusy?.(true);
     const mine = d;
+    if (!liveFailed.current && !new URLSearchParams(window.location.search).has("sprites")) {
+      // the live 3D figure (sharp at any size, turns smoothly); the picture stack below is only the fallback
+      const l = live.current;
+      if (!l) {
+        const made = (live.current = new LiveChar(look));
+        made.load().then(() => onBusy?.(false), () => { liveFailed.current = true; live.current = null; void mine.setLook(look).then(() => mine.prepare(["Idle_Loop", "Walk_Loop"])).then(() => onBusy?.(false)); });
+      } else void l.setLook(look).then(() => onBusy?.(false));
+      return;
+    }
     void mine.setLook(look).then(() => mine.prepare(["Idle_Loop", "Walk_Loop"])).then(() => onBusy?.(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [look]);
@@ -33,14 +45,15 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
     let raf = 0;
     let last = performance.now();
     let t = 0;
-    let drag: { x: number; dir: number } | null = null;
+    let drag: { x: number; dir: number; yaw: number } | null = null;
     const down = (e: PointerEvent) => {
       canvas.setPointerCapture(e.pointerId);
-      drag = { x: e.clientX, dir: state.current.dir };
+      drag = { x: e.clientX, dir: state.current.dir, yaw: state.current.yaw };
     };
     const move = (e: PointerEvent) => {
       if (!drag) return;
       state.current.dir = (((drag.dir + Math.round((e.clientX - drag.x) / 46)) % DIRS) + DIRS) % DIRS;
+      state.current.yaw = drag.yaw + (e.clientX - drag.x) * 0.012;
     };
     const up = () => (drag = null);
     canvas.addEventListener("pointerdown", down);
@@ -60,6 +73,22 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       paintStage(ctx, w, h, t);
+      const l = live.current;
+      if (l?.ready) {
+        l.play(state.current.walking ? "Walk_Loop" : "Idle_Loop");
+        l.tick(dt);
+        const k = Math.min(h / 250, w / 190); // screen pixels per picture pixel
+        const f = l.draw(state.current.yaw, k * dpr, 12);
+        if (f) {
+          const ox = w / 2, oy = h * 0.82;
+          ctx.fillStyle = "rgba(40,22,8,.28)";
+          ctx.beginPath();
+          ctx.ellipse(ox, oy + 4, 38 * k, 11 * k, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.drawImage(f.img, ox - f.ax * k, oy - f.ay * k, f.w * k, f.h * k);
+        }
+        return;
+      }
       const d = doll.current;
       if (!d) return;
       const clip = state.current.walking ? "Walk_Loop" : "Idle_Loop";
@@ -81,6 +110,8 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
     };
     raf = requestAnimationFrame(frame);
     return () => {
+      live.current?.dispose();
+      live.current = null;
       cancelAnimationFrame(raf);
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);

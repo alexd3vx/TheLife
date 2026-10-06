@@ -3,6 +3,7 @@ import { ACTIONS, furnitureById } from "@thelife/game-core";
 import type { Layout, Placement } from "../play/layout";
 import { propImage, propsMeta, sharpNow, spriteSharp, type PropMeta, type SpriteMeta } from "./assets";
 import type { CharProvider } from "./charProvider";
+import type { LiveChar } from "./livechar";
 import { HALF_H, HALF_W, PX_PER_M_UP, dirOf, project, unproject } from "./projection";
 
 const WALK_SPEED = 1.55;
@@ -97,6 +98,8 @@ export class IsoRoom {
   private items: Item[] = [];
   private nav!: NavGrid;
   private char!: CharProvider;
+  /** When set, the character is drawn live from the 3D model (sharp at any size, any direction) instead of from baked pictures. */
+  live: LiveChar | null = null;
   private raf = 0;
   private last = 0;
   private time = 0;
@@ -185,7 +188,7 @@ export class IsoRoom {
     this.items = items;
     this.buildNav();
     for (const it of items) this.deriveUse(it, byId);
-    await this.preloadChar();
+    if (!this.live) await this.preloadChar();
     this.fit();
   }
 
@@ -689,6 +692,13 @@ export class IsoRoom {
       this.clipTime = 0;
     }
     this.clipTime += dt;
+    if (this.live?.ready) {
+      if (this.move && (wantClip === "Sitting_Enter" || wantClip === "Sitting_Exit")) this.live.scrub(wantClip, Math.min(1, this.move.t / this.move.dur));
+      else {
+        this.live.play(wantClip);
+        this.live.tick(dt);
+      }
+    }
     // particles
     for (const p of this.puffs) {
       p.age += dt;
@@ -765,7 +775,11 @@ export class IsoRoom {
   private fitCy = 0;
   private fitZoom = 1;
 
-  private charSprite(): { img: CanvasImageSource; meta: SpriteMeta } | null {
+  private charSprite(): { img: CanvasImageSource; meta: SpriteMeta; live?: boolean } | null {
+    if (this.live?.ready) {
+      const f = this.live.draw(this.yaw, this.zoom * this.dpr);
+      return f ? { img: f.img, meta: f, live: true } : null;
+    }
     const want = this.char.ready(this.clip) ? this.clip : "Idle_Loop";
     if (want !== this.clip) this.char.ensure(this.clip);
     let dir = dirOf(Math.sin(this.yaw), Math.cos(this.yaw));
@@ -1023,8 +1037,8 @@ export class IsoRoom {
     if (sprite && showChar) {
       const [px, py] = project(this.pos.x, this.lift, this.pos.z);
       const m = sprite.meta;
-      const shape = this.char.shape?.() ?? { w: 1, h: 1 };
-      const cs = sharpNow.char;
+      const shape = sprite.live ? { w: 1, h: 1 } : (this.char.shape?.() ?? { w: 1, h: 1 });
+      const cs = sprite.live ? 1 : sharpNow.char;
       const box = { x: px - (m.ax / cs) * shape.w, y: py - (m.ay / cs) * shape.h, w: (m.w / cs) * shape.w, h: (m.h / cs) * shape.h };
       const self: Drawn = {
         key: this.pos.x + this.pos.z + 0.35,
