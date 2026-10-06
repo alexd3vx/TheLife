@@ -232,3 +232,11 @@ Chronological record of decisions and changes. Newest first.
 - Customisation: 18 hairstyles, 11 tops (kaftan, agbada, dress, hoodie, jersey...), 5 bottoms, 5 shoes, 8 accessories, 12 skin tones, 13 hair colours, height and build sliders, fabrics; "Surprise me". The creator's painted studio (`iso/StudioStage.tsx`, `creator/StudioPanel.tsx`) replaces the 3D preview.
 - The look is stored with the life on the server (`state.look`; `create` and `look` messages), never on the device.
 - Loading is a cutscene: the arrival film for a new person, the "welcome back" scene for a returning one, over the loading; the room then paints itself in from the doorway.
+
+## Round 6, later: live character, settings, wardrobe
+
+- **The character is drawn live from the 3D model** (`iso/livechar.ts`) with the room's isometric camera at the screen's own resolution: sharp at any size, any direction, smooth animation. The room stays painted. The baked sprite stack (`paperdoll.ts`) is only the fallback when WebGL can't start. The sprite directions were also wrong (camera is south-east, so facing away is its own direction and the flips are 0/2, 3/7, 4/6): fixed for the fallback too, but the picture re-bake was abandoned.
+- **The blur and the slow taps had one more cause:** the "Recommended" graphics preset on phones was 75% resolution and a 30 fps cap. Presets are now low 100%/30, medium 200%/60, high 250%/max, ultra 300%/max; phones get medium unless they are really weak. The 2.5D room now reads the settings (resolution, frame cap, automatic adjustment) and has a Settings button.
+- **Connection:** a leftover `VITE_SERVER_URL` in the Vercel settings pointed the game at the retired fly.dev server. Production now always uses the built-in VPS address. `#/nettest` checks a device's connection step by step.
+- **Wardrobe:** garments are smoothed so they hang like cloth; new shirt (collar), blazer (open V, lapels, white shirt, collar), sweater, suit trousers and a tie accessory. Garments can now have extra layers with their own colour (`Extra` in `lab/procedural/garments.ts`).
+- Dev pages: `#/livetest` (the live character big; `window.__live.setLook({...})`).
