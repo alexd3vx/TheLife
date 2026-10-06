@@ -9,3 +9,4 @@ assets-src/*
 !assets-src/README.md
 dist-artifact
 tools/osm/raw/
+apps/client/public/sprites/**/*.png

@@ -54,6 +54,7 @@ export class FilmRenderer {
   private readonly midTile: HTMLCanvasElement;
   private readonly nearTile: HTMLCanvasElement;
   private readonly stars: { x: number; y: number; r: number }[];
+  private readonly grain: HTMLCanvasElement;
   private beat: FilmBeat = "flight";
   private t = 0;
   private world = 0;
@@ -124,6 +125,17 @@ export class FilmRenderer {
       }
       this.clouds.push(c);
     }
+    // paper grain, laid over everything so the film has the same hand-painted surface as the rooms
+    const [grainCanvas, grainCtx] = makeCanvas(256, 256);
+    const gd = grainCtx.createImageData(256, 256);
+    const gr_ = rng(99);
+    for (let i = 0; i < gd.data.length; i += 4) {
+      const v = 120 + gr_() * 135;
+      gd.data[i] = gd.data[i + 1] = gd.data[i + 2] = v;
+      gd.data[i + 3] = 255;
+    }
+    grainCtx.putImageData(gd, 0, 0);
+    this.grain = grainCanvas;
     this.farTile = this.skylineTile(11, 100, 250, "#4b2a62", "#ffcf80", 0.05);
     this.midTile = this.skylineTile(23, 140, 360, "#2c1a40", "#ffd27a", 0.12);
     this.nearTile = this.skylineTile(5, 60, 170, "#170d27", "#ffbf5a", 0.16);
@@ -208,6 +220,13 @@ export class FilmRenderer {
     else this.home(c, dt);
     c.fillStyle = TINT[this.tier];
     c.fillRect(0, 0, this.w, H);
+    // hand-painted paper grain
+    c.save();
+    c.globalCompositeOperation = "overlay";
+    c.globalAlpha = 0.16;
+    const jitter = Math.floor(this.t * 6) % 3;
+    for (let x = -jitter * 17; x < this.w; x += 256) for (let y = -jitter * 11; y < H; y += 256) c.drawImage(this.grain, x, y);
+    c.restore();
   }
 
   // ---------------------------------------------------------------- shared pieces
@@ -267,6 +286,10 @@ export class FilmRenderer {
     c.lineTo(-240, -128);
     c.lineTo(-150, -24);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#cfcac2";
     c.beginPath();
     c.moveTo(-250, -4);
@@ -274,6 +297,10 @@ export class FilmRenderer {
     c.lineTo(-262, -48);
     c.lineTo(-170, -4);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     // far wing, then the body
     c.fillStyle = "#9c93a2";
     c.beginPath();
@@ -282,6 +309,10 @@ export class FilmRenderer {
     c.lineTo(-10, -34);
     c.lineTo(80, 8);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     const fg = c.createLinearGradient(0, -30, 0, 32);
     fg.addColorStop(0, "#f6efe6");
     fg.addColorStop(0.55, "#d9d0cf");
@@ -295,6 +326,10 @@ export class FilmRenderer {
     c.lineTo(-200, 24);
     c.quadraticCurveTo(-250, 18, -262, -16);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     // stripe and windows
     c.fillStyle = "#1f7a4a";
     c.fillRect(-230, 2, 470, 5);
@@ -307,6 +342,10 @@ export class FilmRenderer {
     c.lineTo(262, -2);
     c.lineTo(222, -2);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     // near wing and engine
     c.fillStyle = "#b8b0ba";
     c.beginPath();
@@ -315,14 +354,26 @@ export class FilmRenderer {
     c.lineTo(-84, 84);
     c.lineTo(110, 14);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#5c5368";
     c.beginPath();
     c.ellipse(jet ? -40 : -10, 54, 54, 17, 0, 0, Math.PI * 2);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#d9d0cf";
     c.beginPath();
     c.ellipse(jet ? 6 : 36, 54, 10, 15, 0, 0, Math.PI * 2);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     // landing gear
     if (gear > 0) {
       c.strokeStyle = "#2a2433";
@@ -339,6 +390,10 @@ export class FilmRenderer {
           c.beginPath();
           c.arc(gx, 26 + len + 8, 15, 0, Math.PI * 2);
           c.fill();
+          c.strokeStyle = "#3a2418";
+          c.lineWidth = 3;
+          c.lineJoin = "round";
+          c.stroke();
         }
       }
     }
@@ -715,6 +770,10 @@ export class FilmRenderer {
     c.lineTo(154, -22);
     c.closePath();
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#12182a";
     c.beginPath();
     c.moveTo(-60, -76);
@@ -722,6 +781,10 @@ export class FilmRenderer {
     c.lineTo(46, -106);
     c.lineTo(88, -76);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "rgba(255,255,255,.14)";
     c.fillRect(-52, -78, 130, 4);
     this.wheel(c, -88, -24, 28);
@@ -750,6 +813,10 @@ export class FilmRenderer {
     c.lineTo(174, -26);
     c.closePath();
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     const g = c.createLinearGradient(0, -138, 0, -90);
     g.addColorStop(0, "#26304a");
     g.addColorStop(1, "#0d1220");
@@ -761,6 +828,10 @@ export class FilmRenderer {
     c.lineTo(104, -94);
     c.lineTo(-150, -94);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "rgba(255,255,255,.22)";
     c.fillRect(-140, -90, 270, 3);
     this.wheel(c, -104, -28, 34);
@@ -801,6 +872,10 @@ export class FilmRenderer {
     c.lineTo(96, -70);
     c.lineTo(100, -30);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#14101c";
     c.fillRect(-100, -144, 128, 12);
     c.fillStyle = "#1a2236";
@@ -830,6 +905,10 @@ export class FilmRenderer {
     c.quadraticCurveTo(220, -160, 232, -100);
     c.lineTo(232, -26);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.fillStyle = "#0b0912";
     c.fillRect(-230, -92, 462, 18);
     c.fillStyle = "#1a2236";
@@ -861,6 +940,10 @@ export class FilmRenderer {
     c.beginPath();
     c.arc(-8, -146, 15, 0, Math.PI * 2);
     c.fill();
+    c.strokeStyle = "#3a2418";
+    c.lineWidth = 3;
+    c.lineJoin = "round";
+    c.stroke();
     c.strokeStyle = "#e7e0d4";
     c.lineWidth = 9;
     c.beginPath();
@@ -955,6 +1038,10 @@ export class FilmRenderer {
       c.lineTo(cx + 215, ground - 226);
       c.lineTo(cx + 215, ground - 186);
       c.fill();
+      c.strokeStyle = "#3a2418";
+      c.lineWidth = 3;
+      c.lineJoin = "round";
+      c.stroke();
       c.fillStyle = "#3a5a7a";
       c.fillRect(cx - 40, ground - 130, 80, 130);
       c.fillStyle = lit;

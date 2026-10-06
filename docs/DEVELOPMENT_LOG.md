@@ -224,3 +224,11 @@ Chronological record of decisions and changes. Newest first.
 - The house no longer shows "Building the house": a door cutscene (door swings open on a warm room, camera pushes in) covers the build and fades when ready.
 - Bag: grid by item size (5x4 lapo tote, 6x5 backpack, 7x5 satchel), worked out from the life (phone, wallet, key, ID, chargers, power bank, groceries, meals); open with I/B or the bag button. Pure logic in game-core/bag.ts.
 - Fixes: duplicate phone toasts (house and map HUD), smoother on-screen control editing, real dates in the phone.
+
+## Phase 2 (2.5D): paper-doll character, studio, painted arrival
+- The 3D person is now only an offline drawing tool. `tools/sprites/bake.mjs layers <body>` draws every body, face, top, bottom, shoe, hairstyle, beard and accessory as its own sprite sheet (5 directions, the other 3 are mirrors; 12 animations) into `apps/client/public/sprites/char2/<body>/<layer>/`. The game stacks and colours these layers in the browser (`iso/paperdoll.ts`): skin tone, hair colour, cloth colours and fabric patterns (ankara, stripes, denim) are multiplied in at runtime, so any combination animates smoothly and costs no 3D.
+- Occlusion: each clothing layer is drawn with the body as an invisible depth occluder, so a hand in front of a thigh really is in front.
+- New stance: the library idle was a fighter's crouch (the "gorilla"). `Idle_Loop` is rebuilt from the T-pose (arms down, upright, slow breath) and `Walk_Loop` from the formal walk with the spine eased back (`lab/procedural/lifeClips.ts`).
+- Customisation: 18 hairstyles, 11 tops (kaftan, agbada, dress, hoodie, jersey...), 5 bottoms, 5 shoes, 8 accessories, 12 skin tones, 13 hair colours, height and build sliders, fabrics; "Surprise me". The creator's painted studio (`iso/StudioStage.tsx`, `creator/StudioPanel.tsx`) replaces the 3D preview.
+- The look is stored with the life on the server (`state.look`; `create` and `look` messages), never on the device.
+- Loading is a cutscene: the arrival film for a new person, the "welcome back" scene for a returning one, over the loading; the room then paints itself in from the doorway.
