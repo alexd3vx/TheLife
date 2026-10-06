@@ -23,3 +23,4 @@ export * from "./buildingPlan.js";
 export * from "./onlineRules.js";
 export * from "./lagosClock.js";
 export * from "./bag.js";
+export * from "./kitchen.js";

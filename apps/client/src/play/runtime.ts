@@ -18,6 +18,7 @@ import { buildShowroomLayout, type Layout } from "./layout";
 import { layoutForTier } from "./layouts";
 import { FURNITURE } from "@thelife/game-core";
 import { buildWorld, type PlacedItem } from "./world";
+import type { Interaction } from "./interactions";
 
 export interface RuntimeEvents {
   onStatus(status: Status): void;
@@ -30,6 +31,8 @@ export interface RuntimeEvents {
   onStats(text: string): void;
   /** What a tap offers (walk, run, use...), or null to close the menu. */
   onMenu?(menu: TapMenu | null): void;
+  /** The fridge, the stove or the table was tapped: open the kitchen on this tab. */
+  onKitchen?(tab: "fridge" | "cook" | "eat"): void;
 }
 
 export interface TapMenu {
@@ -43,6 +46,8 @@ export interface TapMenu {
 export interface PlayRuntime {
   dispose(): void;
   buyGroceries(): void;
+  /** Walks to the nearest thing that does this action (the stove for "cook", a chair for "eatDish") and starts it. */
+  useAction(action: string): boolean;
   /** Draws the 3D scene less while the phone covers it. */
   setPhoneOpen(open: boolean): void;
   /** The running game, for the phone screen. Null in the showroom. */
@@ -226,6 +231,11 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         const menu: TapMenu["options"] = [];
         options.slice(0, 3).forEach((interaction, i) => {
           const label = interaction.hint;
+          const kitchenTab = interaction.action === "snack" ? "fridge" : interaction.action === "cook" ? "cook" : interaction.action === "eatMeal" ? "eat" : null;
+          if (kitchenTab && events.onKitchen) {
+            menu.push({ label: kitchenTab === "fridge" ? "Open the fridge" : kitchenTab === "cook" ? "Cook something" : "Have a meal", icon: i === 0 ? "hand" : "spot", run: () => { close(); events.onKitchen!(kitchenTab); } });
+            return;
+          }
           menu.push({ label, icon: i === 0 ? "hand" : "spot", run: () => { close(); showMarker(interaction.approach[0], interaction.approach[1], controller.tapInteraction(interaction, "auto")); } });
         });
         present({ ...at, title: picked.item.catalog.name, options: menu });
@@ -418,6 +428,18 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     },
     buyGroceries() {
       session?.buyGroceries();
+    },
+    useAction(action) {
+      let best: { i: Interaction; d: number } | null = null;
+      for (const item of world.items) {
+        for (const i of world.interactionsFor(item.def.id)) {
+          if (i.action !== action) continue;
+          const d = Math.hypot(i.approach[0] - controller.position.x, i.approach[1] - controller.position.z);
+          if (!best || d < best.d) best = { i, d };
+        }
+      }
+      if (!best) return false;
+      return controller.tapInteraction(best.i, "auto");
     },
     newGame() {
       markRestart();

@@ -6,6 +6,7 @@ import { world } from "../net/world";
 import ArrivalFilm from "../arrival/ArrivalFilm";
 import DoorCutscene from "./DoorCutscene";
 import InventoryPanel from "../inventory/InventoryPanel";
+import KitchenPanel from "../kitchen/KitchenPanel";
 import type { NeedId, SimEvent } from "@thelife/game-core";
 import { loadManifest } from "../lab/manifest";
 import type { Status } from "./controller";
@@ -66,6 +67,7 @@ export default function PlayPage() {
   const lastNote = useRef<number | null>(null);
   const recentNotes = useRef(new Map<string, number>());
   const [bagOpen, setBagOpen] = useState(false);
+  const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
 
   const pushToasts = useCallback((events: SimEvent[]) => {
@@ -80,7 +82,7 @@ export default function PlayPage() {
     let disposed = false;
     loadManifest()
       .then((manifest) =>
-        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu }, { session: life.session! }),
+        startPlay(container, manifest, { onStatus: setStatus, onHover: setHover, onStats: setStats, onHud: setHud, onEvents: pushToasts, onAway: setAway, onMenu: setMenu, onKitchen: setKitchen }, { session: life.session! }),
       )
       .then((runtime) => {
         if (disposed) {
@@ -280,6 +282,9 @@ export default function PlayPage() {
         <button className="play-bag" onClick={() => setBagOpen(true)} aria-label="Open your bag">
           <GameIcon name="bag" size={22} />
         </button>
+      )}
+      {kitchen && runtimeRef.current?.session && (
+        <KitchenPanel session={runtimeRef.current.session} initialTab={kitchen} onClose={() => setKitchen(null)} runUse={(a) => runtimeRef.current?.useAction(a) ?? false} />
       )}
       {bagOpen && runtimeRef.current?.session && (
         <InventoryPanel session={runtimeRef.current.session} onClose={() => setBagOpen(false)} onPhone={() => { setPhoneApp(null); setPhoneOpen(true); }} />

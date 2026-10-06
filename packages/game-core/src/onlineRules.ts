@@ -7,6 +7,7 @@ import {
   addNote, addTodo, bookTicket, buyHomePlan, buyShares, cancelDownload, deleteNote, deleteTodo, diaryCheckIn, doGig, doWorkout, drinkWater, finishFocus, joinAjo, orderEats, payAjo, recordScore,
   sellShares, setMobileData, setWifi, startDownload, streamData, takeLesson, toggleTodo, uninstallApp, useApp,
 } from "./phoneStore";
+import { buyIngredient, cancelRecipe, chooseDish, chooseRecipe, discardDish, discardLot } from "./kitchen";
 import { BACKGROUNDS, profileFrom, type Profile } from "./profile";
 import type { Sim } from "./sim";
 import { sanitizeTraits } from "./traits";
@@ -38,6 +39,12 @@ const HANDLERS: Record<string, Handler> = {
   },
   cancel: (sim) => sim.cancel(),
   buyGroceries: (sim) => sim.buyGroceries(),
+  buyIngredient: (sim, [id, q]) => (str(id, 30) && int(q, 1, 12) ? buyIngredient(sim.state, id as string, q as number, sim.traits.groceries) : no(bad)),
+  chooseRecipe: (sim, [id]) => (str(id, 30) ? chooseRecipe(sim.state, id as string) : no(bad)),
+  cancelRecipe: (sim) => cancelRecipe(sim.state),
+  chooseDish: (sim, [id]) => (str(id, 30) ? chooseDish(sim.state, id as string) : no(bad)),
+  discardDish: (sim, [id]) => (str(id, 30) ? discardDish(sim.state, id as string) : no(bad)),
+  discardLot: (sim, [id]) => (str(id, 30) ? discardLot(sim.state, id as string) : no(bad)),
   setInUse: (sim, [on]) => {
     const v = bool(on);
     if (v !== null) sim.state.phone.inUse = v;

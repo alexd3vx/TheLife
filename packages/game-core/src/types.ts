@@ -25,6 +25,7 @@ export interface Ledger {
 
 import type { Profile } from "./profile.js";
 import type { PhoneState } from "./phone.js";
+import type { KitchenState } from "./kitchen.js";
 
 export interface Inventory {
   /** Raw food portions from the shop. */
@@ -40,6 +41,8 @@ export interface GameState {
   needs: Needs;
   ledger: Ledger;
   inventory: Inventory;
+  /** The fridge, the cupboard and the cooked food. */
+  kitchen: KitchenState;
   /** Skill experience by skill id. */
   skills: Record<string, number>;
   /** Pay earned but not yet paid out (fractions of a naira). */

@@ -180,6 +180,25 @@ var ACTIONS = {
     cost: { portions: 2 },
     gives: { meals: 1 }
   },
+  cookQuick: {
+    id: "cookQuick",
+    label: "Cooking something quick",
+    pose: "stand",
+    clip: "Life_Cook_Loop",
+    minutes: 12,
+    minutesPerSecond: 2,
+    needs: { fun: 2, energy: -1, hygiene: -1 }
+  },
+  eatDish: {
+    id: "eatDish",
+    label: "Having a plate of food",
+    pose: "seat",
+    clip: "Life_Eat_Loop",
+    minutes: 25,
+    minutesPerSecond: 2,
+    needs: { hunger: 65, fun: 5 },
+    blockedIf: { need: "hunger", atLeast: 92, message: "You're not hungry." }
+  },
   eatMeal: {
     id: "eatMeal",
     label: "Having a meal",
@@ -1546,6 +1565,197 @@ function lagosMinuteNow(nowMs = Date.now()) {
   return (nowMs + LAGOS_OFFSET_MS - EPOCH) / 6e4;
 }
 
+// packages/game-core/src/kitchen.ts
+var DAY = 1440;
+var INGREDIENTS = [
+  { id: "rice", name: "Rice", unit: "cup", price: 350, shelfLife: 90 * DAY, w: 2, h: 1, fresh: false, icon: "seed" },
+  { id: "beans", name: "Beans", unit: "cup", price: 300, shelfLife: 90 * DAY, w: 2, h: 1, fresh: false, icon: "seed" },
+  { id: "garri", name: "Garri", unit: "cup", price: 200, shelfLife: 120 * DAY, w: 2, h: 1, fresh: false, icon: "seed" },
+  { id: "noodles", name: "Noodles", unit: "pack", price: 250, shelfLife: 180 * DAY, w: 1, h: 1, fresh: false, icon: "cookie" },
+  { id: "oil", name: "Vegetable oil", unit: "spoon", price: 150, shelfLife: 180 * DAY, w: 1, h: 1, fresh: false, icon: "lemon" },
+  { id: "tomato", name: "Tomatoes", unit: "basket", price: 200, shelfLife: 4 * DAY, w: 2, h: 1, fresh: true, icon: "apple" },
+  { id: "pepper", name: "Peppers", unit: "handful", price: 120, shelfLife: 5 * DAY, w: 1, h: 1, fresh: true, icon: "pepper" },
+  { id: "onion", name: "Onions", unit: "bulb", price: 100, shelfLife: 14 * DAY, w: 1, h: 1, fresh: false, icon: "carrot" },
+  { id: "plantain", name: "Plantain", unit: "finger", price: 250, shelfLife: 5 * DAY, w: 1, h: 2, fresh: true, icon: "carrot" },
+  { id: "yam", name: "Yam", unit: "slice", price: 450, shelfLife: 7 * DAY, w: 2, h: 1, fresh: false, icon: "carrot" },
+  { id: "egg", name: "Eggs", unit: "egg", price: 200, shelfLife: 14 * DAY, w: 1, h: 1, fresh: true, icon: "egg" },
+  { id: "bread", name: "Bread", unit: "slice", price: 350, shelfLife: 3 * DAY, w: 2, h: 1, fresh: false, icon: "cookie" },
+  { id: "fish", name: "Fish", unit: "piece", price: 900, shelfLife: DAY, w: 2, h: 1, fresh: true, icon: "fish" },
+  { id: "chicken", name: "Chicken", unit: "piece", price: 1500, shelfLife: DAY, w: 2, h: 1, fresh: true, icon: "drumstick" }
+];
+var byIngredient = new Map(INGREDIENTS.map((i) => [i.id, i]));
+var DISH_RECIPES = [
+  { id: "jollof", name: "Jollof rice", blurb: "Party rice. Everyone has an opinion on it.", needs: { rice: 2, tomato: 1, pepper: 1, onion: 1, oil: 1 }, plates: 3, hunger: 70, fun: 10, action: "cook" },
+  { id: "beans_plantain", name: "Beans and plantain", blurb: "Cheap, filling and good.", needs: { beans: 2, plantain: 1, oil: 1, onion: 1 }, plates: 2, hunger: 68, fun: 6, action: "cook" },
+  { id: "fried_rice", name: "Egg fried rice", blurb: "Quick fried rice with egg.", needs: { rice: 2, egg: 1, onion: 1, oil: 1 }, plates: 3, hunger: 64, fun: 6, action: "cook" },
+  { id: "yam_egg", name: "Yam and egg sauce", blurb: "Weekend breakfast.", needs: { yam: 2, egg: 2, tomato: 1, pepper: 1, oil: 1 }, plates: 2, hunger: 72, fun: 8, action: "cook" },
+  { id: "eba_stew", name: "Eba and stew", blurb: "Garri swallow with pepper stew and fish.", needs: { garri: 2, tomato: 2, pepper: 1, oil: 1, fish: 1 }, plates: 2, hunger: 74, fun: 9, action: "cook" },
+  { id: "pepper_soup", name: "Fish pepper soup", blurb: "Hot, thin, comforting.", needs: { fish: 1, pepper: 2, onion: 1 }, plates: 2, hunger: 46, fun: 12, action: "cook" },
+  { id: "noodles_egg", name: "Noodles and egg", blurb: "Ready in minutes.", needs: { noodles: 2, egg: 1, pepper: 1 }, plates: 2, hunger: 54, fun: 4, action: "cookQuick" },
+  { id: "egg_bread", name: "Egg and bread", blurb: "The quickest thing there is.", needs: { egg: 2, bread: 2, tomato: 1 }, plates: 2, hunger: 50, fun: 4, action: "cookQuick" }
+];
+var byRecipe = new Map(DISH_RECIPES.map((r) => [r.id, r]));
+var recipeById = (id) => byRecipe.get(id);
+var DISH_SHELF_LIFE = 14 * 60;
+var fail3 = (reason) => ({ ok: false, reason });
+var ok = (text) => ({ ok: true, text });
+function createKitchen(tier) {
+  const t = tier ?? "middle";
+  const lots = t === "lapo" ? [{ id: "rice", qty: 3, age: 0 }, { id: "noodles", qty: 4, age: 0 }, { id: "oil", qty: 2, age: 0 }, { id: "pepper", qty: 2, age: 0 }, { id: "onion", qty: 2, age: 0 }] : t === "middle" ? [{ id: "rice", qty: 4, age: 0 }, { id: "beans", qty: 3, age: 0 }, { id: "tomato", qty: 3, age: 0 }, { id: "pepper", qty: 2, age: 0 }, { id: "onion", qty: 2, age: 0 }, { id: "oil", qty: 3, age: 0 }, { id: "egg", qty: 4, age: 0 }, { id: "noodles", qty: 2, age: 0 }] : [{ id: "rice", qty: 8, age: 0 }, { id: "beans", qty: 4, age: 0 }, { id: "yam", qty: 4, age: 0 }, { id: "tomato", qty: 6, age: 0 }, { id: "pepper", qty: 4, age: 0 }, { id: "onion", qty: 4, age: 0 }, { id: "oil", qty: 6, age: 0 }, { id: "egg", qty: 8, age: 0 }, { id: "chicken", qty: 4, age: 0 }, { id: "fish", qty: 3, age: 0 }, { id: "bread", qty: 4, age: 0 }];
+  return { fridge: t !== "lapo", lots, dishes: [], cooking: null, eating: null };
+}
+function parseKitchen(raw, tier) {
+  const base = createKitchen(tier);
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw;
+  const num = (v, lo, hi, d) => typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d;
+  const lots = Array.isArray(r.lots) ? r.lots.filter((l) => l && typeof l.id === "string" && byIngredient.has(l.id)).slice(0, 60).map((l) => ({ id: l.id, qty: Math.floor(num(l.qty, 0, 999, 0)), age: num(l.age, 0, 1e9, 0) })).filter((l) => l.qty > 0) : base.lots;
+  const dishes = Array.isArray(r.dishes) ? r.dishes.filter((d) => d && typeof d.id === "string" && byRecipe.has(d.id)).slice(0, 30).map((d) => ({ id: d.id, qty: Math.floor(num(d.qty, 0, 99, 0)), age: num(d.age, 0, 1e9, 0) })).filter((d) => d.qty > 0) : [];
+  return {
+    fridge: typeof r.fridge === "boolean" ? r.fridge : base.fridge,
+    lots,
+    dishes,
+    cooking: typeof r.cooking === "string" && byRecipe.has(r.cooking) ? r.cooking : null,
+    eating: r.eating && typeof r.eating.id === "string" && byRecipe.has(r.eating.id) ? { id: r.eating.id, spoiled: r.eating.spoiled === true } : null
+  };
+}
+function coldFactor(state) {
+  if (!state.kitchen.fridge) return 1;
+  return wallPower(state) ? 0.25 : 0.6;
+}
+var lotSpoiled = (lot, state) => {
+  const ing = byIngredient.get(lot.id);
+  return !!ing && lot.age >= ing.shelfLife && (ing.fresh || lot.age >= ing.shelfLife);
+};
+var dishSpoiled = (dish) => dish.age >= DISH_SHELF_LIFE;
+function tickKitchen(state, minutes) {
+  const k = state.kitchen;
+  const f = coldFactor(state);
+  const gone = [];
+  for (const lot of k.lots) {
+    const ing = byIngredient.get(lot.id);
+    if (!ing) continue;
+    const before = lot.age;
+    lot.age += minutes * (ing.fresh ? f : 1);
+    if (before < ing.shelfLife && lot.age >= ing.shelfLife) gone.push(`Your ${ing.name.toLowerCase()} has gone bad.`);
+  }
+  for (const d of k.dishes) {
+    const before = d.age;
+    d.age += minutes * f;
+    if (before < DISH_SHELF_LIFE && d.age >= DISH_SHELF_LIFE) gone.push(`The ${recipeById(d.id)?.name.toLowerCase() ?? "food"} you cooked has gone bad.`);
+  }
+  return gone;
+}
+function servings(state, id) {
+  return state.kitchen.lots.filter((l) => l.id === id && !lotSpoiled(l, state)).reduce((n, l) => n + l.qty, 0);
+}
+function missingFor(state, r) {
+  return Object.entries(r.needs).filter(([id, need]) => servings(state, id) < need).map(([id, need]) => ({ id, have: servings(state, id), need }));
+}
+function buyIngredient(state, id, qty, priceScale = 1) {
+  const ing = byIngredient.get(id);
+  if (!ing) return fail3("The shop doesn't have that.");
+  const n = Math.floor(qty);
+  if (n < 1 || n > 12) return fail3("Pick between 1 and 12.");
+  const price = Math.max(1, Math.round(ing.price * n * priceScale));
+  const total = state.kitchen.lots.reduce((s, l) => s + l.qty, 0);
+  if (total + n > 120) return fail3("There's no room to keep all that.");
+  const r = transfer(state.ledger, PLAYER, SINK, price, `${ing.name} x${n}`, state.minute);
+  if (!r.ok) return fail3(`That costs \u20A6${price.toLocaleString()}. You don't have enough.`);
+  state.stats.totalSpent += price;
+  const same = state.kitchen.lots.find((l) => l.id === id && l.age < 60 && l.qty < 12);
+  if (same) same.qty += n;
+  else state.kitchen.lots.push({ id, qty: n, age: 0 });
+  return ok(`Bought ${n} ${ing.unit}${n === 1 ? "" : "s"} of ${ing.name.toLowerCase()} for \u20A6${price.toLocaleString()}.`);
+}
+function chooseRecipe(state, recipeId) {
+  const r = byRecipe.get(recipeId);
+  if (!r) return fail3("Nobody knows that recipe.");
+  const k = state.kitchen;
+  if (k.cooking) return fail3("You already have something ready to cook.");
+  const miss = missingFor(state, r);
+  if (miss.length) {
+    const first = miss[0];
+    return fail3(`Not enough ${byIngredient.get(first.id)?.name.toLowerCase() ?? first.id} (${first.have} of ${first.need}).`);
+  }
+  for (const [id, need] of Object.entries(r.needs)) {
+    let left = need;
+    const lots = k.lots.filter((l) => l.id === id && !lotSpoiled(l, state)).sort((a, b) => b.age - a.age);
+    for (const lot of lots) {
+      const take = Math.min(lot.qty, left);
+      lot.qty -= take;
+      left -= take;
+      if (!left) break;
+    }
+  }
+  k.lots = k.lots.filter((l) => l.qty > 0);
+  k.cooking = r.id;
+  return ok(`Ready to cook ${r.name.toLowerCase()}. Go to the stove.`);
+}
+function cancelRecipe(state) {
+  const k = state.kitchen;
+  const r = k.cooking ? byRecipe.get(k.cooking) : null;
+  if (!r) return fail3("Nothing is waiting to be cooked.");
+  for (const [id, need] of Object.entries(r.needs)) k.lots.push({ id, qty: need, age: 0 });
+  k.cooking = null;
+  return ok("You put the ingredients back.");
+}
+function finishCooking(state) {
+  const k = state.kitchen;
+  const r = k.cooking ? byRecipe.get(k.cooking) : null;
+  if (!r) return null;
+  k.cooking = null;
+  const same = k.dishes.find((d) => d.id === r.id && d.age < 30);
+  if (same) same.qty += r.plates;
+  else k.dishes.push({ id: r.id, qty: r.plates, age: 0 });
+  return `${r.name} is ready: ${r.plates} plates.`;
+}
+function chooseDish(state, recipeId) {
+  const k = state.kitchen;
+  const dish = k.dishes.filter((d) => d.id === recipeId).sort((a, b) => b.age - a.age)[0];
+  if (!dish) return fail3("There's none of that left.");
+  if (k.eating) return fail3("You already have a plate ready.");
+  if (state.needs.hunger >= 92) return fail3("You're not hungry.");
+  dish.qty -= 1;
+  k.eating = { id: dish.id, spoiled: dishSpoiled(dish) };
+  k.dishes = k.dishes.filter((d) => d.qty > 0);
+  return ok("Your plate is ready. Sit down to eat.");
+}
+function discardDish(state, recipeId) {
+  const k = state.kitchen;
+  const dish = k.dishes.find((d) => d.id === recipeId && dishSpoiled(d)) ?? k.dishes.find((d) => d.id === recipeId);
+  if (!dish) return fail3("There's none of that.");
+  k.dishes = k.dishes.filter((d) => d !== dish);
+  return ok("Thrown away.");
+}
+function discardLot(state, id) {
+  const k = state.kitchen;
+  const before = k.lots.length;
+  k.lots = k.lots.filter((l) => !(l.id === id && lotSpoiled(l, state)));
+  return k.lots.length < before ? ok("Spoiled food thrown away.") : fail3("Nothing has gone bad.");
+}
+function finishEating(state) {
+  const k = state.kitchen;
+  const e = k.eating;
+  if (!e) return null;
+  k.eating = null;
+  const r = byRecipe.get(e.id);
+  if (!r) return null;
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+  const n = state.needs;
+  if (e.spoiled) {
+    n.hunger = clamp(n.hunger + 25);
+    n.hygiene = clamp(n.hygiene - 15);
+    n.energy = clamp(n.energy - 20);
+    n.bladder = clamp(n.bladder - 30);
+    n.fun = clamp(n.fun - 10);
+    return { text: `The ${r.name.toLowerCase()} had gone bad. Your stomach turns.`, spoiled: true };
+  }
+  n.hunger = clamp(n.hunger + r.hunger - 65);
+  n.fun = clamp(n.fun + r.fun - 5);
+  return { text: `That ${r.name.toLowerCase()} was good.`, spoiled: false };
+}
+
 // packages/game-core/src/traits.ts
 var TRAITS = [
   { id: "hustler", label: "Hustler", kind: "strength", text: "Earns 10% more from work.", effect: { workPay: 1.1 } },
@@ -1620,6 +1830,7 @@ function createGameState(profile = null) {
     needs: createNeeds(),
     ledger,
     inventory: { portions: 3, meals: 0 },
+    kitchen: createKitchen(profile?.tier),
     skills: startingSkills(profile),
     incomeCarry: 0,
     rentOwed: 0,
@@ -1667,25 +1878,41 @@ var Sim = class {
     this.events.push({ kind, text, minute: this.state.minute });
   }
   // -------------------------------------------------------------- starting and stopping actions
-  canStart(actionId) {
+  /**
+   * The same chair or stove does different things depending on what you picked in the kitchen: a plate waiting at the table makes
+   * "have a meal" into eating that plate, and a quick recipe at the stove uses the quick cooking action.
+   */
+  resolve(actionId) {
+    const k = this.state.kitchen;
+    if (actionId === "eatMeal" && k.eating) return "eatDish";
+    if (actionId === "cook" && k.cooking) return recipeById(k.cooking)?.action ?? "cook";
+    return actionId;
+  }
+  canStart(requested) {
+    const actionId = this.resolve(requested);
     const def = ACTIONS[actionId];
     if (!def) return { ok: false, reason: "Unknown activity." };
     const { needs, inventory } = this.state;
     if (def.blockedIf && needs[def.blockedIf.need] >= def.blockedIf.atLeast) return { ok: false, reason: def.blockedIf.message };
     if (def.needsAtLeast && needs[def.needsAtLeast.need] < def.needsAtLeast.atLeast) return { ok: false, reason: def.needsAtLeast.message };
-    if (def.cost?.portions && inventory.portions < def.cost.portions) {
+    if (def.id === "eatDish" && !this.state.kitchen.eating) return { ok: false, reason: "Choose what to eat from the fridge first." };
+    const recipeCook = (def.id === "cook" || def.id === "cookQuick") && !!this.state.kitchen.cooking;
+    if ((def.id === "cook" || def.id === "cookQuick") && !recipeCook && def.id === "cookQuick") return { ok: false, reason: "Pick a recipe first." };
+    if (!recipeCook && def.cost?.portions && inventory.portions < def.cost.portions) {
       return { ok: false, reason: def.id === "snack" ? "The fridge is empty. Order groceries first." : `Not enough ingredients (need ${def.cost.portions}). Order groceries first.` };
     }
     if (def.cost?.meals && inventory.meals < def.cost.meals) return { ok: false, reason: "There's no cooked meal. Cook something first." };
     if (def.cost?.money && this.money < def.cost.money) return { ok: false, reason: "Not enough money." };
     return { ok: true };
   }
-  start(actionId, forced = false) {
+  start(requested, forced = false) {
+    const actionId = this.resolve(requested);
     const check = forced ? { ok: true } : this.canStart(actionId);
     if (!check.ok) return check;
     if (this.active) this.cancel();
     const def = ACTIONS[actionId];
-    if (def.cost?.portions) this.state.inventory.portions -= def.cost.portions;
+    const recipeCook = (def.id === "cook" || def.id === "cookQuick") && !!this.state.kitchen.cooking;
+    if (def.cost?.portions && !recipeCook) this.state.inventory.portions -= def.cost.portions;
     if (def.cost?.meals) this.state.inventory.meals -= def.cost.meals;
     this.active = { def, done: 0, forced };
     return { ok: true };
@@ -1753,9 +1980,16 @@ var Sim = class {
     const until = act.def.until;
     const reachedGoal = until ? this.state.needs[until.need] >= until.atLeast - 1e-6 : false;
     if (!reachedTime && !reachedGoal) return null;
-    if (act.def.gives?.meals) {
+    if ((act.def.id === "cook" || act.def.id === "cookQuick") && this.state.kitchen.cooking) {
+      const text = finishCooking(this.state);
+      if (text) this.emit("good", text);
+    } else if (act.def.gives?.meals) {
       this.state.inventory.meals += act.def.gives.meals;
       this.emit("good", "Your meal is ready.");
+    }
+    if (act.def.id === "eatDish") {
+      const eaten = finishEating(this.state);
+      if (eaten) this.emit(eaten.spoiled ? "bad" : "good", eaten.text);
     }
     this.active = null;
     return act;
@@ -1786,6 +2020,7 @@ var Sim = class {
     if (Math.floor(s.minute / DAY_MINUTES) > previousDay) s.stats.daysSurvived += 1;
     this.checkNeeds();
     this.checkRent();
+    for (const text of tickKitchen(s, clockMinutes)) this.emit("warn", text);
     tickPhone(s, clockMinutes);
   }
   earn(amount) {
@@ -2151,6 +2386,7 @@ function parseGameState(raw) {
     needs,
     ledger: { accounts: { ...accounts }, entries, nextId: r.ledger.nextId ?? entries.length + 1 },
     inventory,
+    kitchen: parseKitchen(r.kitchen, profile?.tier),
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
     rentOwed: Math.max(0, r.rentOwed ?? 0),
@@ -3358,7 +3594,7 @@ function reachableFromSpawn(d) {
   const S = 6;
   const w = Math.ceil(d.bounds.maxX / S), h = Math.ceil(d.bounds.maxZ / S);
   const seen = new Uint8Array(w * h);
-  const ok = (cx, cz) => walkableAt(d, (cx + 0.5) * S, (cz + 0.5) * S, 0.3);
+  const ok2 = (cx, cz) => walkableAt(d, (cx + 0.5) * S, (cz + 0.5) * S, 0.3);
   const start = Math.floor(d.spawn.z / S) * w + Math.floor(d.spawn.x / S);
   const queue = [start];
   seen[start] = 1;
@@ -3369,7 +3605,7 @@ function reachableFromSpawn(d) {
       const nx = x + dx, nz = z + dz;
       if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
       const j = nz * w + nx;
-      if (!seen[j] && ok(nx, nz)) {
+      if (!seen[j] && ok2(nx, nz)) {
         seen[j] = 1;
         queue.push(j);
       }
@@ -3423,6 +3659,12 @@ var HANDLERS = {
   },
   cancel: (sim) => sim.cancel(),
   buyGroceries: (sim) => sim.buyGroceries(),
+  buyIngredient: (sim, [id, q]) => str(id, 30) && int(q, 1, 12) ? buyIngredient(sim.state, id, q, sim.traits.groceries) : no(bad),
+  chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
+  cancelRecipe: (sim) => cancelRecipe(sim.state),
+  chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),
+  discardDish: (sim, [id]) => str(id, 30) ? discardDish(sim.state, id) : no(bad),
+  discardLot: (sim, [id]) => str(id, 30) ? discardLot(sim.state, id) : no(bad),
   setInUse: (sim, [on]) => {
     const v = bool(on);
     if (v !== null) sim.state.phone.inUse = v;

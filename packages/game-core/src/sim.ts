@@ -4,6 +4,7 @@ import { BASE_DECAY_PER_HOUR, clampNeed, createNeeds, performance } from "./need
 import type { Profile } from "./profile";
 import { createPhone, groceriesFor, jobPayBoost, notify, startLateFeeClock, tickPhone } from "./phone";
 import { lagosMinuteNow } from "./lagosClock";
+import { createKitchen, finishCooking, finishEating, recipeById, tickKitchen } from "./kitchen";
 import { combineTraits, type TraitEffects } from "./traits";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
@@ -39,6 +40,7 @@ export function createGameState(profile: Profile | null = null): GameState {
     needs: createNeeds(),
     ledger,
     inventory: { portions: 3, meals: 0 },
+    kitchen: createKitchen(profile?.tier),
     skills: startingSkills(profile),
     incomeCarry: 0,
     rentOwed: 0,
@@ -121,13 +123,28 @@ export class Sim {
 
   // -------------------------------------------------------------- starting and stopping actions
 
-  canStart(actionId: string): StartResult {
+  /**
+   * The same chair or stove does different things depending on what you picked in the kitchen: a plate waiting at the table makes
+   * "have a meal" into eating that plate, and a quick recipe at the stove uses the quick cooking action.
+   */
+  private resolve(actionId: string): string {
+    const k = this.state.kitchen;
+    if (actionId === "eatMeal" && k.eating) return "eatDish";
+    if (actionId === "cook" && k.cooking) return recipeById(k.cooking)?.action ?? "cook";
+    return actionId;
+  }
+
+  canStart(requested: string): StartResult {
+    const actionId = this.resolve(requested);
     const def = ACTIONS[actionId];
     if (!def) return { ok: false, reason: "Unknown activity." };
     const { needs, inventory } = this.state;
     if (def.blockedIf && needs[def.blockedIf.need] >= def.blockedIf.atLeast) return { ok: false, reason: def.blockedIf.message };
     if (def.needsAtLeast && needs[def.needsAtLeast.need] < def.needsAtLeast.atLeast) return { ok: false, reason: def.needsAtLeast.message };
-    if (def.cost?.portions && inventory.portions < def.cost.portions) {
+    if (def.id === "eatDish" && !this.state.kitchen.eating) return { ok: false, reason: "Choose what to eat from the fridge first." };
+    const recipeCook = (def.id === "cook" || def.id === "cookQuick") && !!this.state.kitchen.cooking;
+    if ((def.id === "cook" || def.id === "cookQuick") && !recipeCook && def.id === "cookQuick") return { ok: false, reason: "Pick a recipe first." };
+    if (!recipeCook && def.cost?.portions && inventory.portions < def.cost.portions) {
       return { ok: false, reason: def.id === "snack" ? "The fridge is empty. Order groceries first." : `Not enough ingredients (need ${def.cost.portions}). Order groceries first.` };
     }
     if (def.cost?.meals && inventory.meals < def.cost.meals) return { ok: false, reason: "There's no cooked meal. Cook something first." };
@@ -135,12 +152,14 @@ export class Sim {
     return { ok: true };
   }
 
-  start(actionId: string, forced = false): StartResult {
+  start(requested: string, forced = false): StartResult {
+    const actionId = this.resolve(requested);
     const check = forced ? ({ ok: true } as const) : this.canStart(actionId);
     if (!check.ok) return check;
     if (this.active) this.cancel();
     const def = ACTIONS[actionId]!;
-    if (def.cost?.portions) this.state.inventory.portions -= def.cost.portions;
+    const recipeCook = (def.id === "cook" || def.id === "cookQuick") && !!this.state.kitchen.cooking;
+    if (def.cost?.portions && !recipeCook) this.state.inventory.portions -= def.cost.portions;
     if (def.cost?.meals) this.state.inventory.meals -= def.cost.meals;
     this.active = { def, done: 0, forced };
     return { ok: true };
@@ -220,9 +239,16 @@ export class Sim {
     const until = act.def.until;
     const reachedGoal = until ? this.state.needs[until.need] >= until.atLeast - 1e-6 : false;
     if (!reachedTime && !reachedGoal) return null;
-    if (act.def.gives?.meals) {
+    if ((act.def.id === "cook" || act.def.id === "cookQuick") && this.state.kitchen.cooking) {
+      const text = finishCooking(this.state);
+      if (text) this.emit("good", text);
+    } else if (act.def.gives?.meals) {
       this.state.inventory.meals += act.def.gives.meals;
       this.emit("good", "Your meal is ready.");
+    }
+    if (act.def.id === "eatDish") {
+      const eaten = finishEating(this.state);
+      if (eaten) this.emit(eaten.spoiled ? "bad" : "good", eaten.text);
     }
     this.active = null;
     return act;
@@ -258,6 +284,7 @@ export class Sim {
 
     this.checkNeeds();
     this.checkRent();
+    for (const text of tickKitchen(s, clockMinutes)) this.emit("warn", text);
     tickPhone(s, clockMinutes); // after rent, so rent is paid before the weekly bill
   }
 

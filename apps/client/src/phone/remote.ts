@@ -98,3 +98,12 @@ export const doGig = remote("doGig", core.doGig);
 export const useApp = remote("useApp", core.useApp as (s: GameState, a: string, b: number) => void, (a) => [a[1] as string]);
 export const streamData = remote("streamData", core.streamData);
 export const bookTicket = remote("bookTicket", core.bookTicket);
+
+// ---- the kitchen
+type KR = core.KitchenResult;
+export const buyIngredient = remote("buyIngredient", core.buyIngredient as (s: GameState, id: string, q: number, scale?: number) => KR, (a) => [a[1] as string, a[2] as number]); // the price scale is the server's own
+export const chooseRecipe = remote("chooseRecipe", core.chooseRecipe as (s: GameState, id: string) => KR);
+export const cancelRecipe = remote("cancelRecipe", core.cancelRecipe as (s: GameState) => KR);
+export const chooseDish = remote("chooseDish", core.chooseDish as (s: GameState, id: string) => KR);
+export const discardDish = remote("discardDish", core.discardDish as (s: GameState, id: string) => KR);
+export const discardLot = remote("discardLot", core.discardLot as (s: GameState, id: string) => KR);
