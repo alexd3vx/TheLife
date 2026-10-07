@@ -254,3 +254,9 @@ Chronological record of decisions and changes. Newest first.
 - Edit home (3D and iso): an arrow pad (`iso/EditPad.tsx`) and the keyboard arrows nudge the picked-up piece half a metre in the direction the arrow points on screen; the middle button (or R) turns it. 3D: `edit.nudge(sx, sy)` follows the camera and queues moves; iso: `IsoRoom.nudgeSelected`.
 - Rides: the server only believes a far jump after a paid ride (`arrive` message, `rideUntil` set by `payRide`), otherwise the movement check snapped the player back home.
 - The 3D street is not drawn while the big city map covers it (`setCovered`).
+
+## Stats and player interaction
+
+- Server: `analytics.ts` counts views, different players, guests vs accounts, online now and the peak (hashed keys only), served at `GET /stats`; `#/stats` is the test page and an online chip shows in the home and the street.
+- Player interaction: tap another player in the street for a card (wave, cheer, message, pay). Chat now carries only 90 m in the city (`HEARING_RANGE`), private messages (`dm`) reach anyone online, gestures (`emote`) show on nearby characters, and what people say floats over their heads as a bubble. Update the VPS for the new messages.
+- Street people are real characters (random looks, real walk) within 30 m; the cheap figures are the far crowd.

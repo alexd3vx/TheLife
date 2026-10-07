@@ -21,3 +21,14 @@
 .online-count { position: absolute; z-index: 3; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 112px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: rgba(244, 248, 255, .94); color: #12233f; font: 700 .76rem system-ui; text-decoration: none; box-shadow: 0 6px 22px rgba(8, 20, 50, .28); }
 .online-count i { width: 9px; height: 9px; border-radius: 50%; background: #2f6bff; box-shadow: 0 0 0 3px rgba(47, 107, 255, .25); }
 .online-count.is-low { left: 12px; right: auto; top: calc(max(12px, env(safe-area-inset-top)) + 152px); }
+
+.player-card { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); width: min(380px, calc(100% - 24px)); padding: 12px; border-radius: 22px; background: rgba(244, 248, 255, .96); color: #12233f; box-shadow: 0 10px 34px rgba(8, 20, 50, .38); display: grid; gap: 10px; }
+.player-card header { display: flex; align-items: center; gap: 10px; }
+.player-card header div { flex: 1; display: grid; }
+.player-card header small { color: #5c6f92; }
+.player-card header > button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: #e1ebff; color: #12233f; cursor: pointer; }
+.player-card-avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(145deg, #5b9bff, #2f55d8); color: #fff; font: 800 1rem system-ui; }
+.player-card-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.player-card-actions button { display: grid; justify-items: center; gap: 4px; padding: 10px 4px; border: 0; border-radius: 14px; background: #e1ebff; color: #12233f; font: 700 .78rem system-ui; cursor: pointer; }
+.player-card-actions button:active { background: #2f6bff; color: #fff; }
+.net-actions { display: inline-flex; gap: 6px; }

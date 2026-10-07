@@ -119,12 +119,30 @@ describe("game server", () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Ada");
     await a.next("welcome");
-    const report = await (await fetch(`http://127.0.0.1:${server.port}/stats`)).json();
+    const report = (await (await fetch(`http://127.0.0.1:${server.port}/stats`)).json()) as { online: number; guests: number; viewsToday: number; playersToday: number; hourly: unknown[] };
     expect(report.online).toBe(1);
     expect(report.guests).toBe(1);
     expect(report.viewsToday).toBe(1);
     expect(report.playersToday).toBe(1);
     expect(report.hourly).toHaveLength(24);
+  });
+
+  it("lets players message each other privately and gesture to those nearby", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    const wa = await a.next("welcome");
+    const b = await connect("Bayo");
+    const wb = await b.next("welcome");
+    a.send({ t: "dm", to: wb.id, text: "hello Bayo" });
+    const got = await b.next("chat");
+    expect(got.text).toBe("hello Bayo");
+    expect(got.to).toBe(wb.id);
+    expect(got.from).toBe(wa.id);
+    a.send({ t: "emote", emote: "wave" });
+    expect((await b.next("emote")).emote).toBe("wave");
+    a.send({ t: "emote", emote: "not-a-gesture" } as unknown as ClientMessage);
+    a.send({ t: "chat", text: "anyone near?" });
+    expect((await b.next("chat")).text).toBe("anyone near?");
   });
 
   it("limits chat to a few messages in a burst", async () => {

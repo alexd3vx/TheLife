@@ -15,6 +15,7 @@ import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { payRide, setChargeChecker } from "../phone/remote";
 import OnlineCount from "../net/OnlineCount";
+import PlayerCard from "../net/PlayerCard";
 import "../net/stats.css";
 import { BottomNav, MoreMenu } from "../play/HudParts";
 import TravelFilm from "../arrival/TravelFilm";
@@ -39,6 +40,7 @@ export default function MapPage() {
   const [night, setNight] = useState(false);
   const nightRef = useRef(false);
   const [place, setPlace] = useState<string | null>(null);
+  const [cardId, setCardId] = useState<string | null>(null);
   const [placeShown, setPlaceShown] = useState<string | null>(null);
   // Out of the house you start on the map: pick where to go, then walk there or ride. "Out" is the street itself.
   const [mode, setMode] = useState<"map" | "street">("map");
@@ -61,7 +63,7 @@ export default function MapPage() {
     if (!container) return;
     let disposed = false;
     loadManifest()
-      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu, onPlace: setPlace }))
+      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu, onPlace: setPlace, onPlayer: (p) => setCardId(p?.id ?? null) }))
       .then((runtime) => {
         if (disposed) {
           runtime?.dispose();
@@ -326,7 +328,23 @@ export default function MapPage() {
           })()}
         </>
       )}
-      {!trip && <OnlineCount low />}
+      {(() => {
+        const who = cardId ? runtimeRef.current?.online.remotes.get(cardId) ?? null : null;
+        if (!who || bigMap || trip) return null;
+        const near = !!stats && Math.hypot(who.x - stats.position.x, who.z - stats.position.z) < 12;
+        return (
+          <PlayerCard
+            player={who}
+            near={near}
+            onClose={() => setCardId(null)}
+            onEmote={(name) => {
+              if (!runtimeRef.current?.online.emote(name)) life.session?.notice("Stand still to do that.");
+              else world.send({ t: "emote", emote: name });
+              setCardId(null);
+            }}
+          />
+        );
+      })()}
       {!bigMap && !trip && <BottomNav active="map" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onMap={() => setMode("map")} />}
       {bigMap && (
         <nav className="cm-nav" aria-label="Where to">

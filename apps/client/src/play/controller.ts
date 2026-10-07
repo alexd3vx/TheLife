@@ -599,6 +599,16 @@ export class CharacterController {
     }
   }
 
+  /** A gesture the player chose (wave, cheer...): plays once while standing still, then the body goes back to idle. */
+  playGesture(clip: string): boolean {
+    if (this.mode !== "idle" || this.tween || this.wait) return false;
+    const length = this.avatar.playOnce(clip, 0.2);
+    if (length <= 0) return false;
+    this.clip = clip;
+    this.gesture = { until: this.clock + length };
+    return true;
+  }
+
   private updateLook(dt: number) {
     this.clock += dt;
     let target: THREE.Vector3 | null = null;

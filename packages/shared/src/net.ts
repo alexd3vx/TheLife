@@ -1,6 +1,11 @@
 // The wire protocol between the game client and the game server. Plain JSON messages; every message from a client is
 // validated here before the server looks at it (the server never trusts a client number or string).
 
+/** The gestures a player can show to others nearby. */
+export const EMOTES = ["wave", "cheer", "talk"] as const;
+/** How far (metres) chat and gestures carry out in the city. */
+export const HEARING_RANGE = 90;
+
 export const PROTOCOL_VERSION = 2;
 export const MAX_NAME = 20;
 export const MAX_CHAT = 200;
@@ -49,6 +54,10 @@ export type ClientMessage =
   /** Arrives somewhere by a paid ride (taxi, keke, danfo): the server moves the player there if they just paid for a trip. */
   | { t: "arrive"; x: number; z: number }
   | { t: "chat"; text: string }
+  /** A private message to one player (wherever they are). */
+  | { t: "dm"; to: string; text: string }
+  /** A gesture the other players nearby can see (wave, cheer, talk). */
+  | { t: "emote"; emote: string }
   | { t: "pay"; to: string; amount: number }
   | { t: "ping"; ts: number }
   /** WebRTC signalling for voice, passed to another player untouched. */
@@ -59,7 +68,8 @@ export type ServerMessage =
   | { t: "join"; player: PlayerView }
   | { t: "leave"; id: string }
   | { t: "state"; tick: number; serverTime: number; players: Pick<PlayerView, "id" | "x" | "y" | "z" | "yaw" | "clip" | "level">[] }
-  | { t: "chat"; from: string; name: string; text: string; at: number }
+  | { t: "chat"; from: string; name: string; text: string; at: number; /** Set for a private message: who it was sent to. */ to?: string }
+  | { t: "emote"; from: string; emote: string }
   | { t: "money"; balance: number; note: string }
   /** The authoritative state of your life. `ack` is the last `do` id the server has handled; `active` is the action in progress. */
   | { t: "life"; state: unknown; ack: number; active: { id: string; done: number; forced: boolean } | null; events: { kind: "info" | "good" | "warn" | "bad"; text: string; minute: number }[]; away?: string[] }
@@ -138,6 +148,13 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
       return text ? { t: "chat", text } : null;
     }
+    case "dm": {
+      if (typeof m.to !== "string" || m.to.length > 40 || typeof m.text !== "string") return null;
+      const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
+      return text ? { t: "dm", to: m.to, text } : null;
+    }
+    case "emote":
+      return typeof m.emote === "string" && (EMOTES as readonly string[]).includes(m.emote) ? { t: "emote", emote: m.emote } : null;
     case "pay":
       if (typeof m.to !== "string" || m.to.length > 40 || !finite(m.amount, 1e9)) return null;
       return { t: "pay", to: m.to, amount: Math.floor(m.amount) };

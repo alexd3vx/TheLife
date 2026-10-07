@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@thelife/shared";
+import { HEARING_RANGE, PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@thelife/shared";
 import { join } from "node:path";
 import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
@@ -195,7 +195,35 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         }
         case "chat": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
-          broadcast({ t: "chat", from: me.id, name: me.name, text: message.text, at: now });
+          // out in the city, chat carries only so far; at home nobody hears you (use a private message)
+          if (me.where !== "world") return send(ws, { t: "error", reason: "Nobody is near enough to hear you. Step outside, or send a private message." });
+          const line: ServerMessage = { t: "chat", from: me.id, name: me.name, text: message.text, at: now };
+          send(ws, line);
+          for (const other of room.inWorld()) {
+            if (other.id === me.id || Math.hypot(other.x - me.x, other.z - me.z) > HEARING_RANGE) continue;
+            const target = sockets.get(other.id);
+            if (target) send(target, line);
+          }
+          return;
+        }
+        case "dm": {
+          if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
+          const other = room.players.get(message.to);
+          const target = other ? sockets.get(other.id) : undefined;
+          if (!other || !target || other.id === me.id) return send(ws, { t: "error", reason: "That player isn't here any more." });
+          const line: ServerMessage = { t: "chat", from: me.id, name: me.name, text: message.text, at: now, to: other.id };
+          send(ws, line);
+          send(target, line);
+          return;
+        }
+        case "emote": {
+          if (me.where !== "world" || !room.allow(me, "chat", now)) return;
+          const line: ServerMessage = { t: "emote", from: me.id, emote: message.emote };
+          for (const other of room.inWorld()) {
+            if (other.id === me.id || Math.hypot(other.x - me.x, other.z - me.z) > HEARING_RANGE) continue;
+            const target = sockets.get(other.id);
+            if (target) send(target, line);
+          }
           return;
         }
         case "pay": {

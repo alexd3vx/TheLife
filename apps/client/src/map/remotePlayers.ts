@@ -29,6 +29,8 @@ interface Remote {
   avatar: Avatar | null;
   clip: string;
   figure: THREE.Object3D[];
+  bubble: { sprite: THREE.Sprite; until: number } | null;
+  emoteUntil: number;
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -56,6 +58,53 @@ function nameTag(name: string): THREE.Sprite {
   sprite.renderOrder = 40;
   return sprite;
 }
+
+/** A speech bubble to float above a head. */
+export function bubbleSprite(text: string): THREE.Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 160;
+  const g = canvas.getContext("2d")!;
+  g.font = "600 34px system-ui, sans-serif";
+  // wrap into at most two lines
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (g.measureText(cur ? `${cur} ${w}` : w).width > 440 && cur) {
+      lines.push(cur);
+      cur = w;
+    } else cur = cur ? `${cur} ${w}` : w;
+  }
+  lines.push(cur);
+  const shown = lines.slice(0, 2);
+  if (lines.length > 2) shown[1] = `${shown[1]!.slice(0, 30)}…`;
+  const w = Math.min(500, Math.max(...shown.map((l) => g.measureText(l).width)) + 40);
+  const h = shown.length * 42 + 26;
+  g.fillStyle = "rgba(255,255,255,.96)";
+  g.beginPath();
+  g.roundRect((512 - w) / 2, 6, w, h, 22);
+  g.fill();
+  g.beginPath();
+  g.moveTo(236, 6 + h - 1);
+  g.lineTo(256, 6 + h + 18);
+  g.lineTo(276, 6 + h - 1);
+  g.fill();
+  g.fillStyle = "#12233f";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  shown.forEach((l, i) => g.fillText(l, 256, 6 + 13 + 21 + i * 42, 470));
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: false }));
+  sprite.scale.set(2.4, 0.75, 1);
+  sprite.center.set(0.5, 0);
+  sprite.position.y = 2.25;
+  sprite.renderOrder = 41;
+  return sprite;
+}
+
+export const EMOTE_CLIP: Record<string, string> = { wave: "Life_Wave_Loop", cheer: "KK_Cheering", talk: "Idle_Talking_Loop" };
 
 /** Other players in the shared world: cheap figures with a name tag, drawn slightly in the past and smoothed between snapshots. */
 export class RemotePlayers {
@@ -129,7 +178,7 @@ export class RemotePlayers {
     group.position.set(view.x, view.y, view.z);
     group.rotation.y = view.yaw;
     this.root.add(group);
-    this.players.set(view.id, { view: { ...view }, group, legs, arms, tag, samples: [{ t: performance.now() / 1000, x: view.x, y: view.y, z: view.z, yaw: view.yaw }], phase: 0, avatar: null, clip: "", figure });
+    this.players.set(view.id, { view: { ...view }, group, legs, arms, tag, samples: [{ t: performance.now() / 1000, x: view.x, y: view.y, z: view.z, yaw: view.yaw }], phase: 0, avatar: null, clip: "", figure, bubble: null, emoteUntil: 0 });
     this.loadAvatar(view);
   }
 
@@ -175,6 +224,7 @@ export class RemotePlayers {
     const r = this.players.get(id);
     if (!r) return;
     r.avatar?.dispose();
+    this.dropBubble(r);
     this.root.remove(r.group);
     r.group.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -186,6 +236,54 @@ export class RemotePlayers {
       }
     });
     this.players.delete(id);
+  }
+
+  /** Shows what a player said above their head for a few seconds. */
+  say(id: string, text: string): void {
+    const r = this.players.get(id);
+    if (!r) return;
+    this.dropBubble(r);
+    const sprite = bubbleSprite(text);
+    r.group.add(sprite);
+    r.bubble = { sprite, until: performance.now() / 1000 + 2.5 + Math.min(5, text.length * 0.06) };
+  }
+
+  private dropBubble(r: Remote): void {
+    if (!r.bubble) return;
+    r.group.remove(r.bubble.sprite);
+    r.bubble.sprite.material.map?.dispose();
+    r.bubble.sprite.material.dispose();
+    r.bubble = null;
+  }
+
+  /** Plays a gesture on a player's character once (it goes back to walking or standing afterwards). */
+  emote(id: string, name: string): void {
+    const r = this.players.get(id);
+    const clip = EMOTE_CLIP[name];
+    if (!r?.avatar || !clip) return;
+    const length = r.avatar.playOnce(clip, 0.2);
+    if (length > 0) r.emoteUntil = performance.now() / 1000 + length;
+  }
+
+  /** The player standing where a ray (a tap) passes closest to, if one is near enough. */
+  pickAt(ray: THREE.Ray): PlayerView | null {
+    let best: PlayerView | null = null;
+    let bestD = 0.75;
+    const point = new THREE.Vector3();
+    for (const r of this.players.values()) {
+      if (!r.group.visible) continue;
+      point.set(r.group.position.x, r.group.position.y + 0.95, r.group.position.z);
+      const d = ray.distanceToPoint(point);
+      if (d < bestD) {
+        bestD = d;
+        best = r.view;
+      }
+    }
+    return best;
+  }
+
+  get(id: string): PlayerView | null {
+    return this.players.get(id)?.view ?? null;
   }
 
   /** A snapshot from the server: where everyone is now. */
@@ -230,11 +328,16 @@ export class RemotePlayers {
         continue;
       }
       r.group.visible = true;
+      if (r.bubble && performance.now() / 1000 > r.bubble.until) this.dropBubble(r);
       if (r.avatar) {
         const near = Math.hypot(r.group.position.x - this.focus.x, r.group.position.z - this.focus.z) < 70;
         r.group.visible = near;
         if (near) {
-          if (r.view.clip !== r.clip && r.avatar.play(r.view.clip)) r.clip = r.view.clip;
+          const gesturing = performance.now() / 1000 < r.emoteUntil;
+          if (!gesturing && (r.view.clip !== r.clip || r.emoteUntil > 0) && r.avatar.play(r.view.clip)) {
+            r.clip = r.view.clip;
+            r.emoteUntil = 0;
+          }
           r.avatar.update(dt);
         }
         continue;

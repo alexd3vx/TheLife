@@ -4,6 +4,7 @@ import type { PlayerView, ServerMessage } from "@thelife/shared";
 import type { MapRuntime } from "../map/runtime";
 import type { NetStatus } from "./connection";
 import { world } from "./world";
+import { useServerStats } from "./useServerStats";
 import "./online.css";
 
 interface ChatLine {
@@ -23,6 +24,8 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [draft, setDraft] = useState("");
   const [paying, setPaying] = useState<string | null>(null);
+  /** Who a private message goes to (null = say it out loud to everyone nearby). */
+  const [dmTo, setDmTo] = useState<string | null>(null);
   const [amount, setAmount] = useState("1000");
   const selfId = useRef("");
   const lineNo = useRef(0);
@@ -59,8 +62,21 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
         case "state":
           rt?.online.remotes.apply(m.players, selfId.current);
           break;
-        case "chat":
-          say(m.name, m.text, m.from === selfId.current);
+        case "chat": {
+          const mine = m.from === selfId.current;
+          if (m.to) {
+            // a private message: say who it was between
+            const other = mine ? (rt?.online.remotes.get(m.to)?.name ?? "them") : m.name;
+            say(mine ? `You → ${other}` : `${other} → you`, m.text, mine);
+          } else {
+            say(m.name, m.text, mine);
+            if (mine) rt?.online.say(m.text);
+            else rt?.online.remotes.say(m.from, m.text);
+          }
+          break;
+        }
+        case "emote":
+          rt?.online.remotes.emote(m.from, m.emote);
           break;
         case "money":
           say("", m.note, false, true);
@@ -123,7 +139,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
     e.preventDefault();
     const text = draft.trim();
     if (!text) return;
-    world.send({ t: "chat", text });
+    world.send(dmTo ? { t: "dm", to: dmTo, text } : { t: "chat", text });
     setDraft("");
   };
 
@@ -136,19 +152,24 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
   // The interact button next to another player opens this panel with the pay box ready.
   useEffect(() => {
     const on = (e: Event) => {
+      const d = (e as CustomEvent<string | { id: string; mode: "pay" | "dm" }>).detail;
       setOpen(true);
-      setPaying((e as CustomEvent<string>).detail ?? null);
+      if (d && typeof d === "object" && d.mode === "dm") {
+        setDmTo(d.id);
+        setPaying(null);
+      } else setPaying(typeof d === "string" ? d : (d?.id ?? null));
     };
     window.addEventListener("thelife-open-online", on);
     return () => window.removeEventListener("thelife-open-online", on);
   }, []);
 
   const online = status === "online";
+  const server = useServerStats();
   return (
     <>
       <button className={`net-chip is-${status}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Online play">
         <span className="net-dot" />
-        {online ? `Online · ${players.length + 1}` : status === "connecting" ? "Connecting…" : "Offline"}
+        {online ? (server ? `${server.online} online${server.guests ? ` · ${server.guests} guest${server.guests === 1 ? "" : "s"}` : ""}` : `Online · ${players.length + 1}`) : status === "connecting" ? "Connecting…" : "Offline"}
       </button>
       {open && (
         <div className="net-panel" role="dialog" aria-label="Online play">
@@ -176,7 +197,10 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
                         <button className="is-ghost" onClick={() => setPaying(null)} aria-label="Cancel"><GameIcon name="close" size={12} /></button>
                       </span>
                     ) : (
-                      <button onClick={() => setPaying(p.id)}>Pay</button>
+                      <span className="net-actions">
+                        <button onClick={() => setDmTo(p.id)}>Message</button>
+                        <button onClick={() => setPaying(p.id)}>Pay</button>
+                      </span>
                     )}
                   </li>
                 ))}
@@ -189,8 +213,14 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
                   </p>
                 ))}
               </div>
+              {dmTo && (
+                <p className="net-note">
+                  Private message to <b>{players.find((p) => p.id === dmTo)?.name ?? "player"}</b>{" "}
+                  <button className="is-ghost" onClick={() => setDmTo(null)}>Say it out loud instead</button>
+                </p>
+              )}
               <form className="net-chat" onSubmit={sendChat}>
-                <input value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} placeholder="Say something…" aria-label="Chat message" />
+                <input value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} placeholder={dmTo ? "Private message…" : "Say something (people nearby hear you)…"} aria-label="Chat message" />
                 <button type="submit" disabled={!online}>Send</button>
               </form>
             </>

@@ -19,7 +19,8 @@ import { setFacadeEnvironment } from "./facade";
 import { PostFX } from "../settings/postfx";
 import { bodyFor, sexOf } from "../lab/looks";
 import { ChunkStreamer, type StreamStats } from "./streamer";
-import { RemotePlayers } from "./remotePlayers";
+import { EMOTE_CLIP, RemotePlayers, bubbleSprite } from "./remotePlayers";
+import type { PlayerView } from "@thelife/shared";
 import { DoorManager } from "./doors";
 import { input } from "../controls/input";
 import { SkySystem } from "./sky";
@@ -76,6 +77,10 @@ export interface MapRuntime {
     pose(): { x: number; y: number; z: number; yaw: number; clip: string; level: number };
     /** The server moved us back: put the character at the corrected spot. */
     correct(x: number, z: number): void;
+    /** Shows a gesture on our own character (wave, cheer, talk); false when we are busy walking or sitting. */
+    emote(name: string): boolean;
+    /** A speech bubble over our own head. */
+    say(text: string): void;
   };
   debug: {
     stats(): MapStats;
@@ -83,6 +88,10 @@ export interface MapRuntime {
     lookAt(x: number, z: number, height?: number, back?: number): void;
     cam(x: number, y: number, z: number, tx: number, ty: number, tz: number): void;
     scene: THREE.Scene;
+    /** Where a world point is on the screen, in CSS pixels (for tests). */
+    project(x: number, y: number, z: number): { x: number; y: number };
+    addRemote(view: PlayerView): void;
+    remoteInfo(): { count: number; list: { id: string; x: number; z: number }[] };
     camPos(): { x: number; y: number; z: number; tx: number; ty: number; tz: number };
     tapGround(x: number, z: number): boolean;
     streamer: ChunkStreamer;
@@ -106,6 +115,8 @@ export interface MapEvents {
   onMenu(menu: TapMenu | null): void;
   /** Walking into or out of a named place (null = outside). */
   onPlace?(name: string | null): void;
+  /** The player tapped another player (null = tapped elsewhere). */
+  onPlayer?(player: PlayerView | null): void;
 }
 
 const TAP_MAX_MOVE = 8;
@@ -245,6 +256,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     notice: () => {},
     needs: () => ({ hunger: 100, energy: 100, hygiene: 100, bladder: 100, fun: 100 }),
   };
+  let localBubble: { sprite: THREE.Sprite; until: number } | null = null;
   const controller = new CharacterController(avatar, nav, bridge, () => {}, () => {});
   controller.place(district.spawn.x, district.spawn.z, district.spawn.yaw);
 
@@ -574,6 +586,16 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   }
   function handleTap(clientX: number, clientY: number) {
     const rect = renderer.domElement.getBoundingClientRect();
+    // another player: open their card instead of walking
+    ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    const other = remotes.pickAt(raycaster.ray);
+    if (other) {
+      events.onMenu(null);
+      events.onPlayer?.(other);
+      return;
+    }
+    events.onPlayer?.(null);
     const pinHit = pinAt(clientX, clientY);
     if (pinHit) {
       const lm = district.landmarks.find((l) => l.id === pinHit)!;
@@ -735,6 +757,12 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     terrain.update(controller.position.x, controller.position.z);
     remotes.focus.copy(controller.position);
     remotes.update(dt);
+    if (localBubble && performance.now() / 1000 > localBubble.until) {
+      avatar.root.remove(localBubble.sprite);
+      localBubble.sprite.material.map?.dispose();
+      localBubble.sprite.material.dispose();
+      localBubble = null;
+    }
     localSpeed += (Math.hypot(controller.position.x - lastX, controller.position.z - lastZ) / Math.max(dt, 0.001) - localSpeed) * Math.min(1, dt * 8);
     lastX = controller.position.x;
     lastZ = controller.position.z;
@@ -888,6 +916,21 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         clip: localSpeed > 2.6 ? "Jog_Fwd_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
         level: floorLevel,
       }),
+      emote: (name) => {
+        const clip = EMOTE_CLIP[name];
+        return clip ? controller.playGesture(clip) : false;
+      },
+      say: (text) => {
+        if (localBubble) {
+          avatar.root.remove(localBubble.sprite);
+          localBubble.sprite.material.map?.dispose();
+          localBubble.sprite.material.dispose();
+        }
+        const sprite = bubbleSprite(text);
+        sprite.position.y = 2.1;
+        avatar.root.add(sprite);
+        localBubble = { sprite, until: performance.now() / 1000 + 2.5 + Math.min(5, text.length * 0.06) };
+      },
       correct: (x, z) => {
         const far = Math.hypot(controller.position.x - x, controller.position.z - z) > 30;
         controller.place(x, z, controller.yaw);
@@ -929,6 +972,13 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         controls.update();
       },
       scene,
+      addRemote: (view) => remotes.add(view),
+      remoteInfo: () => ({ count: remotes.count, list: remotes.list().map((r) => ({ id: r.id, x: r.x, z: r.z })) }),
+      project: (x, y, z) => {
+        const v = new THREE.Vector3(x, y, z).project(camera);
+        const rect = renderer.domElement.getBoundingClientRect();
+        return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height };
+      },
       camPos: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z, tx: controls.target.x, ty: controls.target.y, tz: controls.target.z }),
       cam: (x: number, y: number, z: number, tx: number, ty: number, tz: number) => {
         controls.target.set(tx, ty, tz);
