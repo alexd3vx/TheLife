@@ -193,3 +193,12 @@ I searched on 7 Oct for a free, CC0, realistic, African-featured base with morph
 **In the game.** The player's own person shows how they are doing: the home controller sets the mood from their needs every two seconds (tired when energy is low, happy when well, worried or sad when low). Only the people looked at close up get a face rig (the player at home, in the street and in buildings, the creator, the profile, the film); a crowd keeps the cheap blinking eyelid, to save memory.
 
 **Honest gaps.** No tongue or teeth shape changes beyond the jaw; the mouth shapes are approximations, not lip-synced to real audio yet (the loudness hook is there, the call feature is not built). Expressions are subtle in dim light and at street-view distance; they read in the creator, the profile and building interiors. Morphs do not move the shading normals, so a very big expression is lit a little flat. The eyes' iris is still too red.
+
+## 14. Phase 5 result (8 Oct 2026): the life clips on the new body
+
+Every everyday clip was captured at 15 / 50 / 85 % of its loop on a male and a female morphed body (tee, jeans, sneakers) with `#/hair` → `__hair.clipAt(name, frac)`.
+
+- Works with no retarget changes: Idle, Walk, Jog, Talk, Phone, Wave, Cheer, Eat (standing and seated), Wash, Brush, Read, Dance, Sit, Sleep. The existing `lab/retarget.ts` maps all of them onto the per-body fitted skeleton, on both sexes.
+- Acceptable but not great: `Life_Cook` (KK_Work_A) holds the arms wide, and `Life_Type` is still the Driving loop. Both are placeholders until a proper kitchen and desk clip is sourced.
+- Cloth: tops are simulated while the avatar is close up. Right after a hard pose jump (what the capture does) the hem is ragged for a few frames, then settles. Continuous play in the game does not show this.
+- Still missing clips (not on the new body, simply not in the library yet): open/close door, unlock, sit-in-vehicle, ATM, shower with water.

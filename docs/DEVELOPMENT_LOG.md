@@ -374,3 +374,8 @@ Chronological record of decisions and changes. Newest first.
 - Tops are no longer tight shells: tee, tank, vest, polo, long sleeve, hoodie, jersey, shirt and sweater are a fitted bodice (shoulders, chest, sleeves) plus a hanging, simulated body (`looseTop`), blended in over half its length so there is no shelf at the chest.
 - Gowns, dresses, kaftans, agbada and skirts trail behind when walking and swing when stopping (checked in `#/hair` with the walk button).
 - Not simulated: sleeves and the fitted bodice (they are skinned), trousers (they follow the legs).
+
+## Phase 5: animation check on the new body
+- Added `clipAt(name, frac)` to the hair lab page to pause any clip at a fraction of its loop for contact sheets.
+- Captured 17 clips on a male and 9 on a female body. All retarget cleanly; no skeleton changes needed.
+- Known gaps listed in CHARACTER_SPEC §14 (cook arms, typing clip, missing door/ATM clips).

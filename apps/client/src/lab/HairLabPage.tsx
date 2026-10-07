@@ -9,7 +9,7 @@ import "./bodylab.css";
 /** A developer page for hair: one person, a close camera (front, side, back, top), every style and colour. Open it at #/hair. */
 export default function HairLabPage() {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void>; walk(on: boolean): void; mood(m: string): void; speak(on: boolean): void; wink(): void; look(x: number, y: number, z: number): void } | null>(null);
+  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void>; walk(on: boolean): void; mood(m: string): void; speak(on: boolean): void; wink(): void; look(x: number, y: number, z: number): void; clipAt(name: string, frac: number): number } | null>(null);
   const [look, setLook] = useState<Look>({ ...DEFAULT_LOOK, top: null, bottom: null, shoes: null, hair: "p_afro" });
   const [view, setView] = useState("front");
   const [ready, setReady] = useState(false);
@@ -63,6 +63,13 @@ export default function HairLabPage() {
         view: (nv) => { v = nv; frame(); },
         mood: (m) => a.setMood(m as never),
         speak: (on) => a.face?.speak(on),
+        clipAt: (name, frac) => {
+          a.play(name, 0);
+          const d = a.clipDuration(name);
+          a.setPlayback({ paused: true, time: d * frac });
+          a.update(0.001);
+          return d;
+        },
         look: (x, y, z) => a.setLookTarget(new THREE.Vector3(x, y, z)),
         wink: () => a.face?.wink1("l"),
         walk: (on) => {
