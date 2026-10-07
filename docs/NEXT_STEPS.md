@@ -190,5 +190,6 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Asset rebuild (owner's note):** the character animation inside the house differs from outside; the owner intends to rebuild all assets so it is consistent, before moving one feature at a time, with no rush. (7 Oct)
 - **Big open question (owner's note):** the owner is considering dropping real Lagos as the map and building **their own city, "Alexion City"** (a Tokyo-like invented city). This would replace the real-OSM plan in `MASTER_PLAN.md` if agreed. Brainstorm below. (7 Oct)
 - **Style:** the owner asked for funnier chat with emojis; replies may use a light amount of both. (7 Oct)
+- **Alexion City (Q81-84):** the map becomes an **invented city with a Lagos soul**; five districts and about 60 enterable places at first; keep the engine and swap the data (real Lagos can return as a second map); **the assistant designs the layout and the owner approves**. First proposal: `docs/ALEXION_CITY.md`. This replaces the real-OSM Lagos plan in `MASTER_PLAN.md` once approved. (7 Oct)
 
-*Questions asked so far: 80 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 84 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
