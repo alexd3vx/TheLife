@@ -127,3 +127,7 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 6. Map overhaul (buildings with height, water, bridges, labels, landmarks) and billboards with the admin upload tool.
 7. Medium survival layer (moodles, injuries, weather, power).
 8. Life-depth features (Hustle, Invest, Staff, Government), then vehicles.
+- **Homes (Q17):** bigger rooms (about 1.5 times), separate toilet and bathroom with a real door, a hallway, collision on every wall; cheap homes stay small but always reachable. (7 Oct)
+- **Leaving a building (Q18):** the door opens, your character walks out and stops on the pavement facing the street, camera swings behind (about 1.5 s). (7 Oct)
+- **ATM (Q19):** full-screen real-style ATM (card in, PIN pad, language, menu with withdraw, balance, transfer, airtime, change PIN, cash tray, receipt), several invented banks each with its own colours. (7 Oct)
+- **Airtime and data (Q20):** calls use airtime, chat and LifeGram use data; bundles bought in shops or on the phone. (7 Oct)
