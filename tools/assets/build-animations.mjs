@@ -17,6 +17,8 @@ await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.encoder": MeshoptEncoder, "meshopt.decoder": MeshoptDecoder });
 
 const PACKS = [
+  { id: "mixamo_xbot", credit: "mixamo-soldier", file: join(SRC, "mixamo/Xbot.glb"), keep: ["agree", "headShake", "idle", "run", "sad_pose", "sneak_pose", "walk"] },
+  { id: "mixamo_soldier", credit: "mixamo-soldier", file: join(SRC, "mixamo/Soldier.glb"), keep: ["TPose", "Idle", "Walk", "Run"] },
   {
     id: "ual2",
     credit: "quaternius-ual2",
@@ -31,7 +33,7 @@ const PACKS = [
 
 const manifestPath = join(OUT, "manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-manifest.credits = { ...manifest.credits, "quaternius-ual2": CREDITS["quaternius-ual2"], "kaykit-animations": CREDITS["kaykit-animations"] };
+manifest.credits = { ...manifest.credits, "quaternius-ual2": CREDITS["quaternius-ual2"], "kaykit-animations": CREDITS["kaykit-animations"], "mixamo-soldier": CREDITS["mixamo-soldier"] };
 mkdirSync(join(OUT, "animations"), { recursive: true });
 
 for (const pack of PACKS) {

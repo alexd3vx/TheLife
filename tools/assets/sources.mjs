@@ -20,6 +20,12 @@ export const CREDITS = {
     licence: "CC0 1.0",
     url: "https://quaternius.com/packs/universalanimationlibrary2.html",
   },
+  "mixamo-soldier": {
+    name: "Soldier (idle, walk, run)",
+    author: "Mixamo (Adobe), as shipped in the three.js examples",
+    licence: "Mixamo terms: free to use in projects",
+    url: "https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb",
+  },
   "kaykit-animations": {
     name: "Character Animations 1.1",
     author: "Kay Lousberg (KayKit)",

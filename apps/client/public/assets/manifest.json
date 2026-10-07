@@ -54,6 +54,12 @@
       "author": "Kay Lousberg (KayKit)",
       "licence": "CC0 1.0",
       "url": "https://kaylousberg.itch.io/kaykit-character-animations"
+    },
+    "mixamo-soldier": {
+      "name": "Soldier (idle, walk, run)",
+      "author": "Mixamo (Adobe), as shipped in the three.js examples",
+      "licence": "Mixamo terms: free to use in projects",
+      "url": "https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb"
     }
   },
   "budgets": {
@@ -3938,6 +3944,39 @@
         0.8,
         0.22
       ]
+    },
+    {
+      "id": "mixamo_xbot",
+      "category": "animation",
+      "file": "animations/mixamo_xbot.glb",
+      "bytes": 358304,
+      "animations": 7,
+      "clipNames": [
+        "agree",
+        "headShake",
+        "idle",
+        "run",
+        "sad_pose",
+        "sneak_pose",
+        "walk"
+      ],
+      "label": "mixamo_xbot",
+      "credit": "mixamo-soldier"
+    },
+    {
+      "id": "mixamo_soldier",
+      "category": "animation",
+      "file": "animations/mixamo_soldier.glb",
+      "bytes": 215916,
+      "animations": 4,
+      "clipNames": [
+        "Idle",
+        "Run",
+        "TPose",
+        "Walk"
+      ],
+      "label": "mixamo_soldier",
+      "credit": "mixamo-soldier"
     },
     {
       "id": "ual2",

@@ -26,6 +26,30 @@ export const KAYKIT_BONES: Record<string, string> = {
   ball_r: "toes.r",
 };
 
+/** Our bone -> the Mixamo bone that drives it (the loader drops the colon: "mixamorig:Hips" arrives as "mixamorigHips"). */
+export const MIXAMO_BONES: Record<string, string> = {
+  pelvis: "mixamorig:Hips",
+  spine_01: "mixamorig:Spine",
+  spine_02: "mixamorig:Spine1",
+  spine_03: "mixamorig:Spine2",
+  neck_01: "mixamorig:Neck",
+  Head: "mixamorig:Head",
+  upperarm_l: "mixamorig:LeftArm",
+  lowerarm_l: "mixamorig:LeftForeArm",
+  hand_l: "mixamorig:LeftHand",
+  upperarm_r: "mixamorig:RightArm",
+  lowerarm_r: "mixamorig:RightForeArm",
+  hand_r: "mixamorig:RightHand",
+  thigh_l: "mixamorig:LeftUpLeg",
+  calf_l: "mixamorig:LeftLeg",
+  foot_l: "mixamorig:LeftFoot",
+  ball_l: "mixamorig:LeftToeBase",
+  thigh_r: "mixamorig:RightUpLeg",
+  calf_r: "mixamorig:RightLeg",
+  foot_r: "mixamorig:RightFoot",
+  ball_r: "mixamorig:RightToeBase",
+};
+
 /** A skeleton's rest pose, taken before any animation moves it (retargeting is measured against it). */
 export interface RestPose {
   local: Map<string, THREE.Quaternion>;
@@ -70,6 +94,7 @@ export function captureRest(bones: THREE.Bone[], frame: THREE.Object3D): RestPos
   };
 }
 
+const TRUNK = new Set(["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "Head"]);
 const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), q3 = new THREE.Quaternion();
 
 /**
@@ -129,13 +154,14 @@ export function retargetClip(targetBones: THREE.Bone[], rest: RestPose, sourceRo
   for (const b of order) {
     const mine = map[b.name];
     if (!mine) continue;
-    const child = b.name === "pelvis" ? undefined : b.children.find((c): c is THREE.Bone => (c as THREE.Bone).isBone && !!map[c.name]);
+    // the trunk, neck and head keep their own rest direction (only the limbs need turning to the source's rest pose)
+    const child = TRUNK.has(b.name) ? undefined : b.children.find((c): c is THREE.Bone => (c as THREE.Bone).isBone && !!map[c.name]);
     let fix = new THREE.Quaternion();
     if (child) {
       const dt = rest.position.get(child.name)!.clone().sub(rest.position.get(b.name)!).normalize();
       const ds = srcRestPos.get(map[child.name]!)!.clone().sub(srcRestPos.get(mine)!).normalize();
       if (dt.lengthSq() > 0.5 && ds.lengthSq() > 0.5) fix = new THREE.Quaternion().setFromUnitVectors(dt, ds);
-    } else if (b.name !== "pelvis" && b.parent && correction.has(b.parent as THREE.Bone)) fix = correction.get(b.parent as THREE.Bone)!.clone();
+    } else if (!TRUNK.has(b.name) && b.parent && correction.has(b.parent as THREE.Bone)) fix = correction.get(b.parent as THREE.Bone)!.clone();
     correction.set(b, fix);
   }
 

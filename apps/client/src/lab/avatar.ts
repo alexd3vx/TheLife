@@ -12,7 +12,7 @@ import { buildAccessory } from "./procedural/accessories";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
-import { KAYKIT_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
+import { KAYKIT_BONES, MIXAMO_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
 type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment" | "proc-acc";
@@ -56,22 +56,19 @@ function eachMaterial(root: THREE.Object3D, fn: (material: THREE.MeshStandardMat
  * Activities no free library has a clip for yet (cooking, typing, washing, brushing teeth) use the closest hand movement available.
  */
 const REAL_FOR_LIFE: Record<string, string> = {
-  Idle_Loop: "KK_Idle_A",
-  Walk_Loop: "KK_Walking_A",
-  Walk_Formal_Loop: "KK_Walking_B",
-  Jog_Fwd_Loop: "KK_Running_A",
-  Sprint_Loop: "KK_Running_B",
-  Sitting_Enter: "KK_Sit_Chair_Down",
-  Sitting_Idle_Loop: "KK_Sit_Chair_Idle",
-  Sitting_Exit: "KK_Sit_Chair_StandUp",
+  Idle_Loop: "XB_idle",
+  Walk_Loop: "XB_walk",
+  Walk_Formal_Loop: "XB_walk",
+  Jog_Fwd_Loop: "XB_run",
+  Sprint_Loop: "XB_run",
   Life_Sleep_Loop: "KK_Lie_Idle",
   Life_Eat_Standing_Loop: "U2_Consume",
-  Life_Eat_Loop: "KK_Sit_Chair_Idle",
+  Life_Eat_Loop: "Sitting_Idle_Loop",
   Life_Drink_Loop: "U2_Consume",
   Life_Phone_Loop: "U2_Idle_TalkingPhone_Loop",
   Life_Wave_Loop: "KK_Waving",
   Life_Cook_Loop: "KK_Work_A",
-  Life_Type_Loop: "KK_Sit_Chair_Idle",
+  Life_Type_Loop: "Driving_Loop",
   Life_Wash_Loop: "KK_Work_C",
   Life_Brush_Loop: "KK_Use_Item",
   Life_Read_Loop: "KK_Holding_B",
@@ -168,15 +165,23 @@ export class Avatar {
     this.libraryClips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
     // The animation libraries are real, hand-made clips (Quaternius and KayKit, free). They are never played raw: each clip is
     // retargeted onto this body (measured against both skeletons' rest poses) the first time it is needed, so any body moves right.
-    this.sources = [{ prefix: "", scene: SkeletonUtils.clone(gltf.scene), clips: gltf.animations, restName: "", map: null }];
+    this.sources = [{ prefix: "", scene: SkeletonUtils.clone(gltf.scene), clips: gltf.animations, restName: "A_TPose", map: null }];
     if (this.find("ual2")) {
       const u2 = await loadGLTF(assetUrl(this.asset("ual2").file));
-      this.sources.push({ prefix: "U2_", scene: SkeletonUtils.clone(u2.scene), clips: u2.animations, restName: "", map: null });
+      this.sources.push({ prefix: "U2_", scene: SkeletonUtils.clone(u2.scene), clips: u2.animations, restName: "A_TPose", map: null });
     }
     for (const id of ["kaykit_sim", "kaykit_general", "kaykit_tools", "kaykit_move"]) {
       if (!this.find(id)) continue;
       const k = await loadGLTF(assetUrl(this.asset(id).file));
       this.sources.push({ prefix: "KK_", scene: SkeletonUtils.clone(k.scene), clips: k.animations, restName: "T-Pose", map: KAYKIT_BONES });
+    }
+    if (this.find("mixamo_soldier")) {
+      const m = await loadGLTF(assetUrl(this.asset("mixamo_soldier").file));
+      this.sources.push({ prefix: "MX_", scene: SkeletonUtils.clone(m.scene), clips: m.animations, restName: "TPose", map: MIXAMO_BONES });
+    }
+    if (this.find("mixamo_xbot")) {
+      const m = await loadGLTF(assetUrl(this.asset("mixamo_xbot").file));
+      this.sources.push({ prefix: "XB_", scene: SkeletonUtils.clone(m.scene), clips: m.animations, restName: "", map: MIXAMO_BONES });
     }
     this.addLifeClips();
   }
@@ -810,6 +815,29 @@ export class Avatar {
     action.stop();
     mixer.uncacheRoot(this.bodyScene);
     return Number.isFinite(lowest) ? lowest - this.root.position.y : null;
+  }
+
+  /**
+   * Which way a lying clip's head points on the floor, as an angle from the character's own facing (0 = the way it faces, positive turns
+   * towards its left). The real lying clips are made on a side or the back with the head off to one side, so the bed needs this.
+   */
+  lieAxis(name: string, time = 0.5): number {
+    const clip = this.getClip(name);
+    const head = this.skeleton?.bones.find((b) => b.name === "Head");
+    const pelvis = this.skeleton?.bones.find((b) => b.name === "pelvis");
+    if (!clip || !this.bodyScene || !head || !pelvis) return 0;
+    this.skeleton?.pose();
+    const mixer = new THREE.AnimationMixer(this.bodyScene);
+    const action = mixer.clipAction(clip);
+    action.play();
+    action.time = Math.min(time, clip.duration);
+    mixer.update(0);
+    this.root.updateMatrixWorld(true);
+    const h = this.root.worldToLocal(head.getWorldPosition(new THREE.Vector3()));
+    const p = this.root.worldToLocal(pelvis.getWorldPosition(new THREE.Vector3()));
+    action.stop();
+    mixer.uncacheRoot(this.bodyScene);
+    return Math.atan2(h.x - p.x, h.z - p.z);
   }
 
   /** Where the body is right now in the world: lowest skin point and a few joints (for checking poses on furniture). */

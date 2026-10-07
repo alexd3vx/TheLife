@@ -359,9 +359,11 @@ export class CharacterController {
       // Rest the body on the surface using the lowest point of the sleeping pose, so it lies on the mattress, not in it.
       const low = this.avatar.lowestPoint(def.clip) ?? 0;
       const lie = new THREE.Vector3(pose[0], pose[1] - low - 0.02, pose[2]);
+      // the lying clip has the head off to one side: turn the body so the head lies along the bed, towards its back
+      const lieYaw = interaction.yaw + Math.PI - this.avatar.lieAxis(def.clip);
       const lieDown = () => {
         this.setClip(def.clip);
-        this.startTween(lie, interaction.yaw, 0.9, finish);
+        this.startTween(lie, lieYaw, 0.9, finish);
       };
       const edge = interaction.edge;
       if (!edge) {
