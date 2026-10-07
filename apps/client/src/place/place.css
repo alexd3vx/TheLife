@@ -57,3 +57,6 @@
 .place-qty button { border: 0; border-radius: 999px; padding: 9px 13px; background: #2f6bff; color: #fff; font: 800 .84rem system-ui; cursor: pointer; }
 .place-qty button:disabled { opacity: .35; cursor: default; }
 .place-sheet .place-money .is-owe b { color: #b3322a; }
+.place-title { max-width: calc(100% - 118px); }
+.place-title b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-sheet .place-result { order: -1; }

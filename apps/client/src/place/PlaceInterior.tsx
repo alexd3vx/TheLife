@@ -11,9 +11,11 @@ import type { GameSession } from "../play/gameSession";
 import { GameIcon } from "../ui/icons";
 import BankPanel from "./BankPanel";
 import HospitalPanel from "./HospitalPanel";
+import PolicePanel from "./PolicePanel";
 import ShopPanel from "./ShopPanel";
 import { buildBankRoom } from "./bankScene";
 import { buildHospitalRoom } from "./hospitalScene";
+import { buildPoliceRoom } from "./policeScene";
 import { buildShopRoom } from "./shopScene";
 import type { Outcome } from "./panel";
 import "./place.css";
@@ -33,6 +35,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
   const state = session.sim.state;
   const scale = session.sim.traits.groceries ?? 1;
   const hospitalKind = place.kind === "hospital";
+  const policeKind = place.kind === "police";
   const shopKind = place.kind === "market" || place.kind === "fuel" ? place.kind : null;
   const counter = counterOpen(state);
 
@@ -55,8 +58,8 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         renderer.domElement.remove();
       });
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(hospitalKind ? "#d6eef0" : shopKind === "market" ? "#f1e3c6" : "#cfe0fa");
-      const room = hospitalKind ? buildHospitalRoom(place.name) : shopKind ? buildShopRoom(place.name, shopKind) : buildBankRoom(place.name);
+      scene.background = new THREE.Color(hospitalKind ? "#d6eef0" : policeKind ? "#d3dbe9" : shopKind === "market" ? "#f1e3c6" : "#cfe0fa");
+      const room = hospitalKind ? buildHospitalRoom(place.name) : policeKind ? buildPoliceRoom(place.name) : shopKind ? buildShopRoom(place.name, shopKind) : buildBankRoom(place.name);
       scene.add(room.group);
       scene.add(new THREE.HemisphereLight("#eaf2ff", "#8fa6d0", 1.1));
       const sun = new THREE.DirectionalLight("#ffffff", 2.2);
@@ -102,7 +105,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       staff.root.position.copy(room.staffAt);
       scene.add(me.root, staff.root);
       me.play("Idle_Loop", 0);
-      staff.play(hospitalKind || shopKind ? "Idle_Loop" : "Life_Type_Loop", 0);
+      staff.play(hospitalKind || shopKind || policeKind ? "Idle_Loop" : "Life_Type_Loop", 0);
       let bubble: { sprite: THREE.Sprite; until: number } | null = null;
       staffRef.current = {
         say(text) {
@@ -117,7 +120,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           bubble = { sprite, until: performance.now() / 1000 + 4 + Math.min(5, text.length * 0.05) };
         },
       };
-      staffRef.current.say(hospitalKind ? `Welcome to ${place.name}. What is the matter?` : shopKind ? "Welcome, welcome! What will you buy?" : `Welcome to ${place.name}. How can I help?`);
+      staffRef.current.say(hospitalKind ? `Welcome to ${place.name}. What is the matter?` : policeKind ? "Good day. How may I help you?" : shopKind ? "Welcome, welcome! What will you buy?" : `Welcome to ${place.name}. How can I help?`);
       const clock = new THREE.Clock();
       const loop = () => {
         raf = requestAnimationFrame(loop);
@@ -151,7 +154,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
     const r = fn();
     const text = r.ok ? (r.text ?? "Done.") : (r.reason ?? "That didn't work.");
     setNote({ ok: r.ok, text });
-    staffRef.current?.say(r.ok ? (hospitalKind ? "There you go. Take care." : shopKind ? "Thank you! Anything else?" : "Done. Anything else?") : text.length < 70 ? text : "Sorry, I can't do that.");
+    staffRef.current?.say(r.ok ? (hospitalKind ? "There you go. Take care." : policeKind ? "Noted. Stay safe." : shopKind ? "Thank you! Anything else?" : "Done. Anything else?") : text.length < 70 ? text : "Sorry, I can't do that.");
     session.notice(text);
     bump((n) => n + 1);
   };
@@ -165,6 +168,8 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           <b>{place.name}</b>
           {hospitalKind
             ? <small className="is-open">Open all day and night</small>
+            : policeKind
+            ? <small className="is-open">Open all day and night</small>
             : shopKind
             ? <small className={shopOpen(state, shopKind).open ? "is-open" : ""}>{shopOpen(state, shopKind).open ? "Open now" : `Closed · ${shopOpen(state, shopKind).text}`}</small>
             : <small className={counter.open ? "is-open" : ""}>{counter.open ? "Counter open" : `Counter closed · ${counter.text}`}</small>}
@@ -173,6 +178,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
 
       <section className={`place-sheet${hospitalKind ? " is-hospital" : ""}`}>
         {hospitalKind ? <HospitalPanel state={state} run={run} note={note} scale={scale} />
+          : policeKind ? <PolicePanel state={state} run={run} note={note} scale={scale} />
           : shopKind ? <ShopPanel kind={shopKind} state={state} run={run} note={note} scale={scale} />
           : <BankPanel state={state} run={run} note={note} scale={scale} />}
       </section>

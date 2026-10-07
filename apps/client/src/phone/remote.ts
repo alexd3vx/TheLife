@@ -131,3 +131,6 @@ export const hospitalFirstAid = remote("hospitalFirstAid", core.hospitalFirstAid
 
 // ---- the shops (in person)
 export const shopSnack = remote("shopSnack", core.shopSnack as (s: GameState, kind: core.ShopPlace, id: string, scale?: number) => core.ShopResult, (a) => [a[1], a[2]]); // the price scale is the server's own
+
+// ---- the police station (in person)
+export const police = remote("police", core.policeService as (s: GameState, id: string) => core.PoliceResult);

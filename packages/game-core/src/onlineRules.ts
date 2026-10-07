@@ -11,6 +11,7 @@ import { homeBuy, homeMove, homeSell } from "./home";
 import { payRide } from "./travel";
 import { hospitalFirstAid, hospitalService } from "./hospital";
 import { shopSnack } from "./shop";
+import { policeService } from "./police";
 import { bankBorrow, bankDeposit, bankRepay, bankWithdraw } from "./bank";
 import { buyIngredient, cancelRecipe, chooseDish, chooseRecipe, discardDish, discardLot } from "./kitchen";
 import { BACKGROUNDS, profileFrom, type Profile } from "./profile";
@@ -55,6 +56,7 @@ const HANDLERS: Record<string, Handler> = {
   bankWithdraw: (sim, [amount, atm]) => (typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad)),
   hospital: (sim, [id]) => (str(id, 20) ? hospitalService(sim.state, id as string) : no(bad)),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
+  police: (sim, [id]) => (str(id, 20) ? policeService(sim.state, id as string) : no(bad)),
   shopSnack: (sim, [kind, id]) => (str(kind, 10) && str(id, 20) ? shopSnack(sim.state, kind as "market" | "fuel", id as string, sim.traits.groceries) : no(bad)),
   chooseRecipe: (sim, [id]) => (str(id, 30) ? chooseRecipe(sim.state, id as string) : no(bad)),
   cancelRecipe: (sim) => cancelRecipe(sim.state),

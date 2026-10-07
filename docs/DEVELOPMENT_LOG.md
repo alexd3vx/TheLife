@@ -284,3 +284,8 @@ Chronological record of decisions and changes. Newest first.
 ## Shops
 
 - Markets and fuel stations can be entered from the street (`place/ShopPanel.tsx`, `place/shopScene.ts`). Two tabs: "Eat now" (`game-core/shop.ts`: sachet water, zobo, meat pie, suya, jollof and so on, RPC `shopSnack`) and groceries for the kitchen (the market sells every ingredient, a fuel station's mini-mart only a few staples, `MINIMART_STOCK`). Opening hours follow `places.ts` (market 7AM-7PM, fuel 6AM-10PM); the "thrifty" trait lowers prices on both. Fuel stations now sit in the map's "Food & shops" group.
+
+## Police station
+
+- Police stations can be entered from the street (`place/policeScene.ts`, `place/PolicePanel.tsx`, `game-core/police.ts`, RPC `police`). Free: report a crime or a lost phone (you get a report number, kept in `state.records`), safety advice. Records desk (office hours, weekdays): a ₦5,000 police clearance certificate valid 180 days, shown in the bag. Nothing requires the certificate yet; jobs can ask for `clearanceDaysLeft(state) > 0` later.
+- Place sheets: the result of an action now shows at the top of the sheet, and a long place name no longer covers the Leave button.

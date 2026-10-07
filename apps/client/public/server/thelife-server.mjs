@@ -2585,6 +2585,90 @@ function homeBuy(state, furniture, x, z, rot) {
   return { ok: true, text: `Bought the ${def.name.toLowerCase()} for \u20A6${def.price.toLocaleString()}.` };
 }
 
+// packages/game-core/src/places.ts
+var ALWAYS = { open: 0, close: 24 };
+var HOURS = {
+  airport: ALWAYS,
+  police: ALWAYS,
+  hospital: ALWAYS,
+  fire: ALWAYS,
+  hotel: ALWAYS,
+  school: { open: 7, close: 16, weekdaysOnly: true },
+  church: { open: 5, close: 21 },
+  mosque: { open: 4, close: 22 },
+  bank: { open: 8, close: 16, weekdaysOnly: true },
+  fuel: { open: 6, close: 22 },
+  market: { open: 7, close: 19 },
+  station: { open: 5, close: 22 },
+  museum: { open: 9, close: 17 },
+  government: { open: 8, close: 16, weekdaysOnly: true },
+  stadium: { open: 9, close: 22 },
+  park: { open: 6, close: 20 },
+  port: { open: 6, close: 18 }
+};
+var label = (h) => `${(Math.floor(h) + 11) % 12 + 1}${h % 24 >= 12 && h % 24 < 24 ? "PM" : "AM"}`;
+function openStatus(kind, hour, weekday) {
+  const h = HOURS[kind];
+  if (h.open === 0 && h.close === 24) return { open: true, text: "Open 24h" };
+  const weekend = weekday === 0 || weekday === 6;
+  if (h.weekdaysOnly && weekend) return { open: false, text: "closed today" };
+  if (hour >= h.open && hour < h.close) return { open: true, text: `Open \xB7 till ${label(h.close)}` };
+  return { open: false, text: hour < h.open ? `opens ${label(h.open)}` : `opens ${label(h.open)} tomorrow` };
+}
+
+// packages/game-core/src/police.ts
+var CLEARANCE_PRICE = 5e3;
+var CLEARANCE_DAYS = 180;
+var MAX_REPORTS = 20;
+var POLICE_SERVICES = [
+  { id: "clearance", name: "Police clearance certificate", blurb: "The paper employers and embassies ask for. Valid six months.", price: CLEARANCE_PRICE, desk: true },
+  { id: "report", name: "Report a crime", blurb: "Theft, a fight, a missing phone. You get a report number.", price: 0 },
+  { id: "lostphone", name: "Report a lost or stolen phone", blurb: "An extract of the report you can show your network.", price: 0 },
+  { id: "advice", name: "Ask for safety advice", blurb: "An officer tells you what to watch for in the city.", price: 0 }
+];
+var TIPS = [
+  "Do not count money in public. Use the cash machine in daylight and put the cash away before you walk off.",
+  "At night keep to the lit streets and the main roads. If a danfo driver says one price and the conductor another, step down and wait for the next.",
+  'Never hand your phone to a stranger "to make one quick call". Many phones go that way.',
+  "At the market, keep your bag in front of you. Pickpockets like the crowded lanes around the stalls.",
+  "If someone stops you on the road and does not show an ID, do not follow them. Walk to the nearest station and ask for the duty officer.",
+  "Save the emergency number 112 in your phone. It works on any network, even without airtime."
+];
+function parseRecords(raw) {
+  const r = raw ?? {};
+  const reports = Array.isArray(r.reports) ? r.reports.filter((x) => x && typeof x.no === "string" && typeof x.minute === "number").slice(-MAX_REPORTS).map((x) => ({ no: x.no.slice(0, 30), text: String(x.text ?? "").slice(0, 120), minute: x.minute })) : [];
+  return { ...typeof r.clearance === "number" && Number.isFinite(r.clearance) ? { clearance: r.clearance } : {}, reports };
+}
+function deskOpen(state) {
+  const clock = clockOf(state.minute);
+  return openStatus("government", clock.hourFloat, (clock.day + 3) % 7);
+}
+function clearanceDaysLeft(state) {
+  const at = state.records?.clearance;
+  if (at === void 0) return 0;
+  return Math.max(0, Math.ceil(CLEARANCE_DAYS - (state.minute - at) / 1440));
+}
+function policeService(state, id) {
+  const s = POLICE_SERVICES.find((x) => x.id === id);
+  if (!s) return { ok: false, reason: "The officer says they cannot help with that." };
+  const records = state.records ??= { reports: [] };
+  if (s.id === "advice") return { ok: true, text: TIPS[Math.floor(state.minute / 60) % TIPS.length] };
+  if (s.id === "clearance") {
+    const desk = deskOpen(state);
+    if (!desk.open) return { ok: false, reason: `The records desk is closed (${desk.text}).` };
+    if (clearanceDaysLeft(state) > 30) return { ok: false, reason: `You already have a clearance with ${clearanceDaysLeft(state)} days left.` };
+    const r = transfer(state.ledger, PLAYER, SINK, s.price, "Police clearance", state.minute);
+    if (!r.ok) return { ok: false, reason: `The certificate costs \u20A6${s.price.toLocaleString()}. You have \u20A6${balance(state.ledger, PLAYER).toLocaleString()}.` };
+    state.stats.totalSpent += s.price;
+    records.clearance = state.minute;
+    return { ok: true, text: `Your police clearance is ready (\u20A6${s.price.toLocaleString()}). It is valid for ${CLEARANCE_DAYS} days and is in your bag.` };
+  }
+  const no2 = `LPD/${clockOf(state.minute).day}/${String(records.reports.length + 1).padStart(3, "0")}`;
+  records.reports.push({ no: no2, text: s.id === "lostphone" ? "Lost or stolen phone" : "Crime report", minute: state.minute });
+  if (records.reports.length > MAX_REPORTS) records.reports.splice(0, records.reports.length - MAX_REPORTS);
+  return { ok: true, text: `The officer wrote it down. Your report number is ${no2}.${s.id === "lostphone" ? " Show it to your network to block the line." : ""}` };
+}
+
 // packages/game-core/src/persist.ts
 function parseGameState(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -2618,6 +2702,7 @@ function parseGameState(raw) {
     inventory,
     kitchen: parseKitchen(r.kitchen, profile?.tier),
     ...r.home ? { home: parseHome(r.home) } : {},
+    ...r.records ? { records: parseRecords(r.records) } : {},
     ...typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {},
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,
@@ -3839,37 +3924,6 @@ function hospitalFirstAid(state) {
   return { ok: true, text: `The nurses saw you first and did not ask for money. ${need[0].toUpperCase()}${need.slice(1)} is back to a safe level.` };
 }
 
-// packages/game-core/src/places.ts
-var ALWAYS = { open: 0, close: 24 };
-var HOURS = {
-  airport: ALWAYS,
-  police: ALWAYS,
-  hospital: ALWAYS,
-  fire: ALWAYS,
-  hotel: ALWAYS,
-  school: { open: 7, close: 16, weekdaysOnly: true },
-  church: { open: 5, close: 21 },
-  mosque: { open: 4, close: 22 },
-  bank: { open: 8, close: 16, weekdaysOnly: true },
-  fuel: { open: 6, close: 22 },
-  market: { open: 7, close: 19 },
-  station: { open: 5, close: 22 },
-  museum: { open: 9, close: 17 },
-  government: { open: 8, close: 16, weekdaysOnly: true },
-  stadium: { open: 9, close: 22 },
-  park: { open: 6, close: 20 },
-  port: { open: 6, close: 18 }
-};
-var label = (h) => `${(Math.floor(h) + 11) % 12 + 1}${h % 24 >= 12 && h % 24 < 24 ? "PM" : "AM"}`;
-function openStatus(kind, hour, weekday) {
-  const h = HOURS[kind];
-  if (h.open === 0 && h.close === 24) return { open: true, text: "Open 24h" };
-  const weekend = weekday === 0 || weekday === 6;
-  if (h.weekdaysOnly && weekend) return { open: false, text: "closed today" };
-  if (hour >= h.open && hour < h.close) return { open: true, text: `Open \xB7 till ${label(h.close)}` };
-  return { open: false, text: hour < h.open ? `opens ${label(h.open)}` : `opens ${label(h.open)} tomorrow` };
-}
-
 // packages/game-core/src/shop.ts
 var SNACKS = [
   { id: "water", name: "Sachet water", blurb: "Cold pure water.", price: 100, effect: { energy: 2, hunger: 1 } },
@@ -3996,6 +4050,7 @@ var HANDLERS = {
   bankWithdraw: (sim, [amount, atm]) => typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad),
   hospital: (sim, [id]) => str(id, 20) ? hospitalService(sim.state, id) : no(bad),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
+  police: (sim, [id]) => str(id, 20) ? policeService(sim.state, id) : no(bad),
   shopSnack: (sim, [kind, id]) => str(kind, 10) && str(id, 20) ? shopSnack(sim.state, kind, id, sim.traits.groceries) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),

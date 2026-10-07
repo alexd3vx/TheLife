@@ -1,5 +1,6 @@
 import { PHONE_MODELS, chargerById } from "./phoneData.js";
 import { balance } from "./ledger.js";
+import { clearanceDaysLeft } from "./police.js";
 import type { GameState } from "./types.js";
 
 // What the player carries. Every item has a size on the bag's grid (one cell is a hand's width), and the bag only has so many cells, so
@@ -45,6 +46,10 @@ export function bagItems(state: GameState): BagItem[] {
   out.push({ id: "wallet", name: "Wallet", w: 2, h: 1, icon: "cash", note: `₦${Math.max(0, Math.round(balance(state.ledger))).toLocaleString("en-NG")} in your account` });
   out.push({ id: "keys", name: "House key", w: 1, h: 1, icon: "key", note: "Opens your door" });
   out.push({ id: "id", name: "ID card", w: 1, h: 1, icon: "id", note: state.profile ? `${state.profile.firstName} ${state.profile.surname}`.trim() : "Your ID" });
+  {
+    const left = clearanceDaysLeft(state);
+    if (left > 0) out.push({ id: "clearance", name: "Police clearance", w: 1, h: 1, icon: "id", note: `Valid for ${left} more day${left === 1 ? "" : "s"}` });
+  }
   for (const cid of state.phone.chargers) {
     const c = chargerById(cid);
     if (c) out.push({ id: `charger:${cid}`, name: c.name, w: 1, h: 1, icon: "charger", note: `${c.rate}% battery per hour` });
