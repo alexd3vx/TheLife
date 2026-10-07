@@ -12,7 +12,7 @@ A lagoon in the middle, an ocean to the south, five districts joined by three br
         |                     |
    Third Bridge          Link Road
         |                     |
- Balogun Bazaar ---- Eko Crown ---- Palm Estates
+ Balogun Bazaar ---- Alexion Crown ---- Palm Estates
    (west markets)    (centre island)  (south-east)
                    |
               Harbour & Bridges
@@ -24,7 +24,7 @@ A lagoon in the middle, an ocean to the south, five districts joined by three br
 
 Place kinds in brackets are the interior types already built; "new" means a new interior to make.
 
-### 1. Eko Crown (centre island: government, money, culture)
+### 1. Alexion Crown (centre island: government, money, culture)
 1. Alexion Square and the Eagle Monument (open ground, events, elections)
 2. Cathedral of the Holy Cross [church]
 3. Grand Central Mosque [mosque]
@@ -35,7 +35,7 @@ Place kinds in brackets are the interior types already built; "new" means a new 
 8. National Museum [new]
 9. High Court and the Polling Unit [new]
 10. Central Police Command [police]
-11. Eko Teaching Hospital [hospital]
+11. Alexion Teaching Hospital [hospital]
 12. Crown Library and Alexion Primary School [school]
 
 ### 2. Harbour and Bridges (south: water, ferries, fish)
@@ -96,11 +96,11 @@ Place kinds in brackets are the interior types already built; "new" means a new 
 
 ## Transport
 
-Danfo, keke, okada, taxi and your own car on the roads; the ferry loop from Harbour to Palm Estates; a rail line from the Gateway to Eko Crown later. Three bridges (Third Bridge, Link Bridge, Gateway Causeway) are real structures with traffic and water below.
+Danfo, keke, okada, taxi and your own car on the roads; the ferry loop from Harbour to Palm Estates; a rail line from the Gateway to Alexion Crown later. Three bridges (Third Bridge, Link Bridge, Gateway Causeway) are real structures with traffic and water below.
 
 ## Look and feel
 
-Colourful game-style 3D (owner's choice): saturated colours, chunky buildings with real height, water with depth and foam, floating labels with icons, billboards on the roads. A different colour theme for each district so players always know where they are: Eko Crown gold and white, Harbour teal, Bazaar orange and red, Palm Estates pink and turquoise, Gateway blue and grey.
+Colourful game-style 3D (owner's choice): saturated colours, chunky buildings with real height, water with depth and foam, floating labels with icons, billboards on the roads. A different colour theme for each district so players always know where they are: Alexion Crown gold and white, Harbour teal, Bazaar orange and red, Palm Estates pink and turquoise, Gateway blue and grey.
 
 ## Mapping from what is built
 
@@ -111,9 +111,16 @@ Colourful game-style 3D (owner's choice): saturated colours, chunky buildings wi
 | Places with an interior | bank, hospital, police, church, mosque, school, market and fuel stay; 14 new interior types are marked [new] |
 | Real names in chat, rides, map | Invented names |
 
-## Open items for the owner
+## Decisions (7 Oct)
+
+- Alexion City is in Nigeria: naira, Naija culture and Pidgin stay.
+- No "Eko" in the names: everything is Alexion (so the first district is **Alexion Crown**, the hospital **Alexion Teaching Hospital**).
+- The five districts are used as drafted (with that rename).
+- First new interiors, in the owner's order of interest: airport, stadium, motor park, hotel and nightclub.
+
+## Open items for the owner (answered above)
 
 1. Is Alexion City in Nigeria (so naira, Naija culture, Pidgin stay) or in an invented country with the same culture? (I recommend Nigeria-like, with the currency still naira.)
-2. Does the city keep a real Lagos nickname (for example "Eko") as a local name? Used above in "Eko Crown" and "Eko Teaching Hospital".
+2. Does the city keep a real Lagos nickname (for example "Eko") as a local name? Used above in "Alexion Crown" and "Alexion Teaching Hospital".
 3. Which five district names do you like? Rename freely.
 4. Which three of the [new] interiors come first after the school (airport, stadium and bank-at-night are my picks because of the arrival film and the football career)?
