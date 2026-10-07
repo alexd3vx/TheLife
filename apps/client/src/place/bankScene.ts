@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { canvasTexture, std, type PlaceRoom } from "./roomKit";
+import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
 
 /** The bank branch's lobby, built from simple shapes: tiled floor, a teller's counter behind glass, cash machines, benches, plants. */
 
@@ -104,15 +104,17 @@ export function buildBankRoom(name: string): PlaceRoom {
     box(0.08, 0.42, 0.4, legs, x - 0.5, 0, 2.7);
     box(0.08, 0.42, 0.4, legs, x + 0.5, 0, 2.7);
   }
-  for (const x of [-2.6, 0, 2.6]) {
+  for (const x of [-2.6, -0.7, 0.7, 2.6]) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 10), std("#c9d6ee", 0.3, 0.6));
     post.position.set(x, 0.45, 0.2);
     post.castShadow = true;
     g.add(post);
   }
-  const rope = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.03, 0.03), std("#2f55d8", 0.7));
-  rope.position.set(0, 0.8, 0.2);
-  g.add(rope);
+  for (const cx of [-1.65, 1.65]) {
+    const rope = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.03, 0.03), std("#2f55d8", 0.7));
+    rope.position.set(cx, 0.8, 0.2);
+    g.add(rope);
+  }
   for (const [x, z] of [[-4.4, -3.4], [4.4, 3.4], [-4.4, 3.4]] as const) {
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.45, 12), std("#7a8cb8", 0.8));
     pot.position.set(x, 0.22, z);
@@ -127,17 +129,21 @@ export function buildBankRoom(name: string): PlaceRoom {
   box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 2.4, false);
 
   // light fittings
-  const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#e8f1ff", emissiveIntensity: 1.4 });
-  for (const x of [-3, 0, 3]) for (const z of [2]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
-    lamp.position.set(x, H - 0.1, z);
-    g.add(lamp);
-  }
 
   return {
     group: g,
-    playerAt: new THREE.Vector3(1.1, 0, -0.5),
-    staffAt: new THREE.Vector3(-0.1, 0, -2.75),
+    spawn: new THREE.Vector3(0.6, 0, 3.0),
+    bounds: rect(0, 0, 9.2, 7.6),
+    blockers: [rect(0, -2.5, 5.8, 2.6), rect(W / 2 - 0.55, 0.2, 0.8, 1.0), rect(W / 2 - 0.55, 1.5, 0.8, 1.0), rect(-3.2, 2.8, 1.4, 0.6), rect(-1.7, 2.8, 1.4, 0.6), rect(-4.4, -3.4, 0.7, 0.7), rect(4.4, 3.4, 0.7, 0.7), rect(-4.4, 3.4, 0.7, 0.7)],
+    door: rect(0, D / 2 + 0.3, 2.4, 0.6),
+    spots: [
+      { id: "teller", label: "Talk to the teller", x: 0, z: -0.3, r: 1.9, face: Math.PI, focus: "teller" },
+      { id: "atm", label: "Use the cash machine", x: 3.5, z: 0.85, r: 1.5, face: Math.PI / 2, focus: "atm" },
+      { id: "socket", label: "Charge your phone", x: -4.1, z: 2.4, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+    ],
+    staff: [{ x: -0.1, z: -2.75, yaw: 0, clip: "Life_Type_Loop", greeting: `Welcome to ${name}. How can I help?` }],
+    waypoints: [[-3.6, 0.9], [-0.9, 1.5], [2.6, 2.3], [3.0, 3.1], [-0.6, 3.1], [1.6, 0.9], [-3.4, 0.2]],
+    visitors: 3,
     update() {},
   };
 }

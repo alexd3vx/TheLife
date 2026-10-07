@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { canvasTexture, std, type PlaceRoom } from "./roomKit";
+import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
 
 /** The hospital's ground floor: a reception desk with a nurse, two ward beds behind a curtain, a pharmacy hatch, a waiting area. White and teal. */
 
@@ -135,12 +135,22 @@ export function buildHospitalRoom(name: string): PlaceRoom {
   }
   box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 2.4, false); // the charging socket
 
-  const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#f2fbff", emissiveIntensity: 1.5 });
-  for (const x of [-3, 0, 3]) for (const z of [2]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
-    lamp.position.set(x, H - 0.1, z);
-    g.add(lamp);
-  }
 
-  return { group: g, playerAt: new THREE.Vector3(1.1, 0, -0.5), staffAt: new THREE.Vector3(-0.1, 0, -2.7), update() {} };
+  return {
+    group: g,
+    spawn: new THREE.Vector3(0.6, 0, 3.0),
+    bounds: rect(0, 0, 9.2, 7.6),
+    blockers: [rect(-0.1, -2.5, 5.0, 2.6), rect(-4.4, -2.6, 1.0, 2.8), rect(3.7, -1.9, 2.4, 4.4), rect(-2.6, 2.8, 2.6, 0.7), rect(-4.4, 3.4, 0.7, 0.7), rect(4.4, 3.4, 0.7, 0.7)],
+    door: rect(0, D / 2 + 0.3, 2.4, 0.6),
+    spots: [
+      { id: "reception", label: "Talk to the nurse", x: -0.1, z: -0.3, r: 1.9, face: Math.PI, focus: "care" },
+      { id: "pharmacy", label: "Pharmacy hatch", x: -3.3, z: -2.6, r: 1.3, face: -Math.PI / 2, focus: "pharmacy" },
+      { id: "ward", label: "Ask for a ward bed", x: 1.9, z: -1.0, r: 1.3, face: Math.PI / 2, focus: "ward" },
+      { id: "socket", label: "Charge your phone", x: -4.1, z: 2.4, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+    ],
+    staff: [{ x: -0.1, z: -2.7, yaw: 0, clip: "Idle_Loop", greeting: `Welcome to ${name}. What is the matter?` }],
+    waypoints: [[-3.2, 0.6], [-1.2, 1.4], [1.4, 1.8], [3.4, 2.8], [0.8, 3.2], [-3.4, -0.6], [1.9, 0.9]],
+    visitors: 4,
+    update() {},
+  };
 }

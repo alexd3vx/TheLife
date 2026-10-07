@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { canvasTexture, std, type PlaceRoom } from "./roomKit";
+import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
 
 /** A police station's front office: a high desk with the duty officer, a notice board, a holding bench, filing cabinets, a flag. Navy and grey. */
 export function buildPoliceRoom(name: string): PlaceRoom {
@@ -100,11 +100,20 @@ export function buildPoliceRoom(name: string): PlaceRoom {
   g.add(leaves);
   box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 2.4, false); // the charging socket
 
-  const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#eef3ff", emissiveIntensity: 1.3 });
-  for (const x of [-3, 0, 3]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
-    lamp.position.set(x, H - 0.1, 2);
-    g.add(lamp);
-  }
-  return { group: g, playerAt: new THREE.Vector3(1.1, 0, -0.5), staffAt: new THREE.Vector3(-0.1, 0, -2.7), update() {} };
+  return {
+    group: g,
+    spawn: new THREE.Vector3(0.6, 0, 3.0),
+    bounds: rect(0, 0, 9.2, 7.6),
+    blockers: [rect(-0.1, -2.5, 5.0, 2.6), rect(-W / 2 + 0.2, -1.2, 0.6, 2.6), rect(2.5, 2.8, 2.9, 0.8), rect(3.3, -3.4, 0.5, 0.5), rect(-4.4, 3.4, 0.7, 0.7)],
+    door: rect(0, D / 2 + 0.3, 2.4, 0.6),
+    spots: [
+      { id: "desk", label: "Talk to the duty officer", x: -0.1, z: -0.3, r: 1.9, face: Math.PI, focus: "desk" },
+      { id: "board", label: "Read the notice board", x: -3.7, z: -1.2, r: 1.2, face: -Math.PI / 2, focus: "board" },
+      { id: "socket", label: "Charge your phone", x: -4.1, z: 2.4, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+    ],
+    staff: [{ x: -0.1, z: -2.7, yaw: 0, clip: "Idle_Loop", greeting: "Good day. How may I help you?" }],
+    waypoints: [[-3.0, 1.0], [1.0, 1.4], [3.4, 1.0], [-1.0, 3.1], [2.0, 3.2]],
+    visitors: 2,
+    update() {},
+  };
 }

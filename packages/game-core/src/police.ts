@@ -1,7 +1,7 @@
 import { PLAYER, SINK, balance, transfer } from "./ledger";
 import { openStatus } from "./places";
 import { clockOf } from "./sim";
-import type { GameState, PoliceRecords } from "./types";
+import type { GameState, PlayerRecords } from "./types";
 
 /**
  * The police station: report a crime (free, any hour, you get a report number), ask for advice, and apply for a police clearance
@@ -38,10 +38,12 @@ const TIPS = [
 
 export type PoliceResult = { ok: true; text: string } | { ok: false; reason: string };
 
-export function parseRecords(raw: unknown): PoliceRecords {
-  const r = (raw ?? {}) as Partial<PoliceRecords>;
+export function parseRecords(raw: unknown): PlayerRecords {
+  const r = (raw ?? {}) as Partial<PlayerRecords>;
   const reports = Array.isArray(r.reports) ? r.reports.filter((x) => x && typeof x.no === "string" && typeof x.minute === "number").slice(-MAX_REPORTS).map((x) => ({ no: x.no.slice(0, 30), text: String(x.text ?? "").slice(0, 120), minute: x.minute })) : [];
-  return { ...(typeof r.clearance === "number" && Number.isFinite(r.clearance) ? { clearance: r.clearance } : {}), reports };
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
+  const keep = <K extends string>(k: K, v: number | undefined) => (v === undefined ? {} : ({ [k]: v } as Record<K, number>));
+  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), reports };
 }
 
 /** Is the records desk open now? */

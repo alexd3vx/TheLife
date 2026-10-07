@@ -31,7 +31,10 @@ import "./map.css";
 
 /** The neighbourhood, streamed in chunks. A test bench for the map engine: walk around, zoom out, and run the performance tour. */
 /** Kinds of place that have an inside you can walk into. */
-const INSIDE = new Set<string>(["bank", "hospital", "market", "fuel", "police"]);
+const INSIDE = new Set<string>(["bank", "hospital", "market", "fuel", "police", "church", "mosque"]);
+/** How close to a door you must walk to go in, and how far you must walk off before the same door lets you in again. */
+const DOOR_REACH = 2.4;
+const DOOR_RESET = 6;
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,13 +130,24 @@ export default function MapPage() {
     }
     return best;
   })();
-  // a place with an inside (the bank and the hospital so far) when you stand at its door
-  const nearPlace = stats && intro === "off" ? district.landmarks.find((l) => INSIDE.has(l.kind) && Math.hypot(l.entrance.x - stats.position.x, l.entrance.z - stats.position.z) < 9) ?? null : null;
+  // a place with an inside: walk up to its door and you go in (not before)
   const [inside, setInside] = useState<Landmark | null>(null);
-  const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlace ? `Go into ${nearPlace.name}` : nearPlayer ? nearPlayer.name : null;
-  const nearRef = useRef({ atHome, nearPlayer, nearPlace });
-  nearRef.current = { atHome, nearPlayer, nearPlace };
+  const justLeft = useRef<string | null>(null);
+  const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlayer ? nearPlayer.name : null;
+  const nearRef = useRef({ atHome, nearPlayer });
+  nearRef.current = { atHome, nearPlayer };
   const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip || !!inside;
+  useEffect(() => {
+    if (!stats || mode !== "street") return;
+    const px = stats.position.x, pz = stats.position.z;
+    if (justLeft.current) {
+      const lm = district.landmarks.find((l) => l.id === justLeft.current);
+      if (!lm || Math.hypot(lm.entrance.x - px, lm.entrance.z - pz) > DOOR_RESET) justLeft.current = null;
+    }
+    if (blocked || atHome || inside || !life.session) return;
+    const door = district.landmarks.find((l) => INSIDE.has(l.kind) && l.id !== justLeft.current && Math.hypot(l.entrance.x - px, l.entrance.z - pz) < DOOR_REACH);
+    if (door) setInside(door);
+  }, [stats, blocked, atHome, inside, mode, district, life.session]);
   useEffect(() => {
     runtimeRef.current?.setInputBlocked(blocked);
   }, [blocked, loading]);
@@ -150,7 +164,6 @@ export default function MapPage() {
       if (a === "interact") {
         const n = nearRef.current;
         if (n.atHome) window.location.hash = "#/play";
-        else if (n.nearPlace) setInside(n.nearPlace);
         else if (n.nearPlayer) window.dispatchEvent(new CustomEvent("thelife-open-online", { detail: n.nearPlayer.id }));
       } else if (a === "resetCamera") runtimeRef.current?.resetView();
       else if (a === "map") window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "maps" }));
@@ -270,12 +283,7 @@ export default function MapPage() {
         </div>
       )}
 
-      {nearPlace && !atHome && !inside && intro === "off" && mode === "street" && !trip && (
-        <button className="map-enter" onClick={() => setInside(nearPlace)}>
-          <GameIcon name={nearPlace.kind === "hospital" ? "hospital" : nearPlace.kind === "bank" ? "bank" : nearPlace.kind === "fuel" ? "fuel" : nearPlace.kind === "police" ? "police" : "market"} /> Go into {nearPlace.name}
-        </button>
-      )}
-      {inside && life.session && <PlaceInterior place={inside} session={life.session} onClose={() => setInside(null)} />}
+      {inside && life.session && <PlaceInterior place={inside} session={life.session} onClose={() => { justLeft.current = inside.id; setInside(null); }} />}
       {atHome && intro === "off" && mode === "street" && (
         <a className="map-enter" href="#/play">
           <GameIcon name="home" /> Enter home

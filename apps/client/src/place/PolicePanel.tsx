@@ -1,9 +1,9 @@
 import { CLEARANCE_DAYS, PLAYER, POLICE_SERVICES, balance, clearanceDaysLeft, deskOpen } from "@thelife/game-core";
 import { police } from "../phone/remote";
-import { ChargeButton, naira, type PanelProps } from "./panel";
+import { naira, type PanelProps } from "./panel";
 
 /** The police station's sheet: the records desk (clearance certificate), reports, advice, and the reports you have already made. */
-export default function PolicePanel({ state, run, note }: PanelProps) {
+export default function PolicePanel({ state, run, note, focus }: PanelProps) {
   const cash = balance(state.ledger, PLAYER);
   const desk = deskOpen(state);
   const left = clearanceDaysLeft(state);
@@ -17,7 +17,7 @@ export default function PolicePanel({ state, run, note }: PanelProps) {
       </div>
       {left > 0 && <p className="place-note">Your police clearance is valid for {left} more day{left === 1 ? "" : "s"} (of {CLEARANCE_DAYS}). It is in your bag.</p>}
       <div className="place-services">
-        {POLICE_SERVICES.map((s) => {
+        {POLICE_SERVICES.filter((s) => focus !== "board" || s.id === "advice").map((s) => {
           const blocked = (s.desk && !desk.open) || s.price > cash || (s.id === "clearance" && left > 30);
           return (
             <button key={s.id} className="place-service" disabled={blocked} onClick={() => run(() => police(state, s.id))}>
@@ -32,7 +32,6 @@ export default function PolicePanel({ state, run, note }: PanelProps) {
           Your reports: {reports.slice(-3).map((r) => `${r.no} (${r.text.toLowerCase()})`).join(" · ")}
         </div>
       )}
-      <ChargeButton state={state} run={run} />
       {note && <p className={`place-result${note.ok ? "" : " is-bad"}`} role="status">{note.text}</p>}
     </>
   );

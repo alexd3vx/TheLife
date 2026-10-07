@@ -19,10 +19,54 @@ export function canvasTexture(w: number, h: number, paint: (g: CanvasRenderingCo
 
 export const std = (color: string, rough = 0.8, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
 
-/** What every interior hands back: its 3D group, where the customer and the staff member stand. */
+/** A flat rectangle on the floor (x and z, in metres) that people cannot walk through. */
+export interface Rect {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+export const rect = (cx: number, cz: number, w: number, d: number): Rect => ({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 });
+
+/** Somewhere to stand to use something: the counter, a cash machine, a socket. `focus` says which part of the service sheet it opens. */
+export interface Spot {
+  id: string;
+  /** The button the player sees when they stand here ("Talk to the teller"). */
+  label: string;
+  x: number;
+  z: number;
+  /** How close you must be, in metres. */
+  r: number;
+  /** Which way the character turns to face the thing (radians; 0 faces the camera, PI faces the back wall). */
+  face: number;
+  focus: string;
+}
+
+export interface StaffSpec {
+  x: number;
+  z: number;
+  /** Height of the floor they stand on (a platform). */
+  y?: number;
+  yaw: number;
+  clip: string;
+  greeting: string;
+}
+
+/** What every interior hands back: its 3D group, a walkable floor with things in the way, the spots that open a menu, who works there and where visitors wander. */
 export interface PlaceRoom {
   group: THREE.Group;
-  playerAt: THREE.Vector3;
-  staffAt: THREE.Vector3;
+  /** Where you appear (just inside the door). */
+  spawn: THREE.Vector3;
+  /** The walkable floor. */
+  bounds: Rect;
+  blockers: Rect[];
+  /** Walk into this to go back out to the street. */
+  door: Rect;
+  spots: Spot[];
+  staff: StaffSpec[];
+  /** Places the other people in the room walk between. */
+  waypoints: [number, number][];
+  /** How many other visitors are there on an ordinary day. */
+  visitors: number;
   update(dt: number): void;
 }

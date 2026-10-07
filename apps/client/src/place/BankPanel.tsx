@@ -2,13 +2,13 @@ import { useState } from "react";
 import { ATM_FEE, PLAYER, SAVINGS, balance, counterOpen, loanLimit } from "@thelife/game-core";
 import { bankBorrow, bankDeposit, bankRepay, bankWithdraw } from "../phone/remote";
 import type { PanelProps } from "./panel";
-import { ChargeButton, naira } from "./panel";
+import { naira } from "./panel";
 
 type Window = "teller" | "atm";
 
 /** The bank's service sheet: the teller (savings, loans) and the cash machine. It uses the same savings and loan as the phone's LifePay. */
-export default function BankPanel({ state, run, note }: PanelProps) {
-  const [win, setWin] = useState<Window>("teller");
+export default function BankPanel({ state, run, note, focus }: PanelProps) {
+  const [win, setWin] = useState<Window>(focus === "atm" ? "atm" : "teller");
   const [amount, setAmount] = useState("5000");
   const cash = balance(state.ledger, PLAYER);
   const saved = balance(state.ledger, SAVINGS);
@@ -26,10 +26,10 @@ export default function BankPanel({ state, run, note }: PanelProps) {
         <span><small>Savings</small><b>{naira(saved)}</b></span>
         <span className={loan ? "is-owe" : ""}><small>Loan</small><b>{loan ? naira(loan) : "None"}</b></span>
       </div>
-      <nav className="place-tabs">
+      {!focus && <nav className="place-tabs">
         <button className={win === "teller" ? "is-on" : ""} onClick={() => setWin("teller")}>Teller</button>
         <button className={win === "atm" ? "is-on" : ""} onClick={() => setWin("atm")}>Cash machine</button>
-      </nav>
+      </nav>}
 
       <label className="place-amount">
         <span>Amount</span>
@@ -52,7 +52,6 @@ export default function BankPanel({ state, run, note }: PanelProps) {
       </div>
       {!atm && <p className="place-note">You can borrow up to {naira(loanLimit(state.profile))} at 10%. Savings earn interest every week, here and on your phone.</p>}
 
-      <ChargeButton state={state} run={run} />
       {note && <p className={`place-result${note.ok ? "" : " is-bad"}`} role="status">{note.text}</p>}
     </>
   );

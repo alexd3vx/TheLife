@@ -35,11 +35,16 @@ export interface Inventory {
   meals: number;
 }
 
-export interface PoliceRecords {
+export interface PlayerRecords {
   /** Game minute the police clearance was issued (valid for 180 days). */
   clearance?: number;
   /** Reports made at the station, newest last. */
   reports: { no: string; text: string; minute: number }[];
+  /** Worship: when you last prayed, joined a service and talked to the pastor or imam (game minutes), and what you have given in all. */
+  lastPrayer?: number;
+  lastService?: number;
+  lastCounsel?: number;
+  giving?: number;
 }
 
 export interface GameState {
@@ -55,8 +60,8 @@ export interface GameState {
   home?: HomeChanges;
   /** How the character looks (a cleaned JSON string; see the client's Look). Kept with the life, on the server. */
   look?: string;
-  /** Papers and reports from the police station. */
-  records?: PoliceRecords;
+  /** Papers and reports from the police station, and what you do at church or the mosque. */
+  records?: PlayerRecords;
   /** Skill experience by skill id. */
   skills: Record<string, number>;
   /** Pay earned but not yet paid out (fractions of a naira). */

@@ -31,3 +31,4 @@ export * from "./bank.js";
 export * from "./hospital.js";
 export * from "./shop.js";
 export * from "./police.js";
+export * from "./worship.js";

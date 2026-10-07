@@ -951,8 +951,8 @@ function takeLesson(state, courseId) {
   const p = state.phone;
   const done_ = p.courses[courseId] ?? 0;
   if (done_ >= course.lessons.length) return fail("You finished this course.");
-  const wait = nextLessonIn(state);
-  if (wait > 0) return fail(`Rest your mind. The next lesson opens in ${wait} min.`);
+  const wait2 = nextLessonIn(state);
+  if (wait2 > 0) return fail(`Rest your mind. The next lesson opens in ${wait2} min.`);
   if (state.needs.energy < 20) return fail("You're too tired to focus.");
   p.courses[courseId] = done_ + 1;
   p.lastLessonAt = state.minute;
@@ -1051,8 +1051,8 @@ function nextWorkoutIn(state) {
 function doWorkout(state, id) {
   const w = WORKOUTS.find((x) => x.id === id);
   if (!w) return fail("Unknown workout.");
-  const wait = nextWorkoutIn(state);
-  if (wait > 0) return fail(`Rest first. The next workout is ready in ${wait} min.`);
+  const wait2 = nextWorkoutIn(state);
+  if (wait2 > 0) return fail(`Rest first. The next workout is ready in ${wait2} min.`);
   if (state.needs.energy < w.energy + 10) return fail("You're too tired for that.");
   if (state.needs.hunger < 20) return fail("You're too hungry to exercise. Eat first.");
   const n = state.needs;
@@ -1069,8 +1069,8 @@ function nextGigIn(state) {
 function doGig(state, id) {
   const g = GIGS.find((x) => x.id === id);
   if (!g) return fail("Unknown gig.");
-  const wait = nextGigIn(state);
-  if (wait > 0) return fail(`You need a break. The next gig opens in ${wait} min.`);
+  const wait2 = nextGigIn(state);
+  if (wait2 > 0) return fail(`You need a break. The next gig opens in ${wait2} min.`);
   if (state.needs.energy < g.energy + 15) return fail("You're too tired for this gig.");
   state.needs.energy -= g.energy;
   state.needs.fun = Math.max(0, state.needs.fun - 3);
@@ -2637,7 +2637,9 @@ var TIPS = [
 function parseRecords(raw) {
   const r = raw ?? {};
   const reports = Array.isArray(r.reports) ? r.reports.filter((x) => x && typeof x.no === "string" && typeof x.minute === "number").slice(-MAX_REPORTS).map((x) => ({ no: x.no.slice(0, 30), text: String(x.text ?? "").slice(0, 120), minute: x.minute })) : [];
-  return { ...typeof r.clearance === "number" && Number.isFinite(r.clearance) ? { clearance: r.clearance } : {}, reports };
+  const num = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : void 0;
+  const keep = (k, v) => v === void 0 ? {} : { [k]: v };
+  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), reports };
 }
 function deskOpen(state) {
   const clock = clockOf(state.minute);
@@ -3960,6 +3962,94 @@ function shopSnack(state, kind, id, scale = 1) {
   return { ok: true, text: `${s.name} (\u20A6${price.toLocaleString()}): ${gained.length ? `${gained.join(", ")} up.` : "you were not hungry."}` };
 }
 
+// packages/game-core/src/worship.ts
+var WORSHIP_SERVICES = [
+  { id: "service", name: "Join the service", blurb: "The main gathering of the week. Free. Songs, a sermon and company.", price: 0 },
+  { id: "counsel", name: "Talk with the pastor", blurb: "A listening ear and a few kind words. Free.", price: 0 },
+  { id: "pray", name: "Pray quietly", blurb: "Sit still for a while. Free.", price: 0 },
+  { id: "candle", name: "Light a candle", blurb: "A small light for someone you love.", price: 200 },
+  { id: "offering_500", name: "Give \u20A6500", blurb: "A small offering.", price: 500 },
+  { id: "offering_2000", name: "Give \u20A62,000", blurb: "An offering for the poor box.", price: 2e3 },
+  { id: "offering_10000", name: "Give \u20A610,000", blurb: "A generous gift to the community.", price: 1e4 }
+];
+var HOUR = 60;
+var PRAYER_GAP = 3 * HOUR;
+var COUNSEL_GAP = 6 * HOUR;
+var WORDS_CHURCH = [
+  '"Do not worry about tomorrow. Today has enough of its own trouble." Go well, my child.',
+  'The pastor smiles. "Hard days pass. Keep showing up for the people around you."',
+  '"Be kind to yourself too. You cannot pour from an empty cup."',
+  '"Work hard, rest well, and give thanks for small things."'
+];
+var WORDS_MOSQUE = [
+  'The imam nods. "With hardship comes ease. Be patient, and keep your word."',
+  '"Look after your neighbour, and your neighbour will look after you."',
+  '"Eat well, sleep well, and be thankful. That is half of health."',
+  '"A good deed done quietly is worth more than a loud one."'
+];
+function serviceOn(state, faith) {
+  const clock = clockOf(state.minute);
+  const weekday = (clock.day + 3) % 7;
+  const [day, from, to, label2] = faith === "church" ? [0, 8, 11, "Sunday 8AM-11AM"] : [5, 12, 14, "Friday 12PM-2PM"];
+  return { on: weekday === day && clock.hourFloat >= from && clock.hourFloat < to, text: label2 };
+}
+function houseOpen(state, faith) {
+  const clock = clockOf(state.minute);
+  return openStatus(faith, clock.hourFloat, (clock.day + 3) % 7);
+}
+var wait = (last, now, gap) => last === void 0 ? 0 : Math.max(0, last + gap - now);
+var hoursText = (min) => min >= 90 ? `${Math.round(min / 60)} hours` : `${Math.max(1, Math.ceil(min))} minutes`;
+function worshipService(state, faith, id) {
+  if (faith !== "church" && faith !== "mosque") return { ok: false, reason: "That is not a place of worship." };
+  const s = WORSHIP_SERVICES.find((x) => x.id === id);
+  if (!s) return { ok: false, reason: "They do not offer that." };
+  const open = houseOpen(state, faith);
+  if (!open.open) return { ok: false, reason: `It is closed (${open.text}).` };
+  const rec = state.records ??= { reports: [] };
+  const now = state.minute;
+  const bump = (fun2, energy = 0) => {
+    state.needs.fun = clampNeed(state.needs.fun + fun2);
+    state.needs.energy = clampNeed(state.needs.energy + energy);
+  };
+  const house = faith === "church" ? "church" : "mosque";
+  if (s.id === "service") {
+    const on = serviceOn(state, faith);
+    if (!on.on) return { ok: false, reason: `The main service is ${on.text}.` };
+    if (wait(rec.lastService, now, 12 * HOUR) > 0) return { ok: false, reason: "You have already joined this service." };
+    rec.lastService = now;
+    bump(25, -5);
+    return { ok: true, text: `You join the service. The singing and the company lift you. Fun +25, a little tired.` };
+  }
+  if (s.id === "pray") {
+    const w = wait(rec.lastPrayer, now, PRAYER_GAP);
+    if (w > 0) return { ok: false, reason: `You have prayed a moment ago. Come back in ${hoursText(w)}.` };
+    rec.lastPrayer = now;
+    bump(8, 4);
+    return { ok: true, text: `You sit quietly in the ${house} for a while. You feel calmer. Fun +8, rested a little.` };
+  }
+  if (s.id === "counsel") {
+    const w = wait(rec.lastCounsel, now, COUNSEL_GAP);
+    if (w > 0) return { ok: false, reason: `They have just spoken with you. Come back in ${hoursText(w)}.` };
+    rec.lastCounsel = now;
+    bump(8);
+    const words = faith === "church" ? WORDS_CHURCH : WORDS_MOSQUE;
+    return { ok: true, text: words[Math.floor(now / HOUR) % words.length] };
+  }
+  if (s.price > 0) {
+    const r = transfer(state.ledger, PLAYER, SINK, s.price, s.id === "candle" ? "Candle" : "Offering", now);
+    if (!r.ok) return { ok: false, reason: `That is \u20A6${s.price.toLocaleString()}. You have \u20A6${balance(state.ledger, PLAYER).toLocaleString()}.` };
+    state.stats.totalSpent += s.price;
+  }
+  if (s.id === "candle") {
+    bump(4);
+    return { ok: true, text: "You light a candle and say a name. Fun +4." };
+  }
+  rec.giving = (rec.giving ?? 0) + s.price;
+  const fun = s.price >= 1e4 ? 12 : s.price >= 2e3 ? 7 : 3;
+  bump(fun);
+  return { ok: true, text: `Thank you. May it come back to you many times. Fun +${fun}. You have given \u20A6${rec.giving.toLocaleString()} in all.` };
+}
+
 // packages/game-core/src/bank.ts
 var ATM_FEE = 65;
 var MIN_AMOUNT = 100;
@@ -4050,6 +4140,7 @@ var HANDLERS = {
   bankWithdraw: (sim, [amount, atm]) => typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad),
   hospital: (sim, [id]) => str(id, 20) ? hospitalService(sim.state, id) : no(bad),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
+  worship: (sim, [faith, id]) => str(faith, 10) && str(id, 20) ? worshipService(sim.state, faith, id) : no(bad),
   police: (sim, [id]) => str(id, 20) ? policeService(sim.state, id) : no(bad),
   shopSnack: (sim, [kind, id]) => str(kind, 10) && str(id, 20) ? shopSnack(sim.state, kind, id, sim.traits.groceries) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
@@ -4428,9 +4519,9 @@ var Room = class {
   act(player, id, fn, args, now) {
     player.ack = id;
     if (!player.life) return { ok: false, reason: "Make your character first." };
-    const wait = rpcCooldown(fn);
-    if (wait > 0) {
-      if (now - (player.lastRpcAt[fn] ?? 0) < wait * 1e3) return { ok: true };
+    const wait2 = rpcCooldown(fn);
+    if (wait2 > 0) {
+      if (now - (player.lastRpcAt[fn] ?? 0) < wait2 * 1e3) return { ok: true };
       player.lastRpcAt[fn] = now;
     }
     if (fn === "plug" && args[0] === "wall" && player.where === "world" && !chargingSpotNear(this.district, player.x, player.z)) {

@@ -1,11 +1,11 @@
 .place { position: fixed; inset: 0; z-index: 12; display: flex; flex-direction: column; background: #cfe0fa; color: #12233f; font-family: system-ui, sans-serif; }
-.place-stage { position: relative; flex: 1 1 50%; min-height: 260px; }
+.place-stage { position: absolute; inset: 0; }
 .place-wait { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; background: rgba(207, 224, 250, .85); z-index: 2; }
 .place-leave { position: absolute; left: 12px; top: max(12px, env(safe-area-inset-top)); z-index: 3; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 11px 16px; background: rgba(244, 248, 255, .95); color: #12233f; font: 800 .86rem system-ui; box-shadow: 0 6px 22px rgba(8, 20, 50, .28); cursor: pointer; }
 .place-title { position: absolute; right: 12px; top: max(12px, env(safe-area-inset-top)); z-index: 3; display: grid; justify-items: end; padding: 8px 14px; border-radius: 16px; background: rgba(244, 248, 255, .95); box-shadow: 0 6px 22px rgba(8, 20, 50, .28); }
 .place-title small { color: #b3322a; font-weight: 700; }
 .place-title small.is-open { color: #1f6bff; }
-.place-sheet { flex: 0 1 auto; max-height: 50%; overflow-y: auto; display: grid; gap: 10px; padding: 14px 16px max(18px, env(safe-area-inset-bottom)); background: #f4f8ff; border-radius: 26px 26px 0 0; box-shadow: 0 -10px 34px rgba(8, 20, 50, .3); }
+.place-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; max-height: 66%; overflow-y: auto; display: grid; gap: 10px; padding: 14px 16px max(18px, env(safe-area-inset-bottom)); background: #f4f8ff; border-radius: 26px 26px 0 0; box-shadow: 0 -10px 34px rgba(8, 20, 50, .3); }
 .place-money { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .place-money span { display: grid; gap: 1px; padding: 9px 12px; border-radius: 16px; background: #fff; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); }
 .place-money small { color: #5c6f92; font-weight: 700; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
@@ -30,7 +30,7 @@
 .place-charge:disabled { opacity: .45; }
 .place-result { margin: 0; padding: 10px 14px; border-radius: 14px; background: #dbe8ff; color: #12233f; font: 700 .86rem system-ui; }
 .place-result.is-bad { background: #ffe2df; color: #b3322a; }
-@media (min-width: 900px) { .place { flex-direction: row; } .place-stage { flex: 1; } .place-sheet { width: 420px; max-height: none; border-radius: 0; } }
+@media (min-width: 900px) { .place-sheet { left: auto; top: 0; width: 420px; max-height: none; border-radius: 0; } }
 .place-money-2 { grid-template-columns: 1fr 1.4fr; }
 .place-needs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 8px 12px; border-radius: 16px; background: #fff; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); }
 .place-needs span { display: grid; gap: 4px; }
@@ -60,3 +60,13 @@
 .place-title { max-width: calc(100% - 118px); }
 .place-title b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .place-sheet .place-result { order: -1; }
+
+.place { opacity: 1; transition: opacity .22s ease; animation: place-in .45s ease both; }
+.place.is-leaving { opacity: 0; }
+@keyframes place-in { from { opacity: 0; } to { opacity: 1; } }
+.place-prompt { white-space: nowrap; width: max-content; max-width: calc(100% - 32px); position: absolute; left: 50%; bottom: max(120px, calc(env(safe-area-inset-bottom) + 100px)); transform: translateX(-50%); z-index: 4; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; padding: 14px 22px; background: #2f6bff; color: #fff; font: 800 1rem system-ui; box-shadow: 0 10px 28px rgba(20, 60, 160, .45); cursor: pointer; animation: place-pop .18s ease; }
+@keyframes place-pop { from { transform: translateX(-50%) scale(.85); opacity: 0; } }
+.place-tip { position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2; margin: 0; padding: 8px 14px; border-radius: 999px; background: rgba(244, 248, 255, .9); color: #34466a; font: 700 .8rem system-ui; pointer-events: none; white-space: nowrap; }
+.place-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.place-sheet-head b { font: 800 1.05rem system-ui; }
+.place-sheet-head button { border: 0; border-radius: 999px; padding: 9px 18px; background: #12233f; color: #fff; font: 800 .86rem system-ui; cursor: pointer; }

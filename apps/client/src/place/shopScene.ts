@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { canvasTexture, std, type PlaceRoom } from "./roomKit";
+import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
 
 /**
  * A provision shop: shelves of tins and packs, a fridge of drinks, crates of produce and a counter with the shopkeeper behind it. The
@@ -94,7 +94,7 @@ export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom 
   // produce crates
   const crate = std("#a8794a", 0.9);
   const produce = [std("#d6402a", 0.8), std("#7ab648", 0.8), std("#e8a02a", 0.8), std("#9a2f2f", 0.8)];
-  [[-1.8, 2.6], [-0.6, 2.6], [0.6, 2.6], [1.8, 2.6]].forEach(([x, z], k) => {
+  [[-3.2, 1.6], [-2.0, 1.6], [2.0, 1.6], [3.2, 1.6]].forEach(([x, z], k) => {
     box(0.9, 0.35, 0.65, crate, x!, 0, z!);
     for (let i = 0; i < 9; i++) {
       const f = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), produce[k % 4]);
@@ -102,13 +102,24 @@ export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom 
       g.add(f);
     }
   });
-  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 3.3, false); // the charging socket
+  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 3.0, false); // the charging socket
 
-  const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: market ? "#fff1d6" : "#e8f1ff", emissiveIntensity: 1.4 });
-  for (const x of [-3, 0, 3]) for (const z of [2]) {
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
-    lamp.position.set(x, H - 0.1, z);
-    g.add(lamp);
-  }
-  return { group: g, playerAt: new THREE.Vector3(1.1, 0, -0.5), staffAt: new THREE.Vector3(-0.2, 0, -2.7), update() {} };
+  return {
+    group: g,
+    spawn: new THREE.Vector3(0.6, 0, 3.0),
+    bounds: rect(0, 0, 9.2, 7.6),
+    blockers: [rect(-0.2, -2.5, 4.6, 2.6), rect(-W / 2 + 0.55, -0.8, 1.0, 5.6), rect(W / 2 - 0.5, -1.8, 1.0, 2.6), rect(-2.6, 1.6, 2.4, 0.8), rect(2.6, 1.6, 2.4, 0.8)],
+    door: rect(0, D / 2 + 0.3, 2.4, 0.6),
+    spots: [
+      { id: "counter", label: market ? "Buy food and drinks" : "Pay at the counter", x: -0.2, z: -0.3, r: 1.9, face: Math.PI, focus: "eat" },
+      { id: "shelves", label: "Browse the shelves", x: -3.3, z: -0.4, r: 1.3, face: -Math.PI / 2, focus: "groceries" },
+      { id: "produce", label: "Buy groceries", x: 0.0, z: 1.5, r: 1.2, face: Math.PI, focus: "groceries" },
+      { id: "fridge", label: "Cold drinks", x: 3.5, z: -1.8, r: 1.3, face: Math.PI / 2, focus: "eat" },
+      { id: "socket", label: "Charge your phone", x: -4.0, z: 3.0, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+    ],
+    staff: [{ x: -0.2, z: -2.7, yaw: 0, clip: "Idle_Loop", greeting: "Welcome, welcome! What will you buy?" }],
+    waypoints: [[-3.0, 0.8], [3.0, 0.2], [-1.2, 2.8], [1.6, 3.0], [2.6, -0.2], [-3.4, 2.4]],
+    visitors: market ? 5 : 2,
+    update() {},
+  };
 }
