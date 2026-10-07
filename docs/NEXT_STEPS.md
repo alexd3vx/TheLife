@@ -156,5 +156,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Ageing (Q42):** slow ageing (one game year per real month), kids optional (NPC children you raise and school), pass the household on when you retire. (7 Oct)
 - **Animals (Q43):** a fuller farm: crops and farm animals, pets at home; connects to the food system. (7 Oct)
 - **Property (Q44):** all four: rent and buy homes, land plots, shops and businesses, renting out to other players as landlord. (7 Oct)
+- **Trading (Q45):** a safe trade window (both put items and money in, both confirm, the server swaps in one step), plus player shops by place. (7 Oct)
+- **Accessibility (Q46):** all four: text size and contrast, colour-blind safe cues (shapes and labels besides colour), reduced motion and low-data mode, subtitles for calls and key sounds. (7 Oct)
+- **Push notifications (Q47):** messages and calls, rent, bills and events, needs and health; the owner also wants "more to get them addicted". Plan: opt-in, per-type switches, quiet hours and a daily cap, rewards that bring people back (events, streak-free daily reasons to return) rather than manipulative nags; no loot-box or gambling-style loops. (7 Oct)
+- **First playtest (Q48):** later, after the first wave of the plan. (7 Oct)
 
-*Questions asked so far: 44 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 48 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
