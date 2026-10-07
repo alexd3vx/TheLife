@@ -189,6 +189,23 @@ export class Avatar {
   /** An animation by name, retargeted onto this body the first time it is asked for. */
   private getClip(name: string): THREE.AnimationClip | undefined {
     const have = this.clips.get(name);
+    if (name === "Idle_Loop" && !have) {
+      // Standing still is a held pose (the first frame of a relaxed idle), not a moving clip: idling animations are the first thing to look wrong.
+      const moving = this.getClipUnheld(name);
+      if (!moving) return undefined;
+      const held = new THREE.AnimationClip(name, 1, moving.tracks.map((t) => {
+        const n = t.getValueSize();
+        const first = Array.from(t.values.slice(0, n));
+        return new (t.constructor as new (name: string, times: number[], values: number[]) => THREE.KeyframeTrack)(t.name, [0, 1], [...first, ...first]);
+      }));
+      this.clips.set(name, held);
+      return held;
+    }
+    return this.getClipUnheld(name);
+  }
+
+  private getClipUnheld(name: string): THREE.AnimationClip | undefined {
+    const have = this.clips.get(name);
     if (have) return have;
     const target = this.aliases.get(name);
     if (target) {

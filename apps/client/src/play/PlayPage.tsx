@@ -121,6 +121,23 @@ export default function PlayPage() {
 
   useEffect(() => runtimeRef.current?.setFollow(follow), [follow]);
   useEffect(() => runtimeRef.current?.setPhoneOpen(phoneOpen), [phoneOpen]);
+  // the bottom bar and the money "+" ask for the phone and the bag with these events
+  useEffect(() => {
+    const open = (e: Event) => {
+      setPhoneApp((e as CustomEvent<string | null>).detail ?? null);
+      setPhoneOpen(true);
+    };
+    const toggle = () => setPhoneOpen((o) => !o);
+    const bag = () => setBagOpen((o) => !o);
+    window.addEventListener("thelife-open-phone", open);
+    window.addEventListener("thelife-toggle-phone", toggle);
+    window.addEventListener("thelife-toggle-bag", bag);
+    return () => {
+      window.removeEventListener("thelife-open-phone", open);
+      window.removeEventListener("thelife-toggle-phone", toggle);
+      window.removeEventListener("thelife-toggle-bag", bag);
+    };
+  }, []);
 
   // A new phone notification buzzes the phone icon and shows as a toast while the phone is away.
   const latest = hud?.phone.latest ?? null;
