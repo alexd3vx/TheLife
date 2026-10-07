@@ -112,3 +112,18 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Visiting homes:** live together in the home in real time (host accepts, guest walks in, host can ask guests to leave). (7 Oct)
 - **Map first pass:** 3D buildings with height and colour, water with depth, real bridges, labels and landmarks, **and digital billboards that promoters pay real money for, for a number of days** (like the reference's ad page). (7 Oct)
 - **New-player film:** plane lands and a taxi ride to the chosen home, plus an interactive first day, and the vehicle and airplane cutscenes should be studied from the reference (done above: chase camera, camera modes, skip). (7 Oct)
+- **Billboard ads: manual at first.** Advertisers contact the owner and pay directly; the owner uploads the ad in an admin tool (image, link, number of days, which boards). Payment provider and self-serve page come later. Prices to start from: billboard 7 days, sea plot 7 days, airport boards (see 2b-2). (7 Oct)
+- **Place presence: walk among real players.** Inside a place you see the real players in it (NPC visitors fill empty spots), with a place chat. Needs the server to track which building each player is in. (7 Oct)
+- **Life depth to adopt (in time):** Hustle job board (fee held in escrow), Invest in land by area (weekly growth, omo-onile risk), Staff and house help (wages with Saturday rent), Elections and government (weekly votes, cabinet, polling units visited in person). (7 Oct)
+- **Moderation:** word filter on text, report and block on everything, an admin queue to review reports, hide posts and ban players; photos only from the in-game camera. (7 Oct)
+
+## 7. Proposed build order once the plan is agreed (one at a time)
+
+1. Bugs and basics: bigger homes with wall collision, door transitions (arrive on the doorstep facing out), 3D arrival film, character look consistency (street look done).
+2. Place presence: server tracks which building each player is in; walk among real players inside places; place chat.
+3. Phone numbers and contacts; send money in the chat; voice calls.
+4. Bank rework and LifePay limits (account form, card, PIN, real ATM screen).
+5. LifeGram v1; visiting homes live.
+6. Map overhaul (buildings with height, water, bridges, labels, landmarks) and billboards with the admin upload tool.
+7. Medium survival layer (moodles, injuries, weather, power).
+8. Life-depth features (Hustle, Invest, Staff, Government), then vehicles.
