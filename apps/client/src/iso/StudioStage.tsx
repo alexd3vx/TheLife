@@ -82,7 +82,7 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
         const f = l.draw(state.current.yaw, k * dpr, 12);
         if (f) {
           const ox = w / 2, oy = h * 0.82;
-          ctx.fillStyle = "rgba(40,22,8,.28)";
+          ctx.fillStyle = "rgba(14, 26, 54,.28)";
           ctx.beginPath();
           ctx.ellipse(ox, oy + 4, 38 * k, 11 * k, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -102,7 +102,7 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
       const sx = s * (lookRef.current.build ?? 1), sy = s * (lookRef.current.height ?? 1);
       const ox = w / 2, oy = h * 0.8;
       // a soft shadow, then the person
-      ctx.fillStyle = "rgba(40,22,8,.28)";
+      ctx.fillStyle = "rgba(14, 26, 54,.28)";
       ctx.beginPath();
       ctx.ellipse(ox, oy + 4, 38 * k, 11 * k, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -128,8 +128,8 @@ export default function StudioStage({ look, walking, onBusy }: { look: Look; wal
 /** A corner of a painted room: warm wall, wooden floor, a window of evening light. */
 function paintStage(c: CanvasRenderingContext2D, w: number, h: number, t: number) {
   const wall = c.createLinearGradient(0, 0, 0, h * 0.62);
-  wall.addColorStop(0, "#e9d2a6");
-  wall.addColorStop(1, "#cdb084");
+  wall.addColorStop(0, "#c9d9f2");
+  wall.addColorStop(1, "#a9bde0");
   c.fillStyle = wall;
   c.fillRect(0, 0, w, h);
   // floor: a big diamond of planks
@@ -142,12 +142,12 @@ function paintStage(c: CanvasRenderingContext2D, w: number, h: number, t: number
   c.lineTo(cx - rw, cy);
   c.closePath();
   const floor = c.createLinearGradient(0, cy - rh, 0, cy + rh);
-  floor.addColorStop(0, "#c79a62");
-  floor.addColorStop(1, "#a97c48");
+  floor.addColorStop(0, "#7d92bd");
+  floor.addColorStop(1, "#617aa8");
   c.fillStyle = floor;
   c.fill();
   c.clip();
-  c.strokeStyle = "rgba(60,36,16,.25)";
+  c.strokeStyle = "rgba(14, 26, 54,.25)";
   c.lineWidth = 1.5;
   for (let i = -12; i <= 12; i++) {
     c.beginPath();
@@ -160,7 +160,7 @@ function paintStage(c: CanvasRenderingContext2D, w: number, h: number, t: number
   const wx = w * 0.18, wy = h * 0.12, ww = w * 0.2, wh = h * 0.3;
   c.fillStyle = "#bfe3f5";
   c.fillRect(wx, wy, ww, wh);
-  c.strokeStyle = "#6a4a2a";
+  c.strokeStyle = "#33466e";
   c.lineWidth = 5;
   c.strokeRect(wx, wy, ww, wh);
   c.beginPath();
@@ -172,7 +172,7 @@ function paintStage(c: CanvasRenderingContext2D, w: number, h: number, t: number
   c.save();
   c.globalCompositeOperation = "lighter";
   const sway = Math.sin(t * 0.4) * 6;
-  c.fillStyle = "rgba(255,226,160,.16)";
+  c.fillStyle = "rgba(168, 200, 255,.16)";
   c.beginPath();
   c.moveTo(wx, wy + wh);
   c.lineTo(wx + ww, wy + wh);
@@ -183,8 +183,8 @@ function paintStage(c: CanvasRenderingContext2D, w: number, h: number, t: number
   c.restore();
   // vignette
   const v = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.4, w / 2, h / 2, Math.max(w, h) * 0.75);
-  v.addColorStop(0, "rgba(30,16,6,0)");
-  v.addColorStop(1, "rgba(30,16,6,.35)");
+  v.addColorStop(0, "rgba(14, 26, 54,0)");
+  v.addColorStop(1, "rgba(14, 26, 54,.35)");
   c.fillStyle = v;
   c.fillRect(0, 0, w, h);
 }

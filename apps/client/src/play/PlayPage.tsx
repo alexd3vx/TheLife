@@ -15,6 +15,7 @@ import type { HudSnapshot } from "./gameSession";
 import PhoneUI from "../phone/PhoneUI";
 import SettingsPanel from "../settings/SettingsPanel";
 import HomeShop from "../iso/HomeShop";
+import EditPad from "../iso/EditPad";
 import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
@@ -245,7 +246,8 @@ export default function PlayPage() {
 
       {editing && (
         <>
-          <div className="home-hint" style={{ top: "calc(max(12px, env(safe-area-inset-top)) + 182px)" }}>{sel ? "Tap the floor to put it there." : "Tap a piece of furniture to pick it up."}</div>
+          <div className="home-hint" style={{ top: "calc(max(12px, env(safe-area-inset-top)) + 182px)" }}>{sel ? "Tap the floor, or use the arrows." : "Tap a piece of furniture to pick it up."}</div>
+          <EditPad active={!!sel && !shopOpen} onMove={(sx, sy) => runtimeRef.current?.edit.nudge(sx, sy)} onTurn={() => runtimeRef.current?.edit.rotate()} />
           <div className="home-bar">
             <button disabled={!sel} onClick={() => runtimeRef.current?.edit.rotate()}>Turn</button>
             <button className="danger" disabled={!sel} onClick={() => runtimeRef.current?.edit.sell()}>

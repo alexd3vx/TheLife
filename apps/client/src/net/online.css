@@ -15,9 +15,9 @@
  
   cursor: pointer;
 }
-.net-chip b { color: #8be3a5; font-weight: 700; }
+.net-chip b { color: #a8c8ff; font-weight: 700; }
 .net-dot { width: 9px; height: 9px; border-radius: 50%; background: #888; }
-.net-chip.is-online .net-dot { background: #3ddc84; }
+.net-chip.is-online .net-dot { background: #5b9bff; }
 .net-chip.is-connecting .net-dot { background: #f0b429; animation: net-pulse 1s infinite; }
 @keyframes net-pulse { 50% { opacity: 0.3; } }
 .net-panel {
@@ -54,5 +54,5 @@
 .net-log { min-height: 80px; max-height: 160px; overflow: auto; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); font-size: 13px; }
 .net-log p { margin: 0 0 3px; word-break: break-word; }
 .net-log .is-system { opacity: 0.65; font-style: italic; }
-.net-log .is-mine b { color: #8be3a5; }
+.net-log .is-mine b { color: #a8c8ff; }
 .net-chat { display: flex; gap: 6px; }

@@ -370,7 +370,7 @@ export function WordGuess({ state, act }: P) {
     setCur("");
     if (g === answer) act((s) => recordScore(s, "wordguess", (s.phone.scores.wordguess ?? 0) + 1));
   };
-  const color = (g: string, i: number) => (g[i] === answer[i] ? "#2fbf71" : answer.includes(g[i]!) ? "#f0b429" : "#6b7280");
+  const color = (g: string, i: number) => (g[i] === answer[i] ? "#5b9bff" : answer.includes(g[i]!) ? "#f0b429" : "#6b7280");
   return (
     <div className="pa-page">
       <div className="pa-card-soft"><span>Words solved</span><strong>{state.phone.scores.wordguess ?? 0}</strong><small>Same word for everyone today. Six tries.</small></div>
@@ -476,7 +476,7 @@ export function Reaction({ state, act }: P) {
   return (
     <div className="pa-page">
       <div className="pa-card-soft"><span>Best time</span><strong>{best !== null ? `${best} ms` : "–"}</strong></div>
-      <button onClick={phase === "idle" || phase === "early" ? start : tap} className="pa-btn" style={{ minHeight: 180, fontSize: "1.2rem", background: phase === "go" ? "#2fbf71" : phase === "wait" ? "#d9534f" : "var(--accent)", color: "#fff" }}>
+      <button onClick={phase === "idle" || phase === "early" ? start : tap} className="pa-btn" style={{ minHeight: 180, fontSize: "1.2rem", background: phase === "go" ? "#5b9bff" : phase === "wait" ? "#d9534f" : "var(--accent)", color: "#fff" }}>
         {phase === "idle" ? (ms !== null ? `${ms} ms. Tap to try again` : "Tap to start") : phase === "wait" ? "Wait for green…" : phase === "go" ? "TAP NOW!" : "Too early! Tap to retry"}
       </button>
     </div>

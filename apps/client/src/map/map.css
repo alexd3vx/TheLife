@@ -1,6 +1,6 @@
 .map-stats {
   position: absolute; z-index: 2; left: 12px; top: 64px; display: grid; gap: 4px; padding: 10px 12px; max-width: 330px;
-  border-radius: 14px; background: rgba(20, 17, 15, .82); font-size: .78rem; pointer-events: none;
+  border-radius: 14px; background: rgba(11, 20, 38, .82); font-size: .78rem; pointer-events: none;
   font-variant-numeric: tabular-nums; color: var(--text);
 }
 .map-stats b { color: var(--accent-strong); }
@@ -17,20 +17,20 @@
 .map-mini { position: absolute; z-index: 3; right: 12px; top: 64px; width: 118px; height: 118px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 6px 18px rgba(0, 0, 0, .4); cursor: pointer; background: #d9e6c6; }
 .map-mini .dmap { pointer-events: none; }
 .map-big { position: absolute; z-index: 5; inset: 56px 12px 72px; border-radius: 18px; overflow: hidden; border: 2px solid rgba(255, 255, 255, .9); background: #d9e6c6; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
-.map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(20, 17, 15, .92); display: grid; gap: 8px; }
+.map-sheet { position: absolute; z-index: 6; left: 12px; right: 12px; bottom: 84px; max-width: 420px; margin: 0 auto; padding: 12px 14px; border-radius: 16px; background: rgba(11, 20, 38, .92); display: grid; gap: 8px; }
 .map-sheet strong { font-size: 1rem; }
 .map-sheet span { color: var(--text-muted); font-size: .82rem; }
 .map-sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .map-sheet-actions button { font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 12px; min-height: 40px; padding: 0 14px; background: var(--accent); color: var(--accent-ink); }
 .map-sheet-actions button.is-ghost { background: rgba(255, 255, 255, .14); color: var(--text); }
-.map-close { position: absolute; z-index: 7; right: 20px; top: 64px; font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer; background: rgba(20, 17, 15, .88); color: var(--text); }
-.map-place { position: absolute; z-index: 6; left: 50%; top: 18%; transform: translateX(-50%); padding: 12px 26px; border-radius: 999px; background: rgba(20, 17, 15, .86); color: #fff; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: place-in 3.2s both; }
+.map-close { position: absolute; z-index: 7; right: 20px; top: 64px; font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 9px 14px; cursor: pointer; background: rgba(11, 20, 38, .88); color: var(--text); }
+.map-place { position: absolute; z-index: 6; left: 50%; top: 18%; transform: translateX(-50%); padding: 12px 26px; border-radius: 999px; background: rgba(11, 20, 38, .86); color: #fff; font-weight: 700; letter-spacing: .02em; pointer-events: none; animation: place-in 3.2s both; }
 .map-place::before { content: "Entering "; font-weight: 500; opacity: .75; }
 @keyframes place-in { 0% { opacity: 0; transform: translate(-50%, -10px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
 .map-mini { cursor: default; }
 .map-mini-open { position: absolute; inset: 0; border: 0; background: transparent; cursor: pointer; }
 .map-mini-zoom { position: absolute; z-index: 2; right: 4px; bottom: 4px; display: grid; gap: 3px; }
-.map-mini-zoom button { width: 24px; height: 24px; border: 0; border-radius: 7px; background: rgba(20, 17, 15, .78); color: #fff; font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
+.map-mini-zoom button { width: 24px; height: 24px; border: 0; border-radius: 7px; background: rgba(11, 20, 38, .78); color: #fff; font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
 .map-mini .dmap { pointer-events: none; }
 .map-mini { width: 132px; height: 132px; }
 
@@ -41,7 +41,7 @@
 .intro-bar.bottom { bottom: 0; transform-origin: bottom; }
 @keyframes intro-bar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .intro-title { position: absolute; left: 6vw; bottom: 16vh; display: grid; gap: 4px; color: #fff; text-shadow: 0 2px 24px rgba(0, 0, 0, .7); animation: intro-title 7.5s ease both; }
-.intro-title span { letter-spacing: .3em; text-transform: uppercase; font-size: .72rem; color: #ffd98a; }
+.intro-title span { letter-spacing: .3em; text-transform: uppercase; font-size: .72rem; color: #a8c8ff; }
 .intro-title strong { font-family: var(--font-display); font-size: clamp(2rem, 6vw, 4rem); line-height: 1; }
 .intro-title em { font-style: normal; opacity: .85; font-size: .95rem; }
 @keyframes intro-title { 0%, 12% { opacity: 0; transform: translate3d(0, 14px, 0); } 28%, 78% { opacity: 1; transform: none; } 100% { opacity: 0; } }

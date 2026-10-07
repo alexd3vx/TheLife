@@ -157,13 +157,13 @@ export default function DistrictMap({ district, player = null, others = [], home
         })}
         {home && (
           <g transform={`translate(${home.x} ${home.z})`} style={{ pointerEvents: "none" }}>
-            <circle r={pin * 0.9} fill="#14110f" stroke="#fff" strokeWidth={pin * 0.14} />
+            <circle r={pin * 0.9} fill="#0b1426" stroke="#fff" strokeWidth={pin * 0.14} />
             <text textAnchor="middle" dominantBaseline="central" fontSize={pin * 0.95} fill="#fff">⌂</text>
           </g>
         )}
         {others.map((o) => (
           <g key={o.id} transform={`translate(${o.x} ${o.z})`} style={{ pointerEvents: "none" }}>
-            <circle r={pin * 0.42} fill="#2fbf71" stroke="#fff" strokeWidth={pin * 0.1} />
+            <circle r={pin * 0.42} fill="#5b9bff" stroke="#fff" strokeWidth={pin * 0.1} />
             {!compact && span < 900 && <text y={-pin * 0.7} textAnchor="middle" fontSize={pin * 0.6} fill="#0b3d22" stroke="#fff" strokeWidth={pin * 0.14} paintOrder="stroke">{o.name}</text>}
           </g>
         ))}

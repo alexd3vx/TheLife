@@ -224,7 +224,7 @@ export function Pay({ state, act }: { state: GameState; act: Act }) {
                 title="Rent"
                 sub={state.rentOwed > 0 ? `${naira(state.rentOwed)} owed` : state.profile && state.profile.rentPerWeek === 0 ? "Family house, nothing to pay" : "All paid"}
                 right={<Btn disabled={state.rentOwed <= 0} onClick={() => act((s) => payRent(s))}>Pay</Btn>}
-                tone="#f2a43a"
+                tone="#5b9bff"
               />
               <Row
                 icon="bolt"
@@ -312,7 +312,7 @@ export function Pay({ state, act }: { state: GameState; act: Act }) {
                   <Row
                     key={e.id}
                     icon={internal ? "swap" : incoming ? "arrowIn" : "arrowOut"}
-                    tone={internal ? "#7a8cff" : incoming ? "#1f9d5c" : "#d9534f"}
+                    tone={internal ? "#7a8cff" : incoming ? "#2f6fd8" : "#d9534f"}
                     title={e.reason}
                     sub={`${lagosDateLabel(c.day)} · ${c.label}`}
                     right={<strong className={internal ? "" : incoming ? "pa-in" : "pa-out"}>{internal ? "" : incoming ? "+" : "−"}{naira(e.amount)}</strong>}
@@ -521,7 +521,7 @@ export function Battery({ state, act, onModel }: { state: GameState; act: Act; o
       </div>
       <p className="pa-fine center">{model.name} · {model.ports.join(" / ")} port · up to {model.maxCharge}% an hour · {model.screen}</p>
       <div className="pa-group">
-        <Row icon="bolt" tone="#f2a43a" title="Mains power" sub={`${wall ? "On" : phone.billOwed >= BILL_PER_WEEK * 2 ? "Cut off: unpaid bill" : "Power cut right now"}${cut && !isPowerCut(state.minute) && state.minute < cut.endMinute && cut.announced ? ` · cut planned ${hhmm(cut.startMinute)}–${hhmm(cut.endMinute)}` : ""}`} />
+        <Row icon="bolt" tone="#5b9bff" title="Mains power" sub={`${wall ? "On" : phone.billOwed >= BILL_PER_WEEK * 2 ? "Cut off: unpaid bill" : "Power cut right now"}${cut && !isPowerCut(state.minute) && state.minute < cut.endMinute && cut.announced ? ` · cut planned ${hhmm(cut.startMinute)}–${hhmm(cut.endMinute)}` : ""}`} />
         <Row
           icon="plug"
           tone="#4d8bff"

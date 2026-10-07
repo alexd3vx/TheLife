@@ -58,7 +58,7 @@ export interface PlayRuntime {
   session: GameSession | null;
   newGame(): void;
   /** Rearranging the home: pick up, move, turn, sell and buy furniture. */
-  edit: { start(): void; stop(): void; rotate(): void; sell(): void; buy(furniture: string): Promise<string | null> };
+  edit: { start(): void; stop(): void; rotate(): void; nudge(sx: number, sy: number): void; sell(): void; buy(furniture: string): Promise<string | null> };
   setFollow(on: boolean): void;
   resetView(): void;
   /** For tests and debugging. */
@@ -283,6 +283,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     for (const i of world.items) placedById.set(i.def.id, i);
     select(keepId ? (placedById.get(keepId) ?? null) : null);
   }
+  let nudgeQueue: Promise<void> = Promise.resolve();
   async function commitMove(item: PlacedItem, x: number, z: number, rot: number) {
     const st = options.session!.sim.state;
     const r = homeMove(st, item.def.id, x, z, rot);
@@ -563,6 +564,23 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
         const rot = (((it.def.rot ?? 0) + 90) % 360 + 360) % 360;
         if (!world.fits(it.def.id, it.def.furniture, it.instance.size, it.def.x, it.def.z, rot)) return options.session!.notice("There isn't room to turn it.");
         void commitMove(it, it.def.x, it.def.z, rot);
+      },
+      nudge(sx, sy) {
+        // arrows follow the screen: "up" is away from the camera. One step is half a metre, along whichever floor axis is closest.
+        nudgeQueue = nudgeQueue.then(async () => {
+          const it = selected;
+          if (!it || !editing) return;
+          const fx = controls.target.x - camera.position.x, fz = controls.target.z - camera.position.z;
+          const len = Math.hypot(fx, fz) || 1;
+          const ux = fx / len, uz = fz / len;
+          const vx = ux * sy + -uz * sx, vz = uz * sy + ux * sx;
+          const step = 0.5;
+          const x = it.def.x + (Math.abs(vx) >= Math.abs(vz) ? Math.sign(vx) * step : 0);
+          const z = it.def.z + (Math.abs(vx) >= Math.abs(vz) ? 0 : Math.sign(vz) * step);
+          const rot = it.def.rot ?? 0;
+          if (!world.fits(it.def.id, it.def.furniture, it.instance.size, x, z, rot)) return options.session!.notice("Something is in the way.");
+          await commitMove(it, x, z, rot);
+        });
       },
       sell() {
         const it = selected;

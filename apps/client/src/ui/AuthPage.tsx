@@ -110,7 +110,7 @@ export function AuthPage() {
         {sentTo ? (
           <div className="auth-done" role="status">
             <div className="auth-done-mark" aria-hidden="true">
-              <svg viewBox="0 0 64 64" width="64" height="64"><rect x="8" y="16" width="48" height="34" rx="5" fill="#ffd98a" /><path d="M10 20l22 18 22-18" fill="none" stroke="#7a4a12" strokeWidth="3" strokeLinejoin="round" /></svg>
+              <svg viewBox="0 0 64 64" width="64" height="64"><rect x="8" y="16" width="48" height="34" rx="5" fill="#a8c8ff" /><path d="M10 20l22 18 22-18" fill="none" stroke="#7a4a12" strokeWidth="3" strokeLinejoin="round" /></svg>
             </div>
             <h2>Check your inbox</h2>
             <p>

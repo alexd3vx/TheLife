@@ -7,33 +7,33 @@
 @media (orientation: portrait) { .film-bars { height: 6vh; } }
 
 .film-title { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; z-index: 2; animation: film-in 1.4s ease both; background: radial-gradient(ellipse at 50% 55%, #2a1a40, #05030a 70%); }
-.film-title small { letter-spacing: .5em; text-transform: uppercase; color: #ffd98a; font-size: .8rem; }
-.film-title h1 { font-family: var(--font-display); font-size: clamp(3.4rem, 12vw, 8rem); margin: 0; letter-spacing: -.02em; text-shadow: 0 0 60px rgba(255, 200, 120, .45); animation: film-title 3.4s ease both; }
+.film-title small { letter-spacing: .5em; text-transform: uppercase; color: #a8c8ff; font-size: .8rem; }
+.film-title h1 { font-family: var(--font-display); font-size: clamp(3.4rem, 12vw, 8rem); margin: 0; letter-spacing: -.02em; text-shadow: 0 0 60px rgba(168, 200, 255, .45); animation: film-title 3.4s ease both; }
 .film-title em { font-style: normal; opacity: .75; letter-spacing: .2em; font-size: .9rem; }
-.film-flare { position: absolute; left: 50%; top: 52%; width: 70vw; height: 2px; transform: translate(-50%, -50%) scaleX(0); background: linear-gradient(90deg, transparent, #ffd98a, transparent); animation: film-flare 3.2s ease-out both; }
+.film-flare { position: absolute; left: 50%; top: 52%; width: 70vw; height: 2px; transform: translate(-50%, -50%) scaleX(0); background: linear-gradient(90deg, transparent, #a8c8ff, transparent); animation: film-flare 3.2s ease-out both; }
 @keyframes film-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes film-title { 0% { opacity: 0; letter-spacing: .1em; } 35%, 80% { opacity: 1; } 100% { opacity: 0; letter-spacing: .06em; } }
 @keyframes film-flare { 0% { transform: translate(-50%, -50%) scaleX(0); opacity: 0; } 30% { opacity: 1; } 60% { transform: translate(-50%, -50%) scaleX(1); } 100% { transform: translate(-50%, -50%) scaleX(1.2); opacity: 0; } }
 
 .film-caption { position: absolute; left: 7vw; bottom: 14vh; max-width: min(520px, 86vw); z-index: 4; text-shadow: 0 2px 24px rgba(0, 0, 0, .75); animation: film-caption 5.5s ease both; }
-.film-caption small { color: #ffd98a; letter-spacing: .28em; text-transform: uppercase; font-size: .78rem; }
+.film-caption small { color: #a8c8ff; letter-spacing: .28em; text-transform: uppercase; font-size: .78rem; }
 .film-caption p { margin: 6px 0 0; font-size: clamp(1.05rem, 2.6vw, 1.5rem); font-family: var(--font-display); }
 @keyframes film-caption { 0%, 8% { opacity: 0; transform: translate3d(0, 14px, 0); } 22%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
 .film-landed { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; z-index: 4; padding: 0 8vw; text-shadow: 0 2px 30px rgba(0, 0, 0, .8); animation: film-caption 4s ease both; }
-.film-landed small { color: #ffd98a; letter-spacing: .4em; text-transform: uppercase; }
+.film-landed small { color: #a8c8ff; letter-spacing: .4em; text-transform: uppercase; }
 .film-landed h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 3.6rem); margin: 0; }
 .film-landed p { margin: 0 auto; max-width: 40ch; opacity: .9; }
 
 .film-skip { position: absolute; right: 18px; bottom: calc(9vh + 14px); z-index: 6; background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .25); border-radius: 99px; padding: 8px 18px; font: inherit; cursor: pointer; }
 .film-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; z-index: 6; background: rgba(255, 255, 255, .12); }
-.film-progress span { display: block; height: 100%; background: #ffd98a; transition: width .5s linear; }
+.film-progress span { display: block; height: 100%; background: #a8c8ff; transition: width .5s linear; }
 
 .beat-ride .film-caption { bottom: auto; top: 13vh; }
 .beat-home .film-landed { place-content: start center; padding-top: 14vh; }
 
 .welcome-text { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; z-index: 4; padding: 0 8vw; text-shadow: 0 2px 28px rgba(0, 0, 0, .7); animation: welcome-in 4.2s ease both; }
-.welcome-text small { color: #ffd98a; letter-spacing: .4em; text-transform: uppercase; }
+.welcome-text small { color: #a8c8ff; letter-spacing: .4em; text-transform: uppercase; }
 .welcome-text h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 3.4rem); margin: 0; }
 .welcome-text p { margin: 0; opacity: .92; font-size: 1.05rem; }
 .welcome-text em { font-style: normal; opacity: .75; }

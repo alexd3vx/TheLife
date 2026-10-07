@@ -692,7 +692,7 @@ export class FilmRenderer {
       c.globalAlpha = 1;
       c.fillStyle = "#f6efe6";
       c.fillRect(x + 12, road - 112, gap - 40, 24);
-      this.light(c, x + gap / 2 - 6, road - 40, 240, "rgba(255,200,120,.25)");
+      this.light(c, x + gap / 2 - 6, road - 40, 240, "rgba(168, 200, 255,.25)");
     }
   }
 

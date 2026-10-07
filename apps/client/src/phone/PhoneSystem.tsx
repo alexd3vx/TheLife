@@ -70,7 +70,7 @@ export function Settings({ state, act }: { state: GameState; act: Act }) {
       <p className="pa-section">Home internet</p>
       <div className="pa-group">
         {HOME_PLANS.map((plan) => (
-          <Row key={plan.id} icon="wifi" tone="#2fbf71" title={plan.name} sub={`${plan.blurb} · ${plan.speed} MB/min`} right={<Btn kind="soft" onClick={() => act((s) => buyHomePlan(s, plan.id))}>{naira(plan.price)}</Btn>} />
+          <Row key={plan.id} icon="wifi" tone="#5b9bff" title={plan.name} sub={`${plan.blurb} · ${plan.speed} MB/min`} right={<Btn kind="soft" onClick={() => act((s) => buyHomePlan(s, plan.id))}>{naira(plan.price)}</Btn>} />
         ))}
       </div>
       <p className="pa-fine">Wi-Fi needs mains power for the router, so a power cut takes it away. Downloads then use mobile data.</p>

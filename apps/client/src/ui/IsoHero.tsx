@@ -22,7 +22,7 @@ const BLOCKS: Block[] = [
 ];
 
 const TONES = {
-  sand: { top: "#ffd27a", left: "#e0a24a", right: "#b97a2c" },
+  sand: { top: "#a8c8ff", left: "#6f9be0", right: "#4a73b8" },
   clay: { top: "#f08a5d", left: "#c9623a", right: "#9a4528" },
   teal: { top: "#5fd1b8", left: "#2f9c8a", right: "#1f6f66" },
   plum: { top: "#b78bd9", left: "#7d55a3", right: "#58397a" },
@@ -75,18 +75,18 @@ export function IsoHero() {
     <svg className="iso-hero" viewBox="0 0 780 640" preserveAspectRatio="xMidYMid slice" role="presentation">
       <defs>
         <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2b1a3a" />
-          <stop offset=".55" stopColor="#8a3d4f" />
-          <stop offset="1" stopColor="#f2a43a" />
+          <stop offset="0" stopColor="#0b1a3a" />
+          <stop offset=".55" stopColor="#2f55b0" />
+          <stop offset="1" stopColor="#5b9bff" />
         </linearGradient>
         <radialGradient id="sun" cx=".5" cy=".5" r=".5">
-          <stop offset="0" stopColor="#ffe3a3" stopOpacity=".95" />
-          <stop offset="1" stopColor="#ffe3a3" stopOpacity="0" />
+          <stop offset="0" stopColor="#cfe2ff" stopOpacity=".95" />
+          <stop offset="1" stopColor="#cfe2ff" stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect width="780" height="640" fill="url(#sky)" />
       <circle className="iso-sun" cx="560" cy="250" r="190" fill="url(#sun)" />
-      <polygon points="390,360 790,560 390,760 -10,560" fill="#1b1411" opacity=".55" />
+      <polygon points="390,360 790,560 390,760 -10,560" fill="#0a1226" opacity=".55" />
       {ordered.map((block, i) => (
         <IsoBox key={`${block.x}-${block.y}`} block={block} index={i} />
       ))}

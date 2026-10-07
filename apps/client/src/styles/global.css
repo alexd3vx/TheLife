@@ -1,15 +1,15 @@
 :root {
-  --bg: #14110f;
-  --surface: #1d1815;
-  --surface-2: #26201c;
-  --border: #3a312b;
-  --text: #f6efe7;
-  --text-muted: #b6a99b;
-  --accent: #f2a43a;
-  --accent-strong: #ffd27a;
-  --accent-ink: #2a1a05;
+  --bg: #0b1426;
+  --surface: #111d36;
+  --surface-2: #182848;
+  --border: #2b4170;
+  --text: #eef3ff;
+  --text-muted: #9fb3d6;
+  --accent: #5b9bff;
+  --accent-strong: #a8c8ff;
+  --accent-ink: #06142e;
   --danger: #ff7a6b;
-  --ok: #6fdcb4;
+  --ok: #7fb8ff;
   --radius: 14px;
   --font-display: "Fraunces", Georgia, serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;

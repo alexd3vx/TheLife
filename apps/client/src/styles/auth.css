@@ -75,7 +75,7 @@
   font-size: 16px; /* prevents iOS zoom on focus */
 }
 .field input::placeholder { color: #7d7064; }
-.field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(242, 164, 58, 0.25); }
+.field input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(91, 155, 255, 0.25); }
 .field input[aria-invalid="true"] { border-color: var(--danger); }
 
 .field-error { color: var(--danger); font-size: 0.85rem; margin: 0; }
@@ -85,13 +85,13 @@
 
 .form-error, .form-notice { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 0.92rem; }
 .form-error { background: rgba(255, 122, 107, 0.12); color: var(--danger); border: 1px solid rgba(255, 122, 107, 0.35); }
-.form-notice { background: rgba(111, 220, 180, 0.12); color: var(--ok); border: 1px solid rgba(111, 220, 180, 0.35); }
+.form-notice { background: rgba(127, 184, 255, 0.12); color: var(--ok); border: 1px solid rgba(127, 184, 255, 0.35); }
 
 .banner { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; }
-.banner-dev { background: rgba(242, 164, 58, 0.12); color: var(--accent-strong); border: 1px dashed rgba(242, 164, 58, 0.5); }
+.banner-dev { background: rgba(91, 155, 255, 0.12); color: var(--accent-strong); border: 1px dashed rgba(91, 155, 255, 0.5); }
 .banner-warn { background: rgba(255, 122, 107, 0.12); color: var(--danger); }
 
-.fine { margin: 4px 0 0; color: #8d8174; font-size: 0.78rem; }
+.fine { margin: 4px 0 0; color: #8a9bc0; font-size: 0.78rem; }
 
 /* Tablet and phone: hero becomes a short banner above the form. */
 @media (max-width: 860px) {
@@ -110,7 +110,7 @@
 .link-button { background: none; border: 0; color: var(--text-muted); text-decoration: underline; cursor: pointer; min-height: 36px; }
 .link-button:hover { color: var(--text); }
 
-.divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; color: #8d8174; font-size: 0.8rem; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; color: #8a9bc0; font-size: 0.8rem; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
 .home { position: relative; min-height: 100%; overflow: hidden; }
@@ -123,7 +123,7 @@
   padding: 22px 24px;
   display: grid;
   gap: 10px;
-  background: rgba(20, 17, 15, 0.82);
+  background: rgba(11, 20, 38, 0.82);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -132,7 +132,7 @@
 .home-card p { margin: 0; }
 
 /* ---------------------------------------------------------------- the cinematic sign-in */
-.scene { position: fixed; inset: 0; overflow: hidden; background: #16113a; }
+.scene { position: fixed; inset: 0; overflow: hidden; background: #0a1636; }
 .scene-svg { position: absolute; inset: -3%; width: 106%; height: 106%; animation: scene-dolly 48s ease-in-out infinite alternate; will-change: transform; }
 @keyframes scene-dolly { from { transform: scale(1) translate3d(-1.2%, 0, 0); } to { transform: scale(1.07) translate3d(1.2%, -0.6%, 0); } }
 .scene-layer { will-change: transform; }
@@ -185,9 +185,9 @@
 .auth.cine .auth-tagline { z-index: 2; color: #fff; text-shadow: 0 2px 28px rgba(0, 0, 0, .55); padding: 0 1vw; animation: rise-in 1.4s .3s cubic-bezier(.2,.7,.2,1) both; }
 .auth.cine .auth-tagline h1 { font-family: var(--font-display); font-size: clamp(2.4rem, 5.4vw, 4.6rem); line-height: 1.02; margin: 0 0 12px; letter-spacing: -.01em; }
 .auth.cine .auth-tagline p { margin: 0; font-size: clamp(1rem, 1.5vw, 1.25rem); max-width: 34ch; color: #ffe9cf; }
-.auth.cine .auth-tagline .brand-line { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; font-size: .8rem; color: #ffd98a; }
+.auth.cine .auth-tagline .brand-line { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; font-size: .8rem; color: #a8c8ff; }
 .auth.cine .auth-panel .auth-title, .auth.cine .auth-panel .auth-sub, .auth.cine .auth-panel .brand { display: none; }
-.auth.cine .auth-panel { position: relative; z-index: 2; margin: 5vh 0; border-radius: 22px; padding: 26px 26px 22px; background: rgba(18, 12, 28, .72); backdrop-filter: blur(14px) saturate(1.2); border: 1px solid rgba(255, 217, 138, .22); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); animation: rise-in 1.2s .6s cubic-bezier(.2,.7,.2,1) both; max-height: 84vh; overflow: auto; align-self: center; }
+.auth.cine .auth-panel { position: relative; z-index: 2; margin: 5vh 0; border-radius: 22px; padding: 26px 26px 22px; background: rgba(18, 12, 28, .72); backdrop-filter: blur(14px) saturate(1.2); border: 1px solid rgba(168, 200, 255, .22); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); animation: rise-in 1.2s .6s cubic-bezier(.2,.7,.2,1) both; max-height: 84vh; overflow: auto; align-self: center; }
 @keyframes rise-in { from { opacity: 0; transform: translate3d(0, 22px, 0); } to { opacity: 1; transform: none; } }
 @media (max-width: 860px) {
   .auth.cine { grid-template-columns: 1fr; align-content: end; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); gap: 10px; }

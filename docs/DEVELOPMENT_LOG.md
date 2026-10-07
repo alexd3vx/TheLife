@@ -247,3 +247,10 @@ Chronological record of decisions and changes. Newest first.
 - 3D house: the character uses the look saved with the life; plaster walls with skirting and crown; contact shadow under the character; Medium preset now has anti-aliasing and medium shadows.
 - **Edit home in 3D** (`play/runtime.ts`, `world.ts`): tap a piece to pick it up, tap the floor to put it down; Turn, Sell and Shop. `world.relayout` swaps changed furniture in place; `world.fits` checks walls, other pieces and that everything reachable stays reachable. The same server rules as the isometric room (`home.ts`).
 - **Fast travel** (`game-core/travel.ts`, `arrival/TravelFilm.tsx`, `map/MapPage.tsx`): the Map button (and the minimap) open the city map; pick a place and choose how to get there. Danfo, keke, taxi or your own driver depend on your background; the fare comes from the distance on the server. A short hand-inked ride scene plays, then you arrive at the door.
+
+## Blue theme, arrow buttons for furniture, rides that arrive
+
+- The whole UI (menus, HUD, phone, creator, login scene, map) uses one blue palette: `--accent #5b9bff`, backgrounds `#0b1426`/`#111d36`. Warning/danger reds stay red.
+- Edit home (3D and iso): an arrow pad (`iso/EditPad.tsx`) and the keyboard arrows nudge the picked-up piece half a metre in the direction the arrow points on screen; the middle button (or R) turns it. 3D: `edit.nudge(sx, sy)` follows the camera and queues moves; iso: `IsoRoom.nudgeSelected`.
+- Rides: the server only believes a far jump after a paid ride (`arrive` message, `rideUntil` set by `payRide`), otherwise the movement check snapped the player back home.
+- The 3D street is not drawn while the big city map covers it (`setCovered`).

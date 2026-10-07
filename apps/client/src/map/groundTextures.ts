@@ -102,7 +102,7 @@ export function glowTexture(): THREE.CanvasTexture {
   const t = canvasTexture(128, (ctx, n) => {
     const g = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
     g.addColorStop(0, "rgba(255,220,150,.95)");
-    g.addColorStop(0.45, "rgba(255,200,120,.35)");
+    g.addColorStop(0.45, "rgba(168, 200, 255,.35)");
     g.addColorStop(1, "rgba(255,190,100,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, n, n);

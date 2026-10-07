@@ -684,6 +684,22 @@ export class IsoRoom {
     this.onEditChange?.({ kind: "move", id: it.def.id, x: it.def.x, z: it.def.z, rot: q * 90 });
   }
 
+  /** Moves the picked-up piece one step the way an arrow points on the screen (sx: 1 right, -1 left; sy: 1 up, -1 down). */
+  nudgeSelected(sx: number, sy: number): void {
+    const it = this.selected;
+    if (!it) return;
+    const step = 0.5;
+    // on this slanted view "right" is +x and -z together, "up" is -x and -z together
+    const dx = (sx - sy) * step, dz = (-sx - sy) * step;
+    const x = IsoRoom.snap(it.def.x + dx), z = IsoRoom.snap(it.def.z + dz);
+    if (!this.fitsItem(it, x, z, it.rot)) return this.setStatus("Something is in the way.");
+    // show it at once; the saved layout catches up a moment later
+    const kids = this.items.filter((o) => o.def.onTopOf === it.def.id);
+    for (const k of kids) k.def = { ...k.def, x: k.def.x + (x - it.def.x), z: k.def.z + (z - it.def.z) };
+    it.def = { ...it.def, x, z };
+    this.onEditChange?.({ kind: "move", id: it.def.id, x, z, rot: it.rot * 90 });
+  }
+
   sellSelected(): void {
     const it = this.selected;
     if (!it) return;
@@ -1061,7 +1077,7 @@ export class IsoRoom {
         const v = rnd();
         c.fillStyle = v < 0.33 ? dark : v < 0.66 ? base : light;
         c.fill();
-        c.strokeStyle = "rgba(60,36,16,.28)";
+        c.strokeStyle = "rgba(14, 26, 54,.28)";
         c.lineWidth = 1;
         c.stroke();
       }
@@ -1097,7 +1113,7 @@ export class IsoRoom {
     c.fill();
     // skirting board
     const s0 = project(q[0]![0]!, 0.14, q[0]![1]!), s1 = project(q[1]![0]!, 0.14, q[1]![1]!);
-    c.fillStyle = "rgba(60,36,16,.35)";
+    c.fillStyle = "rgba(14, 26, 54,.35)";
     c.beginPath();
     c.moveTo(p0[0], p0[1]);
     c.lineTo(p1[0], p1[1]);
@@ -1418,7 +1434,7 @@ export class IsoRoom {
           else c.moveTo(px, py);
         });
         c.closePath();
-        c.fillStyle = `rgba(255,226,160,${0.16 * (1 - night)})`;
+        c.fillStyle = `rgba(168, 200, 255,${0.16 * (1 - night)})`;
         c.fill();
       }
     }
@@ -1483,7 +1499,7 @@ export class IsoRoom {
       c.stroke();
     } else {
       c.font = `700 ${Math.round(p.size * 120 + k * 8)}px "Fraunces", Georgia, serif`;
-      c.fillStyle = p.kind === "z" ? "#e8f0ff" : "#ffd98a";
+      c.fillStyle = p.kind === "z" ? "#e8f0ff" : "#a8c8ff";
       c.strokeStyle = "rgba(40,24,16,.85)";
       c.lineWidth = 4;
       const txt = p.kind === "z" ? "z" : "♪";
@@ -1510,7 +1526,7 @@ export class IsoRoom {
 
   private shadow(c: CanvasRenderingContext2D, x: number, z: number, y: number, hx: number, hz: number) {
     const [px, py] = project(x, y, z);
-    c.fillStyle = "rgba(30,16,6,.22)";
+    c.fillStyle = "rgba(14, 26, 54,.22)";
     c.beginPath();
     c.ellipse(px, py, (hx + hz) * HALF_W * 0.85, (hx + hz) * HALF_H * 0.85, 0, 0, Math.PI * 2);
     c.fill();

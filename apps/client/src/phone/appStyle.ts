@@ -11,7 +11,7 @@ export interface AppLook {
 }
 
 const CORE: Record<string, AppLook> = {
-  chat: { icon: "chat", from: "#3ddc84", to: "#12a35a" },
+  chat: { icon: "chat", from: "#5b9bff", to: "#5b9bff" },
   pay: { icon: "pay", from: "#ffb347", to: "#e8761f" },
   shop: { icon: "shop", from: "#ff7a7a", to: "#d93a5b" },
   jobs: { icon: "jobs", from: "#6aa5ff", to: "#3558e0" },

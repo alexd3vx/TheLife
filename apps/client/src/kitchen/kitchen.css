@@ -1,4 +1,4 @@
-.kt { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 8, 6, .72); padding: 12px; }
+.kt { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(6, 12, 26, .72); padding: 12px; }
 .kt-card { width: min(520px, 100%); max-height: 92vh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: grid; gap: 10px; align-content: start; }
 .kt-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .kt-head h2 { margin: 0; font-family: var(--font-display); }
@@ -7,7 +7,7 @@
 .kt-tabs { display: flex; gap: 6px; }
 .kt-tabs button { flex: 1; min-height: 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 .kt-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
-.kt-msg { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(242, 164, 58, .14); font-size: .88rem; }
+.kt-msg { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(91, 155, 255, .14); font-size: .88rem; }
 .kt-list { display: grid; gap: 8px; }
 .kt-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
 .kt-row.is-bad { border-color: #8a3a35; background: rgba(229, 88, 79, .08); }

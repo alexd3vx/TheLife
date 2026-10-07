@@ -1,4 +1,4 @@
-.inv { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(10, 8, 6, .72); padding: 16px; }
+.inv { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(6, 12, 26, .72); padding: 16px; }
 .inv-card { --cell: min(58px, calc((100vw - 72px) / var(--cols))); width: min(460px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 16px; display: grid; gap: 12px; max-height: 92vh; overflow: auto; }
 .inv-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .inv-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.2rem; }
@@ -6,7 +6,7 @@
 .inv-close { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: inherit; cursor: pointer; display: grid; place-items: center; }
 .inv-grid { position: relative; width: calc(var(--cell) * var(--cols)); height: calc(var(--cell) * var(--rows)); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); margin: 0 auto; background: rgba(0, 0, 0, .25); border-radius: 12px; padding: 0; }
 .inv-cell { border: 1px solid rgba(255, 255, 255, .06); box-sizing: border-box; }
-.inv-item { position: absolute; left: calc(var(--x) * var(--cell) + 2px); top: calc(var(--y) * var(--cell) + 2px); width: calc(var(--w) * var(--cell) - 4px); height: calc(var(--h) * var(--cell) - 4px); border-radius: 10px; border: 2px solid color-mix(in srgb, var(--tint) 70%, #fff 10%); background: color-mix(in srgb, var(--tint) 32%, #14110f); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; cursor: pointer; font: inherit; overflow: hidden; }
+.inv-item { position: absolute; left: calc(var(--x) * var(--cell) + 2px); top: calc(var(--y) * var(--cell) + 2px); width: calc(var(--w) * var(--cell) - 4px); height: calc(var(--h) * var(--cell) - 4px); border-radius: 10px; border: 2px solid color-mix(in srgb, var(--tint) 70%, #fff 10%); background: color-mix(in srgb, var(--tint) 32%, #0b1426); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; cursor: pointer; font: inherit; overflow: hidden; }
 .inv-item.is-picked { outline: 3px solid var(--accent); outline-offset: 1px; }
 .inv-name { font-size: .64rem; line-height: 1.1; text-align: center; opacity: .92; }
 .inv-qty { position: absolute; right: 4px; bottom: 2px; font-size: .75rem; background: rgba(0, 0, 0, .55); border-radius: 8px; padding: 0 5px; }
@@ -14,4 +14,4 @@
 .inv-info { display: grid; gap: 4px; min-height: 76px; align-content: start; font-size: .92rem; }
 .inv-info small, .inv-info span { color: var(--text-muted); }
 .inv-info .btn { margin-top: 6px; justify-self: start; }
-.play-bag { position: absolute; z-index: 4; right: 84px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(20, 17, 15, .82); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.play-bag { position: absolute; z-index: 4; right: 84px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(11, 20, 38, .82); color: #fff; display: grid; place-items: center; cursor: pointer; }

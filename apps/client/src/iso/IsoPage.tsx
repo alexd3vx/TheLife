@@ -14,6 +14,7 @@ import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
 import SettingsPanel from "../settings/SettingsPanel";
+import EditPad from "./EditPad";
 import HomeShop from "./HomeShop";
 import { homeBuy, homeMove, homeSell } from "../phone/remote";
 import { layoutForTier, layoutWithHome } from "../play/layouts";
@@ -185,7 +186,8 @@ export default function IsoPage() {
       )}
       {editing && (
         <>
-          <div className="home-hint">{sel ? "Drag it, or tap the floor to move it." : "Tap a piece of furniture to pick it up."}</div>
+          <div className="home-hint">{sel ? "Drag it, tap the floor, or use the arrows." : "Tap a piece of furniture to pick it up."}</div>
+          <EditPad active={!!sel} onMove={(sx, sy) => roomRef.current?.nudgeSelected(sx, sy)} onTurn={() => roomRef.current?.rotateSelected()} />
           <div className="home-bar">
             <button disabled={!sel} onClick={() => roomRef.current?.rotateSelected()}>Turn</button>
             <button className="danger" disabled={!sel} onClick={() => roomRef.current?.sellSelected()}>
