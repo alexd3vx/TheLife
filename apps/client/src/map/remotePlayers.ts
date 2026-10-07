@@ -104,7 +104,7 @@ export function bubbleSprite(text: string): THREE.Sprite {
   return sprite;
 }
 
-export const EMOTE_CLIP: Record<string, string> = { wave: "Life_Wave_Loop", cheer: "KK_Cheering", talk: "Idle_Talking_Loop" };
+export const EMOTE_CLIP: Record<string, string> = { wave: "Life_Wave_Loop", cheer: "Life_Cheer_Loop", talk: "Life_Talk_Loop" };
 
 /** Other players in the shared world: cheap figures with a name tag, drawn slightly in the past and smoothed between snapshots. */
 export class RemotePlayers {

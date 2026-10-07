@@ -56,6 +56,9 @@ interface Building {
   size: number;
 }
 
+/** The places that stay on the map when it is zoomed far out. */
+const MAJOR = new Set<string>(["airport", "hospital", "bank", "market", "station", "government", "port", "stadium", "museum"]);
+
 let groundPicture: HTMLCanvasElement | null = null;
 function ground(district: District): HTMLCanvasElement {
   if (groundPicture) return groundPicture;
@@ -88,14 +91,15 @@ function buildings(district: District): Building[] {
     const f = l.footprint;
     const poly: [number, number][] = l.poly ?? [[f.minX, f.minZ], [f.maxX, f.minZ], [f.maxX, f.maxZ], [f.minX, f.maxZ]];
     const named = !!l.landmark;
-    const h = Math.max(3.2, l.floors * l.storey) * (named ? 1.15 : 1);
+    const h = Math.max(3.2, l.floors * l.storey) * (named ? 1.35 : 1);
     const c = l.colour % WALLS.length;
+    const tint = l.landmark ? pinColour(l.landmark, PIN_STYLE[l.landmark].colour) : null;
     const pts = new Float32Array(poly.length * 2);
     poly.forEach(([x, z], i) => {
       pts[i * 2] = x;
       pts[i * 2 + 1] = z;
     });
-    out.push({ pts, h, lit: shade(WALLS[c]!, 0.94), dark: shade(WALLS[c]!, 0.8), roof: ROOFS[c]!, key: (f.minX + f.maxX + f.minZ + f.maxZ) / 2, minX: f.minX, maxX: f.maxX, minZ: f.minZ, maxZ: f.maxZ, wind: area(poly) > 0 ? 1 : -1, size: Math.max(f.maxX - f.minX, f.maxZ - f.minZ) });
+    out.push({ pts, h, lit: tint ? mix(tint, "#ffffff", 0.62, 0.98) : shade(WALLS[c]!, 0.94), dark: tint ? mix(tint, "#ffffff", 0.45, 0.86) : shade(WALLS[c]!, 0.8), roof: tint ?? ROOFS[c]!, key: (f.minX + f.maxX + f.minZ + f.maxZ) / 2, minX: f.minX, maxX: f.maxX, minZ: f.minZ, maxZ: f.maxZ, wind: area(poly) > 0 ? 1 : -1, size: Math.max(f.maxX - f.minX, f.maxZ - f.minZ) });
   }
   out.sort((a, b) => a.key - b.key);
   buildingsCache = out;
@@ -127,6 +131,13 @@ const area = (p: [number, number][]) => {
   return a / 2;
 };
 
+/** A colour blended towards another, then darkened a little. */
+function mix(hex: string, towards: string, t: number, k: number): string {
+  const a = parseInt(hex.slice(1), 16), b = parseInt(towards.slice(1), 16);
+  const ch = (sh: number) => Math.min(255, Math.round((((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t) * k));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+
 function shade(hex: string, k: number): string {
   const n = parseInt(hex.slice(1), 16);
   const r = Math.min(255, Math.round(((n >> 16) & 255) * k)), g = Math.min(255, Math.round(((n >> 8) & 255) * k)), b = Math.min(255, Math.round((n & 255) * k));
@@ -143,7 +154,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
   const dirty = useRef(true);
   const size = useRef({ w: 1, h: 1, dpr: 1 });
   const [filter, setFilter] = useState<"all" | "open" | PlaceGroup>("all");
-  const [listOpen, setListOpen] = useState(() => window.innerWidth > 700);
+  const [listOpen, setListOpen] = useState(false);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
 
@@ -404,7 +415,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
     const on = selected === l.id;
     const glyph = iconPath(style.icon);
     return (
-      <button key={l.id} data-wx={l.x} data-wz={l.z} data-wy={18} className={`cm-pin${st.open ? "" : " is-closed"}${on ? " is-on" : ""}`} onClick={() => onSelect(on ? null : l.id)} aria-label={`${l.name}, ${st.text}`}>
+      <button key={l.id} data-major={MAJOR.has(l.kind) ? "1" : undefined} data-wx={l.x} data-wz={l.z} data-wy={18} className={`cm-pin${st.open ? "" : " is-closed"}${on ? " is-on" : ""}`} onClick={() => onSelect(on ? null : l.id)} aria-label={`${l.name}, ${st.text}`}>
         <span className="cm-pin-icon" style={{ background: pinColour(l.kind, style.colour) }}>
           {glyph && (
             <svg viewBox={`0 0 ${glyph.box[0]} ${glyph.box[1]}`} width="12" height="12" aria-hidden="true">
@@ -433,6 +444,7 @@ export default function CityMap({ district, player, home, others = [], hour, wee
     placeLabels.current = () => {
       const { w, h } = size.current;
       el.classList.toggle("is-dots", view.current.s < 0.7);
+      el.classList.toggle("is-far", view.current.s < 0.4);
       for (const it of items) {
         let x = it.x, z = it.z;
         if (it.dyn) {
@@ -467,6 +479,12 @@ export default function CityMap({ district, player, home, others = [], hour, wee
           <span key={o.id} className="cm-other" data-wx={o.x} data-wz={o.z} data-wy={2}>{o.name}</span>
         ))}
         {player && <span className="cm-me" />}
+      </div>
+
+      <div className="cm-filters" role="group" aria-label="What to show">
+        {chips.map((c) => (
+          <button key={c.id} className={filter === c.id ? "is-on" : ""} onClick={() => setFilter(c.id)}>{c.label}</button>
+        ))}
       </div>
 
       <div className={`cm-panel${listOpen ? "" : " is-hidden"}`}>

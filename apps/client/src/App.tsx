@@ -18,6 +18,7 @@ const IsoPage = lazy(() => import("./iso/IsoPage"));
 const CharTestPage = lazy(() => import("./iso/CharTestPage"));
 const NetTestPage = lazy(() => import("./net/NetTestPage"));
 const StatsPage = lazy(() => import("./net/StatsPage"));
+const AnimEditorPage = lazy(() => import("./lab/AnimEditorPage"));
 const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
@@ -84,6 +85,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <PhoneTestPage />
+      </Suspense>
+    );
+  }
+  if (hash.startsWith("#/anim")) {
+    return (
+      <Suspense fallback={null}>
+        <AnimEditorPage />
       </Suspense>
     );
   }

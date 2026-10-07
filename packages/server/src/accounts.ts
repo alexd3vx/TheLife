@@ -19,3 +19,19 @@ export function supabaseVerifier(url: string | undefined, anonKey: string | unde
     return user;
   };
 }
+
+/** Asks Supabase whether the account behind a token is an admin (the `profiles.is_admin` flag, which only the owner sets by hand). */
+export function supabaseAdminCheck(url: string | undefined, anonKey: string | undefined): ((token: string) => Promise<boolean>) | undefined {
+  if (!url || !anonKey) return undefined;
+  const base = url.replace(/\/$/, "");
+  return async (token) => {
+    try {
+      const res = await fetch(`${base}/rest/v1/profiles?select=is_admin&limit=1`, { headers: { authorization: `Bearer ${token}`, apikey: anonKey } });
+      if (!res.ok) return false;
+      const rows = (await res.json()) as { is_admin?: unknown }[];
+      return rows[0]?.is_admin === true;
+    } catch {
+      return false;
+    }
+  };
+}

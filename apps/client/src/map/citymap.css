@@ -58,3 +58,10 @@
 .map-mode .net-chip.is-online .net-dot { background: #6aa8ff; }
 .map-mode .hud-more { display: none; }
 .map-mode .hud-needs-row, .map-mode .hud-chips { display: none; }
+
+.cm-filters { position: absolute; z-index: 5; left: 12px; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 62px); display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; }
+.cm-filters::-webkit-scrollbar { display: none; }
+.cm-filters button { flex: none; border: 0; border-radius: 999px; padding: 9px 15px; background: rgba(244, 248, 255, .95); color: #34466a; font: 700 .8rem system-ui; box-shadow: 0 4px 14px rgba(8, 20, 50, .22); cursor: pointer; }
+.cm-filters button.is-on { background: #12233f; color: #fff; }
+.is-far .cm-pin:not([data-major]):not(.is-on) { display: none; }
+@media (min-width: 701px) { .cm-panel, .cm-show { top: calc(max(12px, env(safe-area-inset-top)) + 112px); } }

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
 import { Analytics } from "./analytics.js";
+import { AnimStore, cleanMap, validName } from "./animstore.js";
 
 export interface GameServerOptions {
   port?: number;
@@ -21,6 +22,8 @@ export interface GameServerOptions {
    */
   verifyToken?: (token: string) => Promise<{ id: string; email?: string } | null>;
   allowGuests?: boolean;
+  /** Says whether a Supabase token belongs to an admin. Without it (and without accounts at all, as in tests) the animation editor is open. */
+  isAdminToken?: (token: string) => Promise<boolean>;
 }
 
 export interface GameServer {
@@ -40,7 +43,72 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
   const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];
+  const anim = new AnimStore(options.dataDir ? join(options.dataDir, "anim") : null);
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, PUT, OPTIONS", "access-control-allow-headers": "authorization, content-type" };
+  const readBody = (req: IncomingMessage, max: number) =>
+    new Promise<string | null>((resolve) => {
+      let size = 0;
+      const parts: Buffer[] = [];
+      req.on("data", (c: Buffer) => {
+        size += c.length;
+        if (size > max) {
+          resolve(null);
+          req.destroy();
+        } else parts.push(c);
+      });
+      req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
+      req.on("error", () => resolve(null));
+    });
+  const mayEdit = async (req: IncomingMessage): Promise<boolean> => {
+    if (!options.verifyToken) return true; // no accounts: a local or test server
+    const token = (req.headers.authorization ?? "").replace(/^Bearer /i, "");
+    if (!token || !options.isAdminToken) return false;
+    return (await options.verifyToken(token).catch(() => null)) !== null && (await options.isAdminToken(token));
+  };
   const http: Server = createServer((req, res) => {
+    const url = (req.url ?? "").split("?")[0]!;
+    if (url.startsWith("/anim/")) {
+      void (async () => {
+        if (req.method === "OPTIONS") {
+          res.writeHead(204, cors);
+          return res.end();
+        }
+        const json = (code: number, body: string) => {
+          res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store", ...cors });
+          res.end(body);
+        };
+        if (req.method === "GET" && url === "/anim/map") return json(200, JSON.stringify({ slots: anim.getMap(), clips: anim.names() }));
+        const m = /^\/anim\/clip\/([^/]+)$/.exec(url);
+        if (m && validName(m[1]!)) {
+          if (req.method === "GET") {
+            const c = anim.getClip(m[1]!);
+            return c ? json(200, c) : json(404, "{}");
+          }
+          if (req.method === "PUT") {
+            if (!(await mayEdit(req))) return json(403, '{"error":"Only the owner can publish animations."}');
+            const body = await readBody(req, 1_600_000);
+            return body !== null && anim.putClip(m[1]!, body) ? json(200, '{"ok":true}') : json(400, '{"error":"That clip was not accepted."}');
+          }
+        }
+        if (req.method === "PUT" && url === "/anim/map") {
+          if (!(await mayEdit(req))) return json(403, '{"error":"Only the owner can publish animations."}');
+          const body = await readBody(req, 100_000);
+          let parsed: unknown = null;
+          try {
+            parsed = body ? (JSON.parse(body) as { slots?: unknown }).slots : null;
+          } catch {
+            /* bad json */
+          }
+          const clean = cleanMap(parsed);
+          if (!clean) return json(400, '{"error":"That animation map was not accepted."}');
+          anim.putMap(clean);
+          return json(200, '{"ok":true}');
+        }
+        json(404, "{}");
+      })();
+      return;
+    }
+
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
       res.end(JSON.stringify({ ok: true, room: room.name, players: room.size, protocol: PROTOCOL_VERSION }));

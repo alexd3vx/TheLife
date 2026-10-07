@@ -12,6 +12,7 @@ import { buildAccessory } from "./procedural/accessories";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
+import { animConfig, derive } from "./animConfig";
 import { KAYKIT_BONES, MIXAMO_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
@@ -55,7 +56,9 @@ function eachMaterial(root: THREE.Object3D, fn: (material: THREE.MeshStandardMat
  * libraries and are retargeted onto the body. (UAL's own idle is a fighting crouch, so the everyday stance and walk are KayKit's.)
  * Activities no free library has a clip for yet (cooking, typing, washing, brushing teeth) use the closest hand movement available.
  */
-const REAL_FOR_LIFE: Record<string, string> = {
+export const REAL_FOR_LIFE: Record<string, string> = {
+  Life_Cheer_Loop: "KK_Cheering",
+  Life_Talk_Loop: "Idle_Talking_Loop",
   Idle_Loop: "XB_idle",
   Walk_Loop: "XB_walk",
   Walk_Formal_Loop: "XB_walk",
@@ -161,6 +164,7 @@ export class Avatar {
   }
 
   private async loadAnimations(): Promise<void> {
+    await animConfig.load();
     // The animation libraries are real, hand-made clips (Quaternius, KayKit and Mixamo, free). They are never played raw: each clip is
     // retargeted onto this body (measured against both skeletons' rest poses) the first time it is needed, so any body moves right.
     // All the files download together, and whatever the character was asked to play starts the moment they are in.
@@ -184,10 +188,26 @@ export class Avatar {
   private sources: { prefix: string; scene: THREE.Object3D; clips: THREE.AnimationClip[]; restName: string; map: Record<string, string> | null }[] = [];
   private lazy = new Map<string, { src: Avatar["sources"][number]; clip: THREE.AnimationClip }>();
   private aliases = new Map<string, string>(Object.entries(REAL_FOR_LIFE));
+  /** The built-in clips made in code for moves that have a real clip; the move uses them if the real one is missing (never the previous move). */
+  private fallbacks = new Map<string, THREE.AnimationClip>();
   private restPose: RestPose | null = null;
 
   /** An animation by name, retargeted onto this body the first time it is asked for. */
+  /** The clip a game move plays: the editor's choice for that move if there is one, otherwise the built-in one. */
   private getClip(name: string): THREE.AnimationClip | undefined {
+    const ov = animConfig.slots[name];
+    if (!ov) return this.getClipHeld(name);
+    const key = `@${name}@${animConfig.version}`;
+    const have = this.clips.get(key);
+    if (have) return have;
+    const base = ov.clip.startsWith("custom:") ? animConfig.custom.get(ov.clip.slice(7)) : this.getClipUnheld(ov.clip);
+    if (!base) return this.getClipHeld(name);
+    const made = derive(base, name, ov);
+    this.clips.set(key, made);
+    return made;
+  }
+
+  private getClipHeld(name: string): THREE.AnimationClip | undefined {
     const have = this.clips.get(name);
     if (name === "Idle_Loop" && !have) {
       // Standing still is a held pose (the first frame of a relaxed idle), not a moving clip: idling animations are the first thing to look wrong.
@@ -233,7 +253,62 @@ export class Avatar {
       this.clips.set(name, moved);
       return moved;
     }
-    return undefined;
+    return this.fallbacks.get(name);
+  }
+
+  /** Every clip the editor can offer: the libraries' (retargeted when asked for) and the imported ones. */
+  libraryNames(): string[] {
+    return [...this.lazy.keys()].filter((n) => !this.aliases.has(n) || n.startsWith("U1_")).sort();
+  }
+
+  /** A library clip as it plays on this body, with no move settings applied ("custom:name" for imported ones). */
+  rawClip(name: string): THREE.AnimationClip | undefined {
+    return name.startsWith("custom:") ? animConfig.custom.get(name.slice(7)) : this.getClipUnheld(name);
+  }
+
+  /** Brings a clip made for another skeleton (an imported Mixamo file, say) onto this body. */
+  retargetFrom(sourceRoot: THREE.Object3D, clip: THREE.AnimationClip, map: Record<string, string> | null, restClip?: THREE.AnimationClip): THREE.AnimationClip | null {
+    if (!this.skeleton || !this.restPose) return null;
+    let use = map;
+    if (!use) {
+      const names = new Set<string>();
+      sourceRoot.traverse((o) => names.add(o.name));
+      use = {};
+      for (const bone of this.skeleton.bones) if (names.has(bone.name)) use[bone.name] = bone.name;
+    }
+    return retargetClip(this.skeleton.bones, this.restPose, sourceRoot, clip, use, 30, restClip);
+  }
+
+  /** The clip a game move uses right now (settings applied). */
+  slotClip(slot: string): THREE.AnimationClip | undefined {
+    return this.getClip(slot);
+  }
+
+  /** Plays any clip object (for the editor's preview). Pause and scrub with `setPlayback`. */
+  playClip(clip: THREE.AnimationClip, loop = true, fade = 0.12): void {
+    if (!this.mixer) return;
+    const next = this.mixer.clipAction(clip);
+    next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+    next.clampWhenFinished = !loop;
+    next.paused = false;
+    next.reset().setEffectiveWeight(1).play();
+    if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, fade, false);
+    this.currentAction = next;
+  }
+
+  setPlayback(o: { paused?: boolean; time?: number; speed?: number }): void {
+    const a = this.currentAction;
+    if (!a) return;
+    if (o.speed !== undefined) a.timeScale = o.speed;
+    if (o.time !== undefined) {
+      a.time = o.time;
+      this.mixer?.update(0);
+    }
+    if (o.paused !== undefined) a.paused = o.paused;
+  }
+
+  get playbackTime(): number {
+    return this.currentAction?.time ?? 0;
   }
 
   /** Everyday-life clips are made from real clips; ones with no real stand-in fall back to a clip made in code. */
@@ -243,10 +318,17 @@ export class Avatar {
     const playing = this.currentAction?.getClip().name;
     this.lazy.clear();
     for (const src of this.sources) {
-      for (const clip of src.clips) if (clip.name !== src.restName) this.lazy.set(`${src.prefix}${clip.name}`, { src, clip });
+      for (const clip of src.clips) if (clip.name !== src.restName) {
+        this.lazy.set(`${src.prefix}${clip.name}`, { src, clip });
+        if (src.prefix === "") this.lazy.set(`U1_${clip.name}`, { src, clip });
+      }
     }
     this.clips.clear();
-    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) if (!this.lazy.has(clip.name) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
+    this.fallbacks.clear();
+    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) {
+      if (!this.lazy.has(clip.name) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
+      else this.fallbacks.set(clip.name, clip); // used only when the real clip for this move can't be found
+    }
     const resume = playing ?? this.wanted;
     if (resume) this.play(resume, 0);
   }
@@ -724,8 +806,9 @@ export class Avatar {
     const clip = this.getClip(name);
     if (!clip || !this.mixer) return false;
     const next = this.mixer.clipAction(clip);
-    next.setLoop(THREE.LoopRepeat, Infinity);
-    next.clampWhenFinished = false;
+    const once = animConfig.slots[name]?.loop === false;
+    next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
+    next.clampWhenFinished = once;
     next.reset().setEffectiveWeight(1).play();
     if (this.currentAction && this.currentAction !== next) this.currentAction.crossFadeTo(next, fade, false);
     this.currentAction = next;

@@ -19,7 +19,9 @@ export interface ServerStats {
 }
 
 /** The server's plain-http address (the same host as the game socket). */
-export const statsUrl = (): string => defaultServerUrl().replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/$/, "") + "/stats";
+/** The game server's plain-http base address. */
+export const serverHttpBase = (): string => defaultServerUrl().replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/$/, "");
+export const statsUrl = (): string => `${serverHttpBase()}/stats`;
 
 /** How many are online (and the visit counts), refreshed every so often. Null until the first answer. */
 export function useServerStats(everyMs = 20_000): ServerStats | null {

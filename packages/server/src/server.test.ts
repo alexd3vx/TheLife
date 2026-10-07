@@ -145,6 +145,22 @@ describe("game server", () => {
     expect((await b.next("chat")).text).toBe("anyone near?");
   });
 
+  it("stores the animation editor's map and clips, and serves them to everyone", async () => {
+    server = await startGameServer({ port: 0 });
+    const base = `http://127.0.0.1:${server.port}`;
+    const put = await fetch(`${base}/anim/map`, { method: "PUT", body: JSON.stringify({ slots: { Life_Cook_Loop: { clip: "custom:stir", speed: 0.8, loop: true } } }) });
+    expect(put.status).toBe(200);
+    const bad = await fetch(`${base}/anim/map`, { method: "PUT", body: JSON.stringify({ slots: { "bad name!": { clip: "x" } } }) });
+    expect(bad.status).toBe(400);
+    const clip = await fetch(`${base}/anim/clip/stir`, { method: "PUT", body: JSON.stringify({ name: "stir", duration: 1, tracks: [] }) });
+    expect(clip.status).toBe(200);
+    const got = (await (await fetch(`${base}/anim/map`)).json()) as { slots: Record<string, { clip: string; speed: number }>; clips: string[] };
+    expect(got.slots.Life_Cook_Loop!.clip).toBe("custom:stir");
+    expect(got.slots.Life_Cook_Loop!.speed).toBe(0.8);
+    expect(got.clips).toEqual(["stir"]);
+    expect((await fetch(`${base}/anim/clip/stir`)).status).toBe(200);
+  });
+
   it("limits chat to a few messages in a burst", async () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Ada");

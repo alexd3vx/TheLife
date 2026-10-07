@@ -1,7 +1,7 @@
 // TheLife service worker: keeps the game's own files on the device so it opens fast and starts offline. Playing still needs the internet
 // (your life lives on the server). Nothing about the player is stored here, only the app's files.
 const SHELL = "thelife-shell-v2";
-const FILES = "thelife-files-v1";
+const FILES = "thelife-files-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -38,6 +38,22 @@ self.addEventListener("fetch", (event) => {
           return res;
         })
         .catch(() => caches.match("/").then((r) => r || Response.error())),
+    );
+    return;
+  }
+
+  // The list of game files changes with every release (new animations, models): the network first, the saved copy only when offline.
+  if (url.pathname === "/assets/manifest.json") {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(FILES).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((r) => r || Response.error())),
     );
     return;
   }
