@@ -152,5 +152,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **AI NPCs (Q38):** scripted dialogue with Pidgin variety now; AI chat for a few key NPCs later, capped and cheap. (7 Oct)
 - **Install (Q39):** PWA now, Play Store app (TWA wrapper) later. (7 Oct)
 - **Analytics (Q40):** anonymous usage counts only (online now, visits, sessions, which places and apps are used, crashes). (7 Oct)
+- **Relationships (Q41):** player partners with consent both ways; relatives added by consent; NPC partners also possible. (7 Oct)
+- **Ageing (Q42):** slow ageing (one game year per real month), kids optional (NPC children you raise and school), pass the household on when you retire. (7 Oct)
+- **Animals (Q43):** a fuller farm: crops and farm animals, pets at home; connects to the food system. (7 Oct)
+- **Property (Q44):** all four: rent and buy homes, land plots, shops and businesses, renting out to other players as landlord. (7 Oct)
 
-*Questions asked so far: 40 of the owner's 100 (plus 16 earlier in the master plan).*
+*Questions asked so far: 44 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
