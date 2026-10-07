@@ -20,6 +20,8 @@ import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
+import OnlineCount from "../net/OnlineCount";
+import "../net/stats.css";
 import { BottomNav, Chips, MoreMenu, NeedsRow, TopPill } from "./HudParts";
 
 interface Toast {
@@ -184,6 +186,7 @@ export default function PlayPage() {
           <TopPill hud={hud} />
           <Chips hud={hud} />
           <NeedsRow hud={hud} />
+          <OnlineCount />
         </>
       )}
 

@@ -1,0 +1,23 @@
+.stats { min-height: 100%; padding: max(16px, env(safe-area-inset-top)) 16px 40px; max-width: 760px; margin: 0 auto; color: var(--text); }
+.stats header { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; margin-bottom: 14px; }
+.stats header a { color: var(--accent-strong); text-decoration: none; font-weight: 600; }
+.stats h1 { margin: 0; font: 800 1.4rem var(--font-display); }
+.stats header small { grid-column: 1 / -1; color: var(--text-muted); }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stats-tile { padding: 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); display: grid; gap: 4px; }
+.stats-tile b { font: 800 1.7rem var(--font-display); color: var(--accent-strong); }
+.stats-tile span { color: var(--text-muted); font-size: .8rem; }
+.stats-tile.big { grid-column: 1 / -1; background: linear-gradient(135deg, #1c3a80, #2f6bff); border: 0; }
+.stats-tile.big b { font-size: 3rem; color: #fff; } .stats-tile.big span { color: #dbe7ff; }
+.stats-card { padding: 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 12px; }
+.stats-card h2 { margin: 0 0 10px; font-size: .95rem; }
+.stats-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; }
+.stats-bar { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.stats-bar i { display: block; width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--accent); }
+.stats-bar small { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; font-size: .62rem; color: var(--text-muted); white-space: nowrap; }
+.stats-card { padding-bottom: 28px; }
+.stats-note { color: var(--text-muted); font-size: .82rem; }
+
+.online-count { position: absolute; z-index: 3; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 112px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: rgba(244, 248, 255, .94); color: #12233f; font: 700 .76rem system-ui; text-decoration: none; box-shadow: 0 6px 22px rgba(8, 20, 50, .28); }
+.online-count i { width: 9px; height: 9px; border-radius: 50%; background: #2f6bff; box-shadow: 0 0 0 3px rgba(47, 107, 255, .25); }
+.online-count.is-low { left: 12px; right: auto; top: calc(max(12px, env(safe-area-inset-top)) + 152px); }

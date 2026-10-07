@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import GameHud from "../play/GameHud";
+import OnlineCount from "../net/OnlineCount";
+import "../net/stats.css";
 import { BottomNav, MoreMenu } from "../play/HudParts";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import ArrivalFilm from "../arrival/ArrivalFilm";
@@ -184,6 +186,7 @@ export default function IsoPage() {
           ]}
         />
       )}
+      {!editing && session && ready && !introOn && <OnlineCount />}
       {!editing && session && ready && !introOn && (
         <BottomNav active="home" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onBuy={() => { toggleEdit(); setShopOpen(true); }} />
       )}

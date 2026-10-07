@@ -4194,12 +4194,125 @@ var Room = class {
   }
 };
 
+// packages/server/src/analytics.ts
+import { createHash as createHash2 } from "node:crypto";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
+var dayOf2 = (t) => new Date(t).toISOString().slice(0, 10);
+var hourOf = (t) => new Date(t).toISOString().slice(0, 13);
+var hash3 = (key) => createHash2("sha1").update(key).digest("hex").slice(0, 10);
+var Analytics = class {
+  constructor(file) {
+    this.file = file;
+    if (file && existsSync2(file)) {
+      try {
+        this.data = { ...this.data, ...JSON.parse(readFileSync2(file, "utf8")) };
+      } catch {
+      }
+    }
+    if (file) this.timer = setInterval(() => this.save(), 6e4);
+  }
+  file;
+  data = { days: {}, hours: {}, totalViews: 0, everSeen: [], peak: { online: 0, at: 0 } };
+  dirty = false;
+  timer = null;
+  online = /* @__PURE__ */ new Map();
+  /** Someone opened the game and got in. */
+  visit(id, key, kind, where, now = Date.now()) {
+    const d = this.data.days[dayOf2(now)] ??= { views: 0, accounts: 0, guests: 0, seen: [] };
+    const h = hash3(key);
+    d.views++;
+    if (kind === "account") d.accounts++;
+    else d.guests++;
+    if (!d.seen.includes(h)) d.seen.push(h);
+    if (!this.data.everSeen.includes(h)) this.data.everSeen.push(h);
+    this.data.totalViews++;
+    const hour = this.data.hours[hourOf(now)] ??= { peak: 0, views: 0 };
+    hour.views++;
+    this.online.set(id, { kind, where });
+    this.notePeak(now);
+    this.dirty = true;
+  }
+  move(id, where) {
+    const o = this.online.get(id);
+    if (o) o.where = where;
+  }
+  leave(id) {
+    this.online.delete(id);
+  }
+  notePeak(now) {
+    const n = this.online.size;
+    const hour = this.data.hours[hourOf(now)] ??= { peak: 0, views: 0 };
+    if (n > hour.peak) hour.peak = n;
+    if (n > this.data.peak.online) this.data.peak = { online: n, at: now };
+  }
+  /** What the stats page shows. */
+  report(now = Date.now()) {
+    this.notePeak(now);
+    let accounts = 0, guests = 0, inWorld = 0;
+    for (const o of this.online.values()) {
+      if (o.kind === "account") accounts++;
+      else guests++;
+      if (o.where === "world") inWorld++;
+    }
+    const today = this.data.days[dayOf2(now)] ?? { views: 0, accounts: 0, guests: 0, seen: [] };
+    const hourly = [];
+    for (let i = 23; i >= 0; i--) {
+      const t = now - i * 36e5;
+      const h = this.data.hours[hourOf(t)];
+      hourly.push({ hour: hourOf(t), views: h?.views ?? 0, peak: h?.peak ?? 0 });
+    }
+    const daily = [];
+    for (let i = 13; i >= 0; i--) {
+      const t = now - i * 864e5;
+      const d = this.data.days[dayOf2(t)];
+      daily.push({ day: dayOf2(t), views: d?.views ?? 0, players: d?.seen.length ?? 0, guests: d?.guests ?? 0, accounts: d?.accounts ?? 0 });
+    }
+    return {
+      online: this.online.size,
+      accounts,
+      guests,
+      inWorld,
+      atHome: this.online.size - inWorld,
+      viewsToday: today.views,
+      playersToday: today.seen.length,
+      viewsTotal: this.data.totalViews,
+      playersTotal: this.data.everSeen.length,
+      peakOnline: this.data.peak.online,
+      peakAt: this.data.peak.at,
+      hourly,
+      daily,
+      at: now
+    };
+  }
+  save() {
+    if (!this.file || !this.dirty) return;
+    this.dirty = false;
+    const keepDays = Object.keys(this.data.days).sort().slice(-60);
+    this.data.days = Object.fromEntries(keepDays.map((k) => [k, this.data.days[k]]));
+    const keepHours = Object.keys(this.data.hours).sort().slice(-72);
+    this.data.hours = Object.fromEntries(keepHours.map((k) => [k, this.data.hours[k]]));
+    try {
+      mkdirSync2(dirname2(this.file), { recursive: true });
+      writeFileSync2(`${this.file}.tmp`, JSON.stringify(this.data));
+      renameSync2(`${this.file}.tmp`, this.file);
+    } catch (e) {
+      console.error("analytics save failed", e);
+    }
+  }
+  close() {
+    if (this.timer) clearInterval(this.timer);
+    this.save();
+  }
+};
+
 // packages/server/src/index.ts
 var send = (ws, message) => {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
 };
 async function startGameServer(options = {}) {
   const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
+  const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
   const room = new Room(options.room ?? "lagos-test", void 0, store);
   const sockets = /* @__PURE__ */ new Map();
   const origins2 = options.origins ?? [];
@@ -4207,6 +4320,11 @@ async function startGameServer(options = {}) {
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
       res.end(JSON.stringify({ ok: true, room: room.name, players: room.size, protocol: PROTOCOL_VERSION }));
+      return;
+    }
+    if (req.url === "/stats") {
+      res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "no-store" });
+      res.end(JSON.stringify(analytics.report()));
       return;
     }
     res.writeHead(404);
@@ -4281,6 +4399,7 @@ async function startGameServer(options = {}) {
         clearTimeout(helloTimer);
         me = joined.player;
         sockets.set(me.id, ws);
+        analytics.visit(me.id, key, account ? "account" : "guest", me.where === "world" ? "world" : "home");
         send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
         if (me.life) {
@@ -4309,6 +4428,7 @@ async function startGameServer(options = {}) {
         case "place": {
           if (me.where === message.where) return;
           me.where = message.where;
+          analytics.move(me.id, me.where === "world" ? "world" : "home");
           if (me.where === "world") {
             sendHome(me, true);
             broadcast({ t: "join", player: room.view(me) }, me.id);
@@ -4373,6 +4493,7 @@ async function startGameServer(options = {}) {
       clearTimeout(helloTimer);
       if (me) {
         room.leave(me.id);
+        analytics.leave(me.id);
         if (sockets.get(me.id) === ws) sockets.delete(me.id);
         if (me.where === "world") broadcast({ t: "leave", id: me.id });
       }
@@ -4411,6 +4532,7 @@ async function startGameServer(options = {}) {
     close: () => new Promise((resolve) => {
       clearInterval(interval);
       clearInterval(lifeInterval);
+      analytics.close();
       const now = Date.now();
       for (const p of room.players.values()) room.saveLife(p, now);
       store.flush();

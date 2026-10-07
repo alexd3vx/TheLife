@@ -115,6 +115,18 @@ describe("game server", () => {
     expect(p.rideUntil).toBe(0);
   });
 
+  it("counts visitors and who is online at /stats", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    await a.next("welcome");
+    const report = await (await fetch(`http://127.0.0.1:${server.port}/stats`)).json();
+    expect(report.online).toBe(1);
+    expect(report.guests).toBe(1);
+    expect(report.viewsToday).toBe(1);
+    expect(report.playersToday).toBe(1);
+    expect(report.hourly).toHaveLength(24);
+  });
+
   it("limits chat to a few messages in a burst", async () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Ada");

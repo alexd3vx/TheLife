@@ -14,6 +14,8 @@ import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { payRide, setChargeChecker } from "../phone/remote";
+import OnlineCount from "../net/OnlineCount";
+import "../net/stats.css";
 import { BottomNav, MoreMenu } from "../play/HudParts";
 import TravelFilm from "../arrival/TravelFilm";
 import { chargingSpotNear, rideOptions } from "@thelife/game-core";
@@ -324,6 +326,7 @@ export default function MapPage() {
           })()}
         </>
       )}
+      {!trip && <OnlineCount low />}
       {!bigMap && !trip && <BottomNav active="map" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onMap={() => setMode("map")} />}
       {bigMap && (
         <nav className="cm-nav" aria-label="Where to">

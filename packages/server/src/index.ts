@@ -4,6 +4,7 @@ import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@theli
 import { join } from "node:path";
 import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
+import { Analytics } from "./analytics.js";
 
 export interface GameServerOptions {
   port?: number;
@@ -35,6 +36,7 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 /** Starts the game server: an HTTP health check and a WebSocket endpoint for one shared world. */
 export async function startGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
+  const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
   const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];
@@ -42,6 +44,11 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
       res.end(JSON.stringify({ ok: true, room: room.name, players: room.size, protocol: PROTOCOL_VERSION }));
+      return;
+    }
+    if (req.url === "/stats") {
+      res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "no-store" });
+      res.end(JSON.stringify(analytics.report()));
       return;
     }
     res.writeHead(404);
@@ -125,6 +132,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         clearTimeout(helloTimer);
         me = joined.player;
         sockets.set(me.id, ws);
+        analytics.visit(me.id, key, account ? "account" : "guest", me.where === "world" ? "world" : "home");
         send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
         if (me.life) {
@@ -153,6 +161,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         case "place": {
           if (me.where === message.where) return;
           me.where = message.where;
+          analytics.move(me.id, me.where === "world" ? "world" : "home");
           if (me.where === "world") {
             sendHome(me, true); // you step out of your own front door
 
@@ -219,6 +228,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       clearTimeout(helloTimer);
       if (me) {
         room.leave(me.id);
+        analytics.leave(me.id);
         if (sockets.get(me.id) === ws) sockets.delete(me.id);
         if (me.where === "world") broadcast({ t: "leave", id: me.id });
       }
@@ -262,6 +272,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
       new Promise<void>((resolve) => {
         clearInterval(interval);
         clearInterval(lifeInterval);
+        analytics.close();
         const now = Date.now();
         for (const p of room.players.values()) room.saveLife(p, now);
         store.flush();
