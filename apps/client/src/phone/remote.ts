@@ -111,6 +111,7 @@ export const discardLot = remote("discardLot", core.discardLot as (s: GameState,
 // ---- the home
 type HR = core.HomeResultLike;
 export const homeMove = remote("homeMove", core.homeMove as (s: GameState, id: string, x: number, z: number, rot: number) => HR);
+export const homeLock = remote("homeLock", core.homeLock as (s: GameState, locked: boolean) => HR);
 export const homeSell = remote("homeSell", core.homeSell as (s: GameState, id: string, furniture?: string) => HR, (a) => [a[1] as string, (a[2] as string | undefined) ?? null]);
 export const homeBuy = remote("homeBuy", core.homeBuy as (s: GameState, furniture: string, x: number, z: number, rot: number) => HR);
 

@@ -242,6 +242,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         raf = requestAnimationFrame(loop);
         const dt = Math.min(0.1, clock.getDelta());
         const frozen = !!openRef.current || leavingRef.current;
+        walker.analog = input.last === "touch";
         walker.update(dt, frozen ? { x: 0, y: 0, m: 0 } : input.move(), !frozen && input.running());
         me.update(dt);
         for (const a of staff) a.update(dt);

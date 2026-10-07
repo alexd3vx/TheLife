@@ -16,6 +16,7 @@ import { markRestart } from "./pendingLife";
 import type { SimEvent } from "@thelife/game-core";
 import { buildShowroomLayout, type Layout } from "./layout";
 import { layoutForTier, layoutWithHome } from "./layouts";
+import { homeLock } from "../phone/remote";
 import { homeMove, homeSell, homeBuy } from "../phone/remote";
 import { furnitureById } from "@thelife/game-core";
 import { FURNITURE } from "@thelife/game-core";
@@ -64,6 +65,11 @@ export interface PlayRuntime {
   /** For tests and debugging. */
   debug: {
     tapGround(x: number, z: number): boolean;
+    canWalkTo(x: number, z: number): boolean;
+    /** Locks or unlocks the front door; returns whether it is locked now. */
+    toggleDoor(): boolean;
+    /** The route to an item's use spot from where the character stands, as points (null when there is none). */
+    routeToItem(id: string): [number, number][] | null;
     tapItem(id: string): boolean;
     /** Placed items with what tapping them does (for the showroom tests). */
     items(): { id: string; furniture: string; action: string | null; seats: number; x: number; z: number; animated: boolean; approach: [number, number] | null; pose: [number, number, number] | null; topY: number }[];
@@ -99,7 +105,9 @@ export type PlayMode = "house" | "showroom";
 
 export async function startPlay(container: HTMLElement, manifest: AssetManifest, events: RuntimeEvents, options: { fresh?: boolean; mode?: PlayMode; session?: GameSession } = {}): Promise<PlayRuntime | null> {
   const showroom = options.mode === "showroom";
-  const tierLayout = layoutForTier((options.session ?? undefined)?.sim.state.profile?.tier);
+  // (development only: ?tier=lapo|middle|nepo shows that background's home whatever life is loaded)
+  const forcedTier = import.meta.env.DEV ? new URLSearchParams(location.search).get("tier") : null;
+  const tierLayout = layoutForTier(forcedTier ?? (options.session ?? undefined)?.sim.state.profile?.tier);
   const layout: Layout = showroom ? buildShowroomLayout(FURNITURE) : layoutWithHome(tierLayout, options.session?.sim.state.home);
   let renderer: THREE.WebGLRenderer;
   try {
@@ -186,10 +194,12 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
   let follow = true;
+  // a bigger house is looked at from a little further back
+  const viewScale = layout.house ? Math.max(0.9, Math.min(1.3, (layout.house.bounds.maxX - layout.house.bounds.minX) / 14)) : 1;
   const VIEW_TARGET = showroom ? new THREE.Vector3(0, 0.9, -2) : new THREE.Vector3(-0.5, 0.9, 0.5);
   function resetView() {
     controls.target.copy(follow ? new THREE.Vector3(controller.position.x, 0.9, controller.position.z) : VIEW_TARGET);
-    camera.position.set(controls.target.x + 4, 9.5, controls.target.z + 11.5);
+    camera.position.set(controls.target.x + 4 * viewScale, 9.5 * viewScale, controls.target.z + 11.5 * viewScale);
     controls.update();
   }
   resetView();
@@ -310,13 +320,59 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     void commitMove(it, x, z, rot);
   }
 
+  // ---- the front door: tap it to lock or unlock it (you walk up to it first)
+  let doorLocked = !!options.session?.sim.state.home?.locked;
+  world.frontDoor?.setLocked(doorLocked);
+  let walkingToDoor = false;
+  function doorAt(clientX: number, clientY: number): boolean {
+    const door = world.frontDoor;
+    if (!door) return false;
+    pointerRay(clientX, clientY);
+    return raycaster.intersectObjects(door.parts, true).length > 0;
+  }
+  function toggleDoorLock() {
+    const session = options.session;
+    if (!session) return;
+    const r = homeLock(session.sim.state, !doorLocked);
+    if (!r.ok) return session.notice(r.reason);
+    doorLocked = !doorLocked;
+    world.frontDoor?.setLocked(doorLocked);
+    session.notice(r.text);
+  }
+  /** Each frame while walking to the door: lock it once the character is beside it. */
+  function doorStep() {
+    const door = world.frontDoor;
+    if (!walkingToDoor || !door) return;
+    if (Math.hypot(controller.position.x - door.x, controller.position.z - door.z) < 1.5) {
+      walkingToDoor = false;
+      controller.stop();
+      toggleDoorLock();
+    } else if (controller.mode === "idle") walkingToDoor = false;
+  }
+
   function handleTap(clientX: number, clientY: number) {
+    walkingToDoor = false;
     if (editing) return editTap(clientX, clientY);
     const rect = renderer.domElement.getBoundingClientRect();
     const at = { x: clientX - rect.left, y: clientY - rect.top };
     const close = () => events.onMenu?.(null);
     /** Shows the options, or (where there is no menu, as in the showroom) just does the first. */
     const present = (menu: TapMenu) => (events.onMenu ? events.onMenu(menu) : menu.options[0]?.run());
+    if (doorAt(clientX, clientY) && world.frontDoor) {
+      const door = world.frontDoor;
+      present({
+        ...at,
+        title: "Front door",
+        options: [{ label: doorLocked ? "Unlock the door" : "Lock the door", icon: "hand", run: () => {
+          close();
+          if (Math.hypot(controller.position.x - door.x, controller.position.z - door.z) < 1.5) return toggleDoorLock();
+          // stand just inside, then turn the key
+          showMarker(door.x, door.z - 1.1, controller.tapGround(door.x, door.z - 1.1, "auto"));
+          walkingToDoor = true;
+        } }],
+      });
+      return;
+    }
     const picked = interactiveAt(clientX, clientY);
     if (picked) {
       const options = [...world.interactionsFor(picked.item.def.id)].sort(
@@ -495,6 +551,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
       camera.position.add(shift);
     }
     controls.update();
+    doorStep();
     world.updateWalls(camera, dt);
 
     markerAge += dt;
@@ -646,6 +703,18 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
     },
     debug: {
       tapGround: (x, z) => controller.tapGround(x, z),
+      routeToItem(id: string) {
+        const i = world.interactionsFor(id)[0];
+        const r = i ? controller.routeTo(i.approach[0], i.approach[1]) : null;
+        return r ? r.map((p) => [p.x, p.z] as [number, number]) : null;
+      },
+      toggleDoor() {
+        toggleDoorLock();
+        return doorLocked;
+      },
+      canWalkTo(x: number, z: number) {
+        return controller.canReach(x, z);
+      },
       tapItem(id) {
         const interaction = world.interactionsFor(id)[0];
         return interaction ? controller.tapInteraction(interaction) : false;

@@ -148,6 +148,12 @@ export function deriveInteractions(items: DerivedItem[], ok: Ok, boxOf?: (id: st
           [c.x + r.x * gap(r.x, r.z), c.z + r.z * gap(r.x, r.z)],
           [c.x - r.x * gap(r.x, r.z), c.z - r.z * gap(r.x, r.z)],
           [c.x - f.x * gap(f.x, f.z), c.z - f.z * gap(f.x, f.z)],
+          // if all four are taken (a desk against a wall with a chair at it), any free spot round the piece will do
+          ...[0.7, 1.4, 2.1, 2.8, 3.5, 4.2, 4.9, 5.6].flatMap((turn) => [1, 1.5].map((far): [number, number] => {
+            const a = Math.atan2(f.x, f.z) + turn;
+            const d = Math.max(gap(Math.sin(a), Math.cos(a)), 0.5) * far;
+            return [c.x + Math.sin(a) * d, c.z + Math.cos(a) * d];
+          })),
         ],
         ok,
       );

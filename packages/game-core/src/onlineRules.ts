@@ -7,7 +7,7 @@ import {
   addNote, addTodo, bookTicket, buyHomePlan, buyShares, cancelDownload, deleteNote, deleteTodo, diaryCheckIn, doGig, doWorkout, drinkWater, finishFocus, joinAjo, orderEats, payAjo, recordScore,
   sellShares, setMobileData, setWifi, startDownload, streamData, takeLesson, toggleTodo, uninstallApp, useApp,
 } from "./phoneStore";
-import { homeBuy, homeMove, homeSell } from "./home";
+import { homeBuy, homeLock, homeMove, homeSell } from "./home";
 import { payRide } from "./travel";
 import { hospitalFirstAid, hospitalService } from "./hospital";
 import { shopSnack } from "./shop";
@@ -49,6 +49,7 @@ const HANDLERS: Record<string, Handler> = {
   buyGroceries: (sim) => sim.buyGroceries(),
   buyIngredient: (sim, [id, q]) => (str(id, 30) && int(q, 1, 12) ? buyIngredient(sim.state, id as string, q as number, sim.traits.groceries) : no(bad)),
   homeMove: (sim, [id, x, z, rot]) => (str(id, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeMove(sim.state, id as string, x, z, rot) : no(bad)),
+  homeLock: (sim, [locked]) => (typeof locked === "boolean" ? homeLock(sim.state, locked) : no(bad)),
   homeSell: (sim, [id, furniture]) => (str(id, 40) ? homeSell(sim.state, id as string, typeof furniture === "string" ? furniture : undefined) : no(bad)),
   homeBuy: (sim, [furniture, x, z, rot]) => (str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture as string, x, z, rot) : no(bad)),
   payRide: (sim, [id, meters]) => (str(id, 12) && typeof meters === "number" ? payRide(sim.state, id as string, meters) : no(bad)),

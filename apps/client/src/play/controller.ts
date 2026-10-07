@@ -39,6 +39,20 @@ const WALK_CLIP_SPEED = 1.35; // ground speed the Walk clip was authored for; th
 const JOG_CLIP_SPEED = 3.0;
 const SLIDE_TIME = 0.5; // seconds to step in front of a seat (or into the shower) from where you stood
 
+/**
+ * How fast a push moves the body. Keys are on or off: walk, or run with the run key. A stick is analog and is only ever held part way
+ * out by a thumb, so a gentle push walks at a steady pace and pushing out further eases up into a run, instead of everything below the
+ * very edge being slower than a walk.
+ */
+function driveSpeed(inp: { m: number; run: boolean; analog: boolean }): number {
+  if (!inp.analog) return (inp.run ? RUN_SPEED : WALK_SPEED) * inp.m;
+  const m = Math.min(1, (inp.m - 0.08) / 0.92);
+  if (inp.run || m > 0.95) return RUN_SPEED;
+  if (m <= 0.45) return WALK_SPEED * Math.max(0.35, m / 0.45);
+  const k = Math.min(1, (m - 0.45) / 0.4);
+  return WALK_SPEED + (RUN_SPEED - WALK_SPEED) * k * k * (3 - 2 * k);
+}
+
 function wrapAngle(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
 }
@@ -60,7 +74,7 @@ export class CharacterController {
 
   private path: Point[] = [];
   /** What the player is pushing right now (a stick or the keys): a world direction, how hard, and whether to run. */
-  private driveInput: { x: number; z: number; m: number; run: boolean } | null = null;
+  private driveInput: { x: number; z: number; m: number; run: boolean; analog: boolean } | null = null;
   private heading = { x: 0, z: 1 };
   private pending: Interaction | null = null;
   private interaction: Interaction | null = null;
@@ -124,8 +138,8 @@ export class CharacterController {
    * Direct control, GTA-style: call it every frame with the way the player is pushing (a unit direction in the world, how hard 0 to 1,
    * and whether to run). It takes over from walking to a tapped spot, gets the character up from a seat first, and slides along walls.
    */
-  drive(dirX: number, dirZ: number, magnitude: number, run: boolean): void {
-    this.driveInput = magnitude > 0.08 ? { x: dirX, z: dirZ, m: Math.min(1, magnitude), run } : null;
+  drive(dirX: number, dirZ: number, magnitude: number, run: boolean, analog = false): void {
+    this.driveInput = magnitude > 0.08 ? { x: dirX, z: dirZ, m: Math.min(1, magnitude), run, analog } : null;
     if (!this.driveInput) return;
     if (this.mode === "idle" || this.mode === "walking") {
       this.path = [];
@@ -150,7 +164,7 @@ export class CharacterController {
 
   private driveStep(dt: number) {
     const inp = this.driveInput;
-    const cruise = inp ? (inp.run ? RUN_SPEED : WALK_SPEED) * inp.m * this.game.speedFactor() : 0;
+    const cruise = inp ? driveSpeed(inp) * this.game.speedFactor() : 0;
     this.speed += THREE.MathUtils.clamp(cruise - this.speed, -DECEL * 1.4 * dt, ACCEL * 1.6 * dt);
     if (inp) {
       this.heading = { x: inp.x, z: inp.z };
@@ -180,6 +194,21 @@ export class CharacterController {
       this.avatar.setSpeed(1);
       this.setClip("Idle_Loop");
     }
+  }
+
+  /** Stops where it stands if it is only walking somewhere (not while doing something). */
+  stop(): void {
+    if (this.mode !== "walking") return;
+    this.path = [];
+    this.pending = null;
+    this.speed = 0;
+    this.mode = "idle";
+    this.setClip("Idle_Loop");
+  }
+
+  /** The walking route from here to a spot, or null (for tests: does it stay inside the house?). */
+  routeTo(x: number, z: number): Point[] | null {
+    return findPath(this.nav, { x: this.position.x, z: this.position.z }, { x, z });
   }
 
   /** Can the character get from here to that spot? (No side effects.) */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLAYER, balance, createGameState, homeBuy, homeMove, homeSell, parseGameState, runRpc, Sim } from "./index.js";
+import { PLAYER, balance, createGameState, homeBuy, homeLock, homeMove, homeSell, parseGameState, parseHome, runRpc, Sim, visitorMayEnter } from "./index.js";
 
 const rich = () => {
   const s = createGameState();
@@ -54,5 +54,18 @@ describe("home editing", () => {
     expect(runRpc(sim, "homeMove", ["bed", 1, 1, 90]).ok).toBe(true);
     const back = parseGameState(JSON.parse(JSON.stringify(sim.state)));
     expect(back?.home?.moved["bed"]).toEqual({ x: 1, z: 1, rot: 90 });
+  });
+
+  it("locks and unlocks the front door, and keeps visitors out while it is locked", () => {
+    const s = createGameState();
+    expect(visitorMayEnter(s, false)).toBe(true);
+    expect(homeLock(s, true).ok).toBe(true);
+    expect(s.home?.locked).toBe(true);
+    expect(visitorMayEnter(s, false)).toBe(false);
+    expect(visitorMayEnter(s, true)).toBe(true);
+    expect(parseHome(JSON.parse(JSON.stringify(s.home))).locked).toBe(true);
+    expect(homeLock(s, false).ok).toBe(true);
+    expect(s.home?.locked).toBeUndefined();
+    expect(homeLock(s, "yes" as never).ok).toBe(false);
   });
 });

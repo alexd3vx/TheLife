@@ -118,6 +118,18 @@ export class Walker {
     avatar.root.rotation.y = this.yaw;
   }
 
+  /** Set by the caller when the push comes from a stick (analog) rather than keys or a tapped route. */
+  analog = false;
+
+  private pushSpeed(m: number, run: boolean, analog: boolean): number {
+    if (!analog) return run ? RUN : WALK;
+    const a = Math.min(1, (m - 0.08) / 0.92);
+    if (run || a > 0.95) return RUN;
+    if (a <= 0.45) return WALK * Math.max(0.35, a / 0.45);
+    const k = Math.min(1, (a - 0.45) / 0.4);
+    return WALK + (RUN - WALK) * k * k * (3 - 2 * k);
+  }
+
   face(yaw: number | null) {
     this.faceTo = yaw;
   }
@@ -158,8 +170,13 @@ export class Walker {
         }
       } else steer = { x: dx, y: -dz, m: 1 };
     }
+    const routing = steer !== moveIn;
+    if (routing) {
+      const end = this.route[this.route.length - 1]!;
+      run = Math.hypot(end[0] - this.pos.x, end[1] - this.pos.z) > 6; // a long way across the room is jogged
+    }
     move = steer;
-    const want = move.m > 0.08 ? (run ? RUN : WALK) * Math.min(1, move.m + 0.15) : 0;
+    const want = move.m > 0.08 ? this.pushSpeed(move.m, run, routing ? false : this.analog) : 0;
     this.speed += Math.sign(want - this.speed) * Math.min(Math.abs(want - this.speed), (want > this.speed ? 5 : 7) * dt);
     if (this.speed > 0.02) {
       const len = Math.hypot(move.x, move.y) || 1;

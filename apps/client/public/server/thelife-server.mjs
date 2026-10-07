@@ -2529,6 +2529,7 @@ function parseHome(raw) {
       }
     }
   }
+  if (r.locked === true) out.locked = true;
   out.nextId = typeof r.nextId === "number" && Number.isInteger(r.nextId) && r.nextId > 0 ? r.nextId : out.added.length + 1;
   return out;
 }
@@ -2583,6 +2584,13 @@ function homeBuy(state, furniture, x, z, rot) {
   state.stats.totalSpent += def.price;
   h.added.push({ id: `n${h.nextId++}`, furniture, x, z, rot: turn(rot) });
   return { ok: true, text: `Bought the ${def.name.toLowerCase()} for \u20A6${def.price.toLocaleString()}.` };
+}
+function homeLock(state, locked) {
+  if (typeof locked !== "boolean") return fail4("That didn't look right.");
+  const h = state.home ??= emptyHome();
+  if (locked) h.locked = true;
+  else delete h.locked;
+  return { ok: true, text: locked ? "Door locked. Visitors will have to wait outside." : "Door unlocked." };
 }
 
 // packages/game-core/src/places.ts
@@ -4169,6 +4177,7 @@ var HANDLERS = {
   buyGroceries: (sim) => sim.buyGroceries(),
   buyIngredient: (sim, [id, q]) => str(id, 30) && int(q, 1, 12) ? buyIngredient(sim.state, id, q, sim.traits.groceries) : no(bad),
   homeMove: (sim, [id, x, z, rot]) => str(id, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeMove(sim.state, id, x, z, rot) : no(bad),
+  homeLock: (sim, [locked]) => typeof locked === "boolean" ? homeLock(sim.state, locked) : no(bad),
   homeSell: (sim, [id, furniture]) => str(id, 40) ? homeSell(sim.state, id, typeof furniture === "string" ? furniture : void 0) : no(bad),
   homeBuy: (sim, [furniture, x, z, rot]) => str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture, x, z, rot) : no(bad),
   payRide: (sim, [id, meters]) => str(id, 12) && typeof meters === "number" ? payRide(sim.state, id, meters) : no(bad),

@@ -14,6 +14,8 @@ export interface HomeChanges {
   /** Furniture the player bought. */
   added: { id: string; furniture: string; x: number; z: number; rot: number }[];
   nextId: number;
+  /** The front door is locked: nobody who visits can come in until the owner opens it. */
+  locked?: boolean;
 }
 
 export const emptyHome = (): HomeChanges => ({ moved: {}, removed: [], added: [], nextId: 1 });
@@ -50,6 +52,7 @@ export function parseHome(raw: unknown): HomeChanges {
       }
     }
   }
+  if (r.locked === true) out.locked = true;
   out.nextId = typeof r.nextId === "number" && Number.isInteger(r.nextId) && r.nextId > 0 ? r.nextId : out.added.length + 1;
   return out;
 }
@@ -111,4 +114,18 @@ export function homeBuy(state: GameState, furniture: string, x: number, z: numbe
   state.stats.totalSpent += def.price;
   h.added.push({ id: `n${h.nextId++}`, furniture, x, z, rot: turn(rot) });
   return { ok: true, text: `Bought the ${def.name.toLowerCase()} for ₦${def.price.toLocaleString()}.` };
+}
+
+/** Locks or unlocks the front door. While it is locked, people who come to visit wait outside until you let them in. */
+export function homeLock(state: GameState, locked: boolean): HomeResult {
+  if (typeof locked !== "boolean") return fail("That didn't look right.");
+  const h = (state.home ??= emptyHome());
+  if (locked) h.locked = true;
+  else delete h.locked;
+  return { ok: true, text: locked ? "Door locked. Visitors will have to wait outside." : "Door unlocked." };
+}
+
+/** Can a visitor walk straight in? Only when the door is unlocked, or the owner has let them in. */
+export function visitorMayEnter(owner: GameState, letIn: boolean): boolean {
+  return !owner.home?.locked || letIn;
 }

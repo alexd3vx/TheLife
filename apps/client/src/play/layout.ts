@@ -16,6 +16,20 @@ export interface WallDef {
   outward: [number, number] | null;
 }
 
+/** A doorway in a wall: a frame and a lintel over the gap, and (for a real door) a leaf standing open. The gap itself is just a gap in the walls. */
+export interface DoorDef {
+  /** Centre of the gap. */
+  x: number;
+  z: number;
+  /** Which way the wall runs: "x" for a wall along x (a north or south wall), "z" for one along z. */
+  axis: "x" | "z";
+  width: number;
+  /** A door leaf, swung open to one side (1 or -1 picks the side it opens towards). Without it the doorway is an open arch. */
+  leaf?: 1 | -1;
+  /** For a door in an outside wall: it fades with that wall when the camera is outside. */
+  outward?: [number, number];
+}
+
 export interface Placement {
   /** Unique id of this placed item. */
   id: string;
@@ -45,6 +59,8 @@ export interface Layout {
   /** House walls; absent for open layouts. */
   walls: WallDef[];
   house?: { bounds: Rect; wallHeight: number; wallThickness: number; doorMarker?: [number, number] };
+  /** Doorways (frames, lintels, door leaves). */
+  doors?: DoorDef[];
   items: Placement[];
   /** Where the character starts. */
   start: { x: number; z: number; yaw: number };
@@ -74,6 +90,11 @@ export const HOUSE_LAYOUT: Layout = {
   name: "House",
   area: { minX: -8, maxX: 8, minZ: -5, maxZ: 8 },
   walls: houseWalls,
+  doors: [
+    { x: -3.0, z: 4.5, axis: "x", width: 1.4, leaf: 1, outward: [0, 1] },
+    { x: 1.5, z: -0.1, axis: "z", width: 1.4 },
+    { x: 2.8, z: 1.6, axis: "x", width: 1.4, leaf: -1 },
+  ],
   house: { bounds: { minX: -6, maxX: 6, minZ: -4.5, maxZ: 4.5 }, wallHeight: HOUSE_WALL_HEIGHT, wallThickness: 0.2 },
   start: { x: -1, z: 1, yaw: Math.PI },
   items: [
@@ -117,16 +138,16 @@ export const HOUSE_LAYOUT: Layout = {
     p("deskLamp", "desk_lamp_arm_01", 0.95, -4.0, { onTopOf: "desk" }),
 
     // ---- Bedroom
-    p("bed", "p_bed", 3.9, -3.3),
-    p("nightL", "painted_wooden_nightstand", 2.7, -4.15, { via: "bed" }),
-    p("nightR", "painted_wooden_nightstand", 5.1, -4.15, { via: "bed" }),
+    p("bed", "p_bed", 3.5, -3.3),
+    p("nightL", "painted_wooden_nightstand", 2.3, -4.15, { via: "bed" }),
+    p("nightR", "painted_wooden_nightstand", 4.7, -4.15, { via: "bed" }),
     p("oilLamp", "vintage_oil_lamp", 5.65, 0.9, { onTopOf: "commode" }),
     // (the wardrobe is tall: it must not stand in front of the desk, where it hid the person working)
     p("wardrobe", "p_wardrobe", 5.7, -0.9, { rot: -90 }),
     p("bookshelf", "wooden_bookshelf_worn", 5.65, -2.3, { rot: -90 }),
-    p("bedRug", "p_rug", 3.9, -0.7),
+    p("bedRug", "p_rug", 3.5, -0.7),
     p("commode", "GothicCommode_01", 5.65, 0.9, { rot: -90 }),
-    p("bedFan", "ceiling_fan", 3.9, -1.7),
+    p("bedFan", "ceiling_fan", 3.5, -1.7),
     p("plant2", "potted_plant_01", 2.1, 1.0),
 
     // ---- Bathroom (south-east)

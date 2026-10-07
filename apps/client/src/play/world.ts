@@ -50,6 +50,8 @@ export interface World {
   sizeOf(furniture: string): Promise<THREE.Vector3>;
   /** The free spot nearest the middle of the house for a piece of furniture. */
   findSpot(furniture: string, size: THREE.Vector3): { x: number; z: number } | null;
+  /** The front door (null in the showroom): its parts for picking, where it stands, and a way to close or open its leaf. */
+  frontDoor: { parts: THREE.Object3D[]; x: number; z: number; setLocked(locked: boolean): void } | null;
   /** 0 (day) to 1 (night), as last set. */
   readonly night: number;
   dispose(): void;
@@ -208,7 +210,8 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     concrete.repeat.set(2, 4);
     const path = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 4.2), new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95 }));
     path.rotation.x = -Math.PI / 2;
-    path.position.set(-3, -0.012, 6.6);
+    const front = layout.doors?.find((d) => d.outward);
+    path.position.set(front?.x ?? -3, -0.012, (front?.z ?? 4.5) + 2.2 + 0.2);
     path.receiveShadow = true;
     scene.add(path);
 
@@ -265,6 +268,55 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     wallMeshes.push({ mesh, centre, outward: wall.outward ? new THREE.Vector3(wall.outward[0], 0, wall.outward[1]) : null, opacity: 1 });
   }
 
+  // ---- doorways: a frame, a lintel over the gap, and a door leaf standing open where there is a real door
+  let frontDoor: World["frontDoor"] = null;
+  const doorSwing = { hinge: null as THREE.Group | null, open: 0, now: 0, target: 0 };
+  if (house && layout.doors) {
+    const frameMat = new THREE.MeshStandardMaterial({ color: "#6b4a2d", roughness: 0.7 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: "#a37a4f", roughness: 0.6 });
+    const doorHeight = Math.min(2.1, wallHeight - 0.35);
+    for (const d of layout.doors) {
+      const g = new THREE.Group();
+      g.position.set(d.x, 0, d.z);
+      if (d.axis === "z") g.rotation.y = Math.PI / 2;
+      // lintel: the wall above the gap (a wall piece, so it fades with the wall)
+      const lintel = new THREE.Mesh(new THREE.BoxGeometry(d.width + 0.1, wallHeight - doorHeight, wallThickness), wallMaterial.clone());
+      lintel.position.set(d.x, doorHeight + (wallHeight - doorHeight) / 2, d.z);
+      if (d.axis === "z") lintel.rotation.y = Math.PI / 2;
+      lintel.castShadow = true;
+      scene.add(lintel);
+      wallMeshes.push({ mesh: lintel, centre: lintel.position.clone(), outward: d.outward ? new THREE.Vector3(d.outward[0], 0, d.outward[1]) : null, opacity: 1 });
+      for (const side of [-1, 1]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, doorHeight, wallThickness + 0.04), frameMat);
+        post.position.set((side * d.width) / 2, doorHeight / 2, 0);
+        post.castShadow = true;
+        g.add(post);
+      }
+      const head = new THREE.Mesh(new THREE.BoxGeometry(d.width + 0.07, 0.07, wallThickness + 0.04), frameMat);
+      head.position.set(0, doorHeight, 0);
+      g.add(head);
+      if (d.leaf) {
+        // the leaf hangs on one post and stands open, close to the wall beside the gap
+        const hinge = new THREE.Group();
+        hinge.position.set((-d.leaf * d.width) / 2 + d.leaf * 0.02, 0, 0);
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(d.width - 0.06, doorHeight - 0.04, 0.045), leafMat);
+        leaf.position.set(d.leaf * (d.width / 2 - 0.03), doorHeight / 2, 0);
+        leaf.castShadow = true;
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshStandardMaterial({ color: "#d9c27a", metalness: 0.7, roughness: 0.3 }));
+        knob.position.set(d.leaf * (d.width - 0.2), doorHeight * 0.48, 0.04);
+        hinge.add(leaf, knob);
+        hinge.rotation.y = d.leaf * (-Math.PI / 2 + 0.25);
+        g.add(hinge);
+        if (d.outward) {
+          doorSwing.hinge = hinge;
+          doorSwing.open = doorSwing.now = doorSwing.target = hinge.rotation.y;
+          frontDoor = { parts: [g], x: d.x, z: d.z, setLocked: (locked) => { doorSwing.target = locked ? 0 : doorSwing.open; } };
+        }
+      }
+      scene.add(g);
+    }
+  }
+
   // ---- warm lights inside the house, switched on by setTimeOfDay at dusk
   const houseLights: THREE.PointLight[] = [];
   if (house) {
@@ -280,6 +332,22 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   function makeBaseNav(): NavGrid {
     const grid = createNavGrid(layout.area, NAV_CELL);
     blockOutside(grid, layout.area, 0.4);
+    // Nobody walks round the outside of a house or through its walls: the garden is shut off, except the step in front of the door
+    // (so a thing is always used from inside the house, never from the other side of a wall).
+    if (house) {
+      const hb = house.bounds, A = layout.area, t = wallThickness / 2;
+      const front = layout.doors?.find((d) => d.outward);
+      const gap = front ? { a: front.x - front.width / 2 + CHARACTER_RADIUS, b: front.x + front.width / 2 - CHARACTER_RADIUS } : null;
+      const step = 2.4;
+      blockRect(grid, { minX: A.minX, maxX: hb.minX - t, minZ: A.minZ, maxZ: A.maxZ }, CHARACTER_RADIUS);
+      blockRect(grid, { minX: hb.maxX + t, maxX: A.maxX, minZ: A.minZ, maxZ: A.maxZ }, CHARACTER_RADIUS);
+      blockRect(grid, { minX: hb.minX, maxX: hb.maxX, minZ: A.minZ, maxZ: hb.minZ - t }, CHARACTER_RADIUS);
+      if (gap) {
+        blockRect(grid, { minX: hb.minX, maxX: gap.a, minZ: hb.maxZ + t, maxZ: A.maxZ }, 0);
+        blockRect(grid, { minX: gap.b, maxX: hb.maxX, minZ: hb.maxZ + t, maxZ: A.maxZ }, 0);
+        blockRect(grid, { minX: gap.a, maxX: gap.b, minZ: hb.maxZ + step, maxZ: A.maxZ }, 0);
+      } else blockRect(grid, { minX: hb.minX, maxX: hb.maxX, minZ: hb.maxZ + t, maxZ: A.maxZ }, CHARACTER_RADIUS);
+    }
     for (const wall of layout.walls) {
       const t = wallThickness / 2;
       blockRect(
@@ -537,6 +605,11 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
   const toCamera = new THREE.Vector3();
   function updateWalls(camera: THREE.Camera, delta: number) {
     camera.getWorldPosition(camPos);
+    if (doorSwing.hinge && doorSwing.now !== doorSwing.target) {
+      doorSwing.now += (doorSwing.target - doorSwing.now) * Math.min(1, delta * 6);
+      if (Math.abs(doorSwing.target - doorSwing.now) < 0.01) doorSwing.now = doorSwing.target;
+      doorSwing.hinge.rotation.y = doorSwing.now;
+    }
     // Like any life sim, the ceiling is cut away: ceiling fans only show when the camera is below the ceiling.
     if (house) for (const item of ceilingItems) item.group.visible = camPos.y < wallHeight;
     for (const wall of wallMeshes) {
@@ -650,6 +723,9 @@ export async function buildWorld(manifest: AssetManifest, layout: Layout, render
     updateFurniture,
     highlight,
     updateWalls,
+    get frontDoor() {
+      return frontDoor;
+    },
     setTimeOfDay,
     get night() {
       return currentNight;

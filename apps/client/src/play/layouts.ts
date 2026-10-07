@@ -22,15 +22,20 @@ function shell(minX: number, maxX: number, minZ: number, maxZ: number, door: [nu
 // better bed, a TV, a fridge, a desk) has to be earned and bought.
 export const LAPO_ROOM: Layout = {
   name: "Room",
-  area: { minX: -7, maxX: 7, minZ: -5, maxZ: 7 },
+  area: { minX: -8, maxX: 9, minZ: -5, maxZ: 8 },
   walls: [
-    ...shell(-4.5, 4.5, -3, 3, [-3.3, -2.1]),
-    { a: [2.6, 1.0], b: [4.5, 1.0], outward: null },
-    { a: [2.6, 1.0], b: [2.6, 1.5], outward: null },
-    { a: [2.6, 2.4], b: [2.6, 3.0], outward: null },
+    ...shell(-4.5, 6.5, -3, 4, [-3.3, -2.1]),
+    // the bathroom, in the south-east corner: a solid wall to the room with a door in its north side
+    { a: [4.0, 1.0], b: [4.4, 1.0], outward: null },
+    { a: [5.5, 1.0], b: [6.5, 1.0], outward: null },
+    { a: [4.0, 1.0], b: [4.0, 4.0], outward: null },
   ],
-  house: { bounds: { minX: -4.5, maxX: 4.5, minZ: -3, maxZ: 3 }, wallHeight: 2.6, wallThickness: 0.2 },
-  start: { x: -2.7, z: 2.0, yaw: Math.PI },
+  doors: [
+    { x: -2.7, z: 4, axis: "x", width: 1.2, leaf: 1, outward: [0, 1] },
+    { x: 4.95, z: 1.0, axis: "x", width: 1.1, leaf: -1 },
+  ],
+  house: { bounds: { minX: -4.5, maxX: 6.5, minZ: -3, maxZ: 4 }, wallHeight: 2.6, wallThickness: 0.2 },
+  start: { x: -2.7, z: 2.4, yaw: Math.PI },
   items: [
     p("bed", "old_bed_frame", -3.6, -1.85),
     p("base", "p_kitchen_base", 0.6, -2.59),
@@ -41,30 +46,35 @@ export const LAPO_ROOM: Layout = {
     p("bulb", "lightbulb_01", 0, 0, { y: 2.3 }),
     p("jerrycan", "metal_jerrycan", -4.1, 1.9, { decor: true }),
     p("box", "cardboard_box_01", -4.0, 0.4, { decor: true }),
-    p("toilet", "p_toilet", 2.95, 1.9, { rot: 90 }),
-    p("shower", "p_shower", 4.0, 2.4, { rot: 180 }),
-    p("basin", "p_basin", 3.55, 1.4, { rot: 0 }),
+    p("toilet", "p_toilet", 4.45, 2.6, { rot: 90 }),
+    p("basin", "p_basin", 6.15, 1.85, { rot: -90 }),
+    p("shower", "p_shower", 5.75, 3.55, { rot: 180 }),
   ],
 };
 
 // ---------------------------------------------------------------- nepo: a furnished duplex-style home
 const nepoWalls: WallDef[] = [
-  ...shell(-8, 8, -5.5, 5.5, [-3.8, -2.4]),
+  ...shell(-8, 10, -5.5, 5.5, [-3.8, -2.4]),
   { a: [2, -5.5], b: [2, -1.0], outward: null },
   { a: [2, 0.4], b: [2, 5.5], outward: null },
   // master bathroom (north-east corner)
-  { a: [6, -5.5], b: [6, -4.6], outward: null },
-  { a: [6, -3.8], b: [6, -2.8], outward: null },
-  { a: [6, -2.8], b: [8, -2.8], outward: null },
+  { a: [6, -5.5], b: [6, -4.7], outward: null },
+  { a: [6, -3.6], b: [6, -2.8], outward: null },
+  { a: [6, -2.8], b: [10, -2.8], outward: null },
   // the study (south-east) is separated from the bedroom
   { a: [2, 0.4], b: [6, 0.4], outward: null },
 ];
 
 export const NEPO_DUPLEX: Layout = {
   name: "Duplex",
-  area: { minX: -10, maxX: 10, minZ: -7, maxZ: 8 },
+  area: { minX: -10, maxX: 12, minZ: -7, maxZ: 8 },
   walls: nepoWalls,
-  house: { bounds: { minX: -8, maxX: 8, minZ: -5.5, maxZ: 5.5 }, wallHeight: 2.9, wallThickness: 0.22 },
+  doors: [
+    { x: -3.1, z: 5.5, axis: "x", width: 1.4, leaf: 1, outward: [0, 1] },
+    { x: 2, z: -0.3, axis: "z", width: 1.4 },
+    { x: 6, z: -4.15, axis: "z", width: 1.1, leaf: 1 },
+  ],
+  house: { bounds: { minX: -8, maxX: 10, minZ: -5.5, maxZ: 5.5 }, wallHeight: 2.9, wallThickness: 0.22 },
   start: { x: -3.1, z: 4.3, yaw: Math.PI },
   items: [
     // kitchen along the north wall
@@ -92,7 +102,6 @@ export const NEPO_DUPLEX: Layout = {
     p("tv", "p_tv_flat", -7.55, 3.2, { rot: 90, via: "sofa" }),
     p("sofa", "sofa_03", -4.4, 3.2, { rot: -90, link: ["tv"] }),
     p("sofa2", "sofa_02", -5.9, 4.85, { rot: 180, link: ["tv"] }),
-    p("armchair", "modern_arm_chair_01", -5.9, 1.55, { rot: -45, link: ["tv"], action: "tv" }),
     p("rug", "p_rug", -5.8, 3.2, { rot: 90 }),
     p("coffeeTable", "modern_coffee_table_02", -5.8, 3.2, { rot: 90 }),
     p("console", "ClassicConsole_01", -7.5, 4.6, { rot: 90 }),
@@ -114,16 +123,16 @@ export const NEPO_DUPLEX: Layout = {
     p("mirror", "ornate_mirror_01", 3.4, -0.75, { y: 1.0, rot: 0 }),
     // master bathroom
     p("toilet", "p_toilet", 6.45, -3.4, { rot: 90 }),
-    p("basin", "p_basin", 7.4, -3.15, { rot: 180 }),
-    p("shower", "p_shower", 7.3, -4.9),
+    p("basin", "p_basin", 8.2, -3.15, { rot: 180 }),
+    p("shower", "p_shower", 9.2, -4.8),
     // study (south-east)
     p("desk", "metal_office_desk", 4.2, 5.0, { via: "deskChair" }),
     p("deskChair", "SchoolChair_01", 4.2, 3.95, { action: "work", link: ["laptop"] }),
     p("laptop", "classic_laptop", 3.7, 5.0, { onTopOf: "desk", via: "deskChair" }),
-    p("deskLamp", "desk_lamp_arm_01", 4.9, 5.0, { onTopOf: "desk" }),
-    p("bookshelf", "wooden_bookshelf_worn", 7.5, 3.0, { rot: -90 }),
+    p("deskLamp", "desk_lamp_arm_01", 4.9, 5.0, { onTopOf: "desk", via: "deskChair" }),
+    p("bookshelf", "wooden_bookshelf_worn", 9.5, 3.0, { rot: -90 }),
     p("studyDay", "vintage_day_bed", 6.4, 1.6, { rot: -90 }),
-    p("washer", "p_washer", 7.5, 5.0, { rot: 180 }),
+    p("washer", "p_washer", 9.5, 5.0, { rot: 180 }),
   ],
 };
 

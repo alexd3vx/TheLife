@@ -729,7 +729,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
       // forward = away from the camera; screen-right = forward x up = (-fz, fx)
       const rx = -camFwd.z, rz = camFwd.x;
       farRoute = null;
-      controller.drive(camFwd.x * mv.y + rx * mv.x, camFwd.z * mv.y + rz * mv.x, mv.m, input.running());
+      controller.drive(camFwd.x * mv.y + rx * mv.x, camFwd.z * mv.y + rz * mv.x, mv.m, input.running(), input.last === "touch");
     } else if (controller.mode === "driving") {
       controller.drive(0, 0, 0, false);
     }
