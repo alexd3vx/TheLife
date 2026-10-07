@@ -179,6 +179,11 @@ function moodLabel(needs) {
   if (m >= 28) return "Low";
   return "Miserable";
 }
+function mostUrgent(needs, threshold = 35) {
+  let worst = null;
+  for (const id of NEED_IDS) if (needs[id] < threshold && (worst === null || needs[id] < needs[worst])) worst = id;
+  return worst;
+}
 
 // packages/game-core/src/actions.ts
 var ACTIONS = {
@@ -3786,6 +3791,54 @@ function payRide(state, ride, meters) {
   return { ok: true, text: option.fare > 0 ? `${option.label}: \u20A6${option.fare.toLocaleString()}.` : `${option.label}.`, fare: option.fare };
 }
 
+// packages/game-core/src/hospital.ts
+var HOSPITAL_SERVICES = [
+  { id: "checkup", group: "care", name: "Check-up", blurb: "A nurse looks you over and sees to what you need most.", price: 3e3, effect: {}, atLeast: {} },
+  { id: "toilet", group: "care", name: "Use the toilet", blurb: "Free. The staff toilet is kept clean.", price: 0, effect: { bladder: 100 } },
+  { id: "general", group: "ward", name: "General ward bed", blurb: "A bed in the open ward. Noisy but you rest.", price: 3500, effect: { energy: 50 } },
+  { id: "private", group: "ward", name: "Private ward", blurb: "A quiet room with a fan, clean sheets and a shower.", price: 12e3, effect: { energy: 100, hygiene: 25, fun: 10 } },
+  { id: "drip", group: "ward", name: "Glucose drip", blurb: "Quick strength when you have not eaten.", price: 4500, effect: { hunger: 40, energy: 15 } },
+  { id: "vitamins", group: "pharmacy", name: "Vitamin C and multivitamins", blurb: "Gets you through a long day.", price: 1500, effect: { energy: 10, fun: 3 } },
+  { id: "soap", group: "pharmacy", name: "Soap and sanitiser", blurb: "Hands, face, and a fresher you.", price: 800, effect: { hygiene: 20 } },
+  { id: "ors", group: "pharmacy", name: "ORS and water", blurb: "Rehydration salts for a hot day.", price: 600, effect: { hunger: 8, energy: 5 } },
+  { id: "canteen", group: "canteen", name: "Canteen: rice and chicken", blurb: "A hot plate from the hospital canteen.", price: 2200, effect: { hunger: 50 } }
+];
+var serviceById = (id) => HOSPITAL_SERVICES.find((s) => s.id === id);
+var CRITICAL = 15;
+function criticalNeed(state) {
+  const n = mostUrgent(state.needs, CRITICAL);
+  return n;
+}
+function hospitalService(state, id) {
+  const s = serviceById(id);
+  if (!s) return { ok: false, reason: "They don't offer that." };
+  const before = { ...state.needs };
+  const effect = { ...s.effect };
+  let advice = "";
+  if (s.id === "checkup") {
+    const need = mostUrgent(state.needs, 101) ?? "energy";
+    effect[need] = 30;
+    advice = ` Mostly you needed ${need === "hunger" ? "a proper meal" : need === "energy" ? "sleep" : need === "hygiene" ? "a wash" : need === "bladder" ? "the toilet" : "some fun"}.`;
+  }
+  if (s.price > 0) {
+    const r = transfer(state.ledger, PLAYER, SINK, s.price, s.name, state.minute);
+    if (!r.ok) return { ok: false, reason: `${s.name} costs \u20A6${s.price.toLocaleString()}. You have \u20A6${balance(state.ledger, PLAYER).toLocaleString()}.` };
+    state.stats.totalSpent += s.price;
+  }
+  for (const id2 of NEED_IDS) {
+    const add = effect[id2];
+    if (add) state.needs[id2] = clampNeed(state.needs[id2] + add);
+  }
+  const gained = NEED_IDS.filter((n) => Math.round(state.needs[n]) > Math.round(before[n]));
+  return { ok: true, text: `${s.name}${s.price > 0 ? ` (\u20A6${s.price.toLocaleString()})` : ""}: ${gained.length ? `${gained.join(", ")} improved.` : "you were already fine."}${advice}` };
+}
+function hospitalFirstAid(state) {
+  const need = criticalNeed(state);
+  if (!need) return { ok: false, reason: "The nurses say you look all right. They only treat for free when someone is about to collapse." };
+  state.needs[need] = Math.max(state.needs[need], 45);
+  return { ok: true, text: `The nurses saw you first and did not ask for money. ${need[0].toUpperCase()}${need.slice(1)} is back to a safe level.` };
+}
+
 // packages/game-core/src/places.ts
 var ALWAYS = { open: 0, close: 24 };
 var HOURS = {
@@ -3905,6 +3958,8 @@ var HANDLERS = {
   bankBorrow: (sim, [amount]) => typeof amount === "number" ? bankBorrow(sim.state, amount) : no(bad),
   bankRepay: (sim, [amount]) => typeof amount === "number" ? bankRepay(sim.state, amount) : no(bad),
   bankWithdraw: (sim, [amount, atm]) => typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad),
+  hospital: (sim, [id]) => str(id, 20) ? hospitalService(sim.state, id) : no(bad),
+  hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),
@@ -4049,8 +4104,10 @@ import { dirname as dirname2 } from "node:path";
 var uidOf = (key) => createHash2("sha1").update(`thelife:${key}`).digest("hex").slice(0, 10);
 var KEEP = 80;
 var Inbox = class {
-  constructor(file) {
+  constructor(file, remote) {
     this.file = file;
+    this.remote = remote;
+    this.ready = remote ? this.loadRemote(remote) : Promise.resolve();
     if (file && existsSync2(file)) {
       try {
         const parsed = JSON.parse(readFileSync2(file, "utf8"));
@@ -4058,17 +4115,33 @@ var Inbox = class {
       } catch {
       }
     }
-    if (file) this.timer = setInterval(() => this.save(), 3e4);
+    if (file && !remote) this.timer = setInterval(() => this.save(), 3e4);
   }
   file;
+  remote;
   data = { users: {}, threads: {} };
   dirty = false;
   timer = null;
+  /** Resolves when the database copy (if there is one) has been read. */
+  ready;
+  async loadRemote(remote) {
+    const { users, messages } = await remote.load();
+    for (const u of users) this.data.users[u.uid] ??= { name: u.name, seen: u.seen };
+    this.data.threads = {};
+    for (const m of messages) {
+      for (const [owner, peer] of [[m.from, m.to], [m.to, m.from]]) {
+        const t = (this.data.threads[owner] ??= {})[peer] ??= [];
+        t.push({ from: m.from, text: m.text, at: m.at });
+        if (t.length > KEEP) t.splice(0, t.length - KEEP);
+      }
+    }
+  }
   touch(uid, name, now) {
     const u = this.data.users[uid];
     if (!u || u.name !== name || now - u.seen > 36e5) {
       this.data.users[uid] = { name, seen: now };
       this.dirty = true;
+      this.remote?.saveUser(uid, name, now);
     }
   }
   nameOf(uid) {
@@ -4082,6 +4155,7 @@ var Inbox = class {
       if (t.length > KEEP) t.splice(0, t.length - KEEP);
     }
     this.dirty = true;
+    this.remote?.saveMessage({ from, to, text, at });
   }
   /** Makes sure a conversation exists (an empty one), so a player you looked up stays in your list. */
   open(owner, peer) {
@@ -4095,7 +4169,7 @@ var Inbox = class {
     return Object.entries(this.data.threads[uid] ?? {}).map(([peer, msgs]) => ({ uid: peer, name: this.nameOf(peer) ?? "Player", msgs })).sort((a, b) => (b.msgs.at(-1)?.at ?? 0) - (a.msgs.at(-1)?.at ?? 0));
   }
   save() {
-    if (!this.file || !this.dirty) return;
+    if (!this.file || !this.dirty || this.remote) return;
     this.dirty = false;
     try {
       mkdirSync2(dirname2(this.file), { recursive: true });
@@ -4485,6 +4559,41 @@ var Analytics = class {
   }
 };
 
+// packages/server/src/supabaseInbox.ts
+function supabaseInbox(url, serviceKey) {
+  if (!url || !serviceKey) return void 0;
+  const base = url.replace(/\/$/, "");
+  const headers = { apikey: serviceKey, authorization: `Bearer ${serviceKey}`, "content-type": "application/json" };
+  const post = (path, body, extra = {}) => {
+    void fetch(`${base}/rest/v1/${path}`, { method: "POST", headers: { ...headers, ...extra }, body: JSON.stringify(body) }).then(async (r) => {
+      if (!r.ok) console.error(`supabase ${path} failed`, r.status, (await r.text()).slice(0, 200));
+    }).catch((e) => console.error(`supabase ${path} failed`, e));
+  };
+  return {
+    async load() {
+      const users = [];
+      const messages = [];
+      try {
+        const u = await fetch(`${base}/rest/v1/players?select=uid,name,seen_at&limit=100000`, { headers });
+        if (u.ok) for (const r of await u.json()) users.push({ uid: r.uid, name: r.name, seen: Date.parse(r.seen_at) || 0 });
+        else console.error("supabase players load failed", u.status);
+        const m = await fetch(`${base}/rest/v1/messages?select=from_uid,to_uid,body,sent_at&order=sent_at.desc&limit=20000`, { headers });
+        if (m.ok) for (const r of (await m.json()).reverse()) messages.push({ from: r.from_uid, to: r.to_uid, text: r.body, at: Date.parse(r.sent_at) || 0 });
+        else console.error("supabase messages load failed", m.status);
+      } catch (e) {
+        console.error("supabase inbox load failed", e);
+      }
+      return { users, messages };
+    },
+    saveUser(uid, name, seen) {
+      post("players?on_conflict=uid", { uid, name, seen_at: new Date(seen).toISOString() }, { prefer: "resolution=merge-duplicates,return=minimal" });
+    },
+    saveMessage(m) {
+      post("messages", { from_uid: m.from, to_uid: m.to, body: m.text, sent_at: new Date(m.at).toISOString() }, { prefer: "return=minimal" });
+    }
+  };
+}
+
 // packages/server/src/animstore.ts
 import { existsSync as existsSync4, mkdirSync as mkdirSync4, readFileSync as readFileSync4, readdirSync, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "node:fs";
 import { join } from "node:path";
@@ -4572,7 +4681,8 @@ var send = (ws, message) => {
 async function startGameServer(options = {}) {
   const store = new LifeStore(options.dataDir ? join2(options.dataDir, "lives.json") : null);
   const analytics = new Analytics(options.dataDir ? join2(options.dataDir, "analytics.json") : null);
-  const inbox = new Inbox(options.dataDir ? join2(options.dataDir, "inbox.json") : null);
+  const inbox = new Inbox(options.dataDir ? join2(options.dataDir, "inbox.json") : null, supabaseInbox(options.inboxDb?.url, options.inboxDb?.serviceKey));
+  await inbox.ready;
   const room = new Room(options.room ?? "lagos-test", void 0, store);
   const sockets = /* @__PURE__ */ new Map();
   const origins2 = options.origins ?? [];
@@ -4949,6 +5059,6 @@ process.on("uncaughtException", (e) => console.error("uncaught", e));
 process.on("unhandledRejection", (e) => console.error("unhandled", e));
 var port = Number(process.env.PORT ?? 8787);
 var origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1", isAdminToken: supabaseAdminCheck(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY) });
+var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1", isAdminToken: supabaseAdminCheck(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), inboxDb: { url: process.env.SUPABASE_URL, serviceKey: process.env.SUPABASE_SERVICE_KEY } });
 console.log(`TheLife game server on port ${server.port} (room ${server.room.name}${origins.length ? `, origins ${origins.join(", ")}` : ", any origin"})`);
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => void server.close().then(() => process.exit(0)));

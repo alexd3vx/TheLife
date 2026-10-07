@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createSave, deleteSave, loadSave, touchSave, type GameSave } from "../save/localSave";
 import { createAuthService } from "./createAuthService";
 import { setAccountAdmin } from "../ui/admin";
+import { setAccountId } from "../net/identity";
 import { setTokenProvider } from "../net/tokenBridge";
 import type { AccountProfile, AuthService, AuthUser } from "./types";
 
@@ -54,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [service]);
 
   // The game server needs a fresh login token each time it connects; the profile row says whether this account is an admin.
+  useEffect(() => {
+    setAccountId(user?.id ?? null);
+  }, [user]);
   useEffect(() => {
     setTokenProvider(() => service.getAccessToken());
     return () => setTokenProvider(null);

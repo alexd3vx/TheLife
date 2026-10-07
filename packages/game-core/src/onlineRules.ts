@@ -9,6 +9,7 @@ import {
 } from "./phoneStore";
 import { homeBuy, homeMove, homeSell } from "./home";
 import { payRide } from "./travel";
+import { hospitalFirstAid, hospitalService } from "./hospital";
 import { bankBorrow, bankDeposit, bankRepay, bankWithdraw } from "./bank";
 import { buyIngredient, cancelRecipe, chooseDish, chooseRecipe, discardDish, discardLot } from "./kitchen";
 import { BACKGROUNDS, profileFrom, type Profile } from "./profile";
@@ -51,6 +52,8 @@ const HANDLERS: Record<string, Handler> = {
   bankBorrow: (sim, [amount]) => (typeof amount === "number" ? bankBorrow(sim.state, amount) : no(bad)),
   bankRepay: (sim, [amount]) => (typeof amount === "number" ? bankRepay(sim.state, amount) : no(bad)),
   bankWithdraw: (sim, [amount, atm]) => (typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad)),
+  hospital: (sim, [id]) => (str(id, 20) ? hospitalService(sim.state, id as string) : no(bad)),
+  hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
   chooseRecipe: (sim, [id]) => (str(id, 30) ? chooseRecipe(sim.state, id as string) : no(bad)),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => (str(id, 30) ? chooseDish(sim.state, id as string) : no(bad)),

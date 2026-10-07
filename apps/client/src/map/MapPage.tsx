@@ -31,7 +31,7 @@ import "./map.css";
 
 /** The neighbourhood, streamed in chunks. A test bench for the map engine: walk around, zoom out, and run the performance tour. */
 /** Kinds of place that have an inside you can walk into. */
-const INSIDE = new Set<string>(["bank"]);
+const INSIDE = new Set<string>(["bank", "hospital"]);
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,7 +127,7 @@ export default function MapPage() {
     }
     return best;
   })();
-  // a place with an inside (for now: the bank) when you stand at its door
+  // a place with an inside (the bank and the hospital so far) when you stand at its door
   const nearPlace = stats && intro === "off" ? district.landmarks.find((l) => INSIDE.has(l.kind) && Math.hypot(l.entrance.x - stats.position.x, l.entrance.z - stats.position.z) < 9) ?? null : null;
   const [inside, setInside] = useState<Landmark | null>(null);
   const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlace ? `Go into ${nearPlace.name}` : nearPlayer ? nearPlayer.name : null;
@@ -272,7 +272,7 @@ export default function MapPage() {
 
       {nearPlace && !atHome && !inside && intro === "off" && mode === "street" && !trip && (
         <button className="map-enter" onClick={() => setInside(nearPlace)}>
-          <GameIcon name="bank" /> Go into {nearPlace.name}
+          <GameIcon name={nearPlace.kind === "hospital" ? "hospital" : "bank"} /> Go into {nearPlace.name}
         </button>
       )}
       {inside && life.session && <PlaceInterior place={inside} session={life.session} onClose={() => setInside(null)} />}

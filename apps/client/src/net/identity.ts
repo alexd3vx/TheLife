@@ -30,3 +30,20 @@ export function rotateKey(): void {
     /* ignore */
   }
 }
+
+/** The id of the signed-in account (set by the auth provider), if there is one. */
+let accountId: string | null = null;
+export function setAccountId(id: string | null): void {
+  accountId = id;
+}
+
+/**
+ * Your player ID, worked out here the same way the server does (a short fingerprint of the account, or of this device's key for a
+ * guest). The server sends it too; this is what shows while the server is still an older version, or has not answered yet.
+ */
+export async function computeUid(): Promise<string> {
+  const key = accountId ? `acct-${accountId}` : playerKey();
+  const bytes = new TextEncoder().encode(`thelife:${key}`);
+  const digest = await crypto.subtle.digest("SHA-1", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 10);
+}

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { PlayerView, ServerMessage } from "@thelife/shared";
 import { world } from "./world";
+import { computeUid } from "./identity";
 
 export interface Line {
   id: number;
@@ -40,6 +41,17 @@ class Social {
   private n = 0;
   private readonly listeners = new Set<() => void>();
 
+  /** Your ID, from the server when it says, otherwise worked out here. */
+  ensureUid(): void {
+    if (this.selfUid) return;
+    void computeUid().then((u) => {
+      if (!this.selfUid) {
+        this.selfUid = u;
+        this.changed();
+      }
+    });
+  }
+
   start(): void {
     if (this.started) return;
     this.started = true;
@@ -71,7 +83,7 @@ class Social {
     switch (m.t) {
       case "welcome":
         this.selfId = m.id;
-        this.selfUid = m.uid ?? "";
+        if (m.uid) this.selfUid = m.uid;
         this.people = new Map(m.players.map((p) => [p.id, p]));
         for (const p of m.players) if (p.uid && this.threads.has(p.uid)) this.threads.get(p.uid)!.name = p.name;
         break;
@@ -166,6 +178,7 @@ export const social = new Social();
 /** Re-renders when anything social changes. */
 export function useSocial(): Social {
   social.start();
+  social.ensureUid();
   useSyncExternalStore(social.subscribe, () => social.version);
   return social;
 }

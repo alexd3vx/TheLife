@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import type { RemoteInbox } from "./supabaseInbox.js";
 
 /** A player's ID: stable for the same account or device key, short enough to share, and not the key itself. */
 export const uidOf = (key: string): string => createHash("sha1").update(`thelife:${key}`).digest("hex").slice(0, 10);
@@ -27,7 +28,11 @@ export class Inbox {
   private dirty = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly file: string | null) {
+  /** Resolves when the database copy (if there is one) has been read. */
+  readonly ready: Promise<void>;
+
+  constructor(private readonly file: string | null, private readonly remote?: RemoteInbox) {
+    this.ready = remote ? this.loadRemote(remote) : Promise.resolve();
     if (file && existsSync(file)) {
       try {
         const parsed = JSON.parse(readFileSync(file, "utf8")) as Saved;
@@ -36,7 +41,21 @@ export class Inbox {
         /* a damaged file starts the inbox again */
       }
     }
-    if (file) this.timer = setInterval(() => this.save(), 30_000);
+    if (file && !remote) this.timer = setInterval(() => this.save(), 30_000);
+  }
+
+  private async loadRemote(remote: RemoteInbox): Promise<void> {
+    const { users, messages } = await remote.load();
+    for (const u of users) this.data.users[u.uid] ??= { name: u.name, seen: u.seen };
+    // the database is the truth: rebuild the conversations from its messages
+    this.data.threads = {};
+    for (const m of messages) {
+      for (const [owner, peer] of [[m.from, m.to], [m.to, m.from]] as const) {
+        const t = ((this.data.threads[owner] ??= {})[peer] ??= []);
+        t.push({ from: m.from, text: m.text, at: m.at });
+        if (t.length > KEEP) t.splice(0, t.length - KEEP);
+      }
+    }
   }
 
   touch(uid: string, name: string, now: number): void {
@@ -44,6 +63,7 @@ export class Inbox {
     if (!u || u.name !== name || now - u.seen > 3_600_000) {
       this.data.users[uid] = { name, seen: now };
       this.dirty = true;
+      this.remote?.saveUser(uid, name, now);
     }
   }
 
@@ -59,6 +79,7 @@ export class Inbox {
       if (t.length > KEEP) t.splice(0, t.length - KEEP);
     }
     this.dirty = true;
+    this.remote?.saveMessage({ from, to, text, at });
   }
 
   /** Makes sure a conversation exists (an empty one), so a player you looked up stays in your list. */
@@ -77,7 +98,7 @@ export class Inbox {
   }
 
   save(): void {
-    if (!this.file || !this.dirty) return;
+    if (!this.file || !this.dirty || this.remote) return;
     this.dirty = false;
     try {
       mkdirSync(dirname(this.file), { recursive: true });

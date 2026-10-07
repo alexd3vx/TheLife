@@ -6,6 +6,7 @@ import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
 import { Analytics } from "./analytics.js";
 import { Inbox, uidOf } from "./inbox.js";
+import { supabaseInbox } from "./supabaseInbox.js";
 import { AnimStore, cleanMap, validName } from "./animstore.js";
 
 export interface GameServerOptions {
@@ -23,6 +24,8 @@ export interface GameServerOptions {
    */
   verifyToken?: (token: string) => Promise<{ id: string; email?: string } | null>;
   allowGuests?: boolean;
+  /** Keep private messages and player IDs in a Supabase database (needs the service key) instead of a file. */
+  inboxDb?: { url?: string; serviceKey?: string };
   /** Says whether a Supabase token belongs to an admin. Without it (and without accounts at all, as in tests) the animation editor is open. */
   isAdminToken?: (token: string) => Promise<boolean>;
 }
@@ -41,7 +44,8 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 export async function startGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
   const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
-  const inbox = new Inbox(options.dataDir ? join(options.dataDir, "inbox.json") : null);
+  const inbox = new Inbox(options.dataDir ? join(options.dataDir, "inbox.json") : null, supabaseInbox(options.inboxDb?.url, options.inboxDb?.serviceKey));
+  await inbox.ready;
   const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];

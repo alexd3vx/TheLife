@@ -1,33 +1,9 @@
 import * as THREE from "three";
+import { canvasTexture, std, type PlaceRoom } from "./roomKit";
 
 /** The bank branch's lobby, built from simple shapes: tiled floor, a teller's counter behind glass, cash machines, benches, plants. */
 
-function canvasTexture(w: number, h: number, paint: (g: CanvasRenderingContext2D) => void, repeat?: [number, number]): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  paint(c.getContext("2d")!);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  if (repeat) {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(...repeat);
-  }
-  t.anisotropy = 4;
-  return t;
-}
-
-const std = (color: string, rough = 0.8, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
-
-export interface BankRoom {
-  group: THREE.Group;
-  /** Where the customer stands (in front of the counter) and the teller behind it. */
-  playerAt: THREE.Vector3;
-  tellerAt: THREE.Vector3;
-  update(dt: number): void;
-}
-
-export function buildBankRoom(name: string): BankRoom {
+export function buildBankRoom(name: string): PlaceRoom {
   const g = new THREE.Group();
   const W = 10, D = 8, H = 3.4;
   const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number, shadow = true) => {
@@ -161,7 +137,7 @@ export function buildBankRoom(name: string): BankRoom {
   return {
     group: g,
     playerAt: new THREE.Vector3(1.1, 0, -0.5),
-    tellerAt: new THREE.Vector3(-0.1, 0, -2.75),
+    staffAt: new THREE.Vector3(-0.1, 0, -2.75),
     update() {},
   };
 }

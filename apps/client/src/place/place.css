@@ -31,3 +31,23 @@
 .place-result { margin: 0; padding: 10px 14px; border-radius: 14px; background: #dbe8ff; color: #12233f; font: 700 .86rem system-ui; }
 .place-result.is-bad { background: #ffe2df; color: #b3322a; }
 @media (min-width: 900px) { .place { flex-direction: row; } .place-stage { flex: 1; } .place-sheet { width: 420px; max-height: none; border-radius: 0; } }
+.place-money-2 { grid-template-columns: 1fr 1.4fr; }
+.place-needs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 8px 12px; border-radius: 16px; background: #fff; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); }
+.place-needs span { display: grid; gap: 4px; }
+.place-needs small { color: #5c6f92; font: 700 .64rem system-ui; text-transform: uppercase; letter-spacing: .05em; }
+.place-needs i { display: block; height: 7px; border-radius: 99px; background: #e1ebff; overflow: hidden; }
+.place-needs em { display: block; height: 100%; border-radius: 99px; background: #2f6bff; }
+.place-needs .is-low em { background: #e29a1f; }
+.place-needs .is-crit em { background: #d6352c; }
+.place-needs .is-crit small { color: #b3322a; }
+.place-aid { display: grid; gap: 2px; text-align: left; border: 0; border-radius: 18px; padding: 13px 16px; background: #d6352c; color: #fff; cursor: pointer; font: 800 .95rem system-ui; box-shadow: 0 6px 18px rgba(214, 53, 44, .35); }
+.place-aid small { font-weight: 600; opacity: .9; }
+.place-services { display: grid; gap: 8px; }
+.place-service { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; border: 0; border-radius: 18px; padding: 12px 14px; background: #fff; color: #12233f; cursor: pointer; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); }
+.place-service span { display: grid; gap: 2px; min-width: 0; }
+.place-service b { font: 800 .94rem system-ui; }
+.place-service small { color: #5c6f92; font: 600 .76rem/1.35 system-ui; }
+.place-service em { font: 700 .74rem system-ui; font-style: normal; color: #1f6bff; }
+.place-service strong { flex: none; padding: 8px 12px; border-radius: 999px; background: #12233f; color: #fff; font: 800 .84rem system-ui; font-variant-numeric: tabular-nums; }
+.place-service:disabled { opacity: .45; cursor: default; }
+.place-sheet.is-hospital .place-tabs button.is-on { background: #1f9d97; }

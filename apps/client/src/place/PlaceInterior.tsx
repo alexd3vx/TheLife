@@ -1,41 +1,36 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useEffect, useRef, useState } from "react";
-import { ATM_FEE, PLAYER, SAVINGS, balance, counterOpen, loanLimit, type Landmark } from "@thelife/game-core";
+import { counterOpen, type Landmark } from "@thelife/game-core";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook, parseLook } from "../lab/looks";
 import { loadManifest } from "../lab/manifest";
 import { randomNpcLook } from "../lab/npcLooks";
 import { bubbleSprite } from "../map/remotePlayers";
 import type { GameSession } from "../play/gameSession";
-import { bankBorrow, bankDeposit, bankRepay, bankWithdraw, plug } from "../phone/remote";
 import { GameIcon } from "../ui/icons";
+import BankPanel from "./BankPanel";
+import HospitalPanel from "./HospitalPanel";
 import { buildBankRoom } from "./bankScene";
+import { buildHospitalRoom } from "./hospitalScene";
+import type { Outcome } from "./panel";
 import "./place.css";
 
-const naira = (n: number) => `₦${n.toLocaleString()}`;
-type Window = "teller" | "atm";
-
 /**
- * Inside a bank branch: the lobby with a teller behind the glass and cash machines on the wall. The counter does savings and loans in
- * office hours; the machines take and give cash any time for a small fee. It runs on the same savings and loan as the phone's LifePay,
- * so a player with a basic phone does their banking here.
+ * Inside a place you can walk into: a 3D room with a member of staff, and a service sheet under it. The bank's counter does savings and
+ * loans and its machines give cash; the hospital mends needs for a price. Both run on the same rules as the phone, so a player with a
+ * basic phone does their business here. `place.kind` picks the room and the sheet.
  */
 export default function PlaceInterior({ place, session, onClose }: { place: Landmark; session: GameSession; onClose(): void }) {
   const boxRef = useRef<HTMLDivElement>(null);
-  const tellerRef = useRef<{ say(text: string): void } | null>(null);
+  const staffRef = useRef<{ say(text: string): void } | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [win, setWin] = useState<Window>("teller");
-  const [amount, setAmount] = useState("5000");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [, bump] = useState(0);
   const state = session.sim.state;
-  const cash = balance(state.ledger, PLAYER);
-  const saved = balance(state.ledger, SAVINGS);
-  const loan = state.phone.loan?.owed ?? 0;
+  const hospitalKind = place.kind === "hospital";
   const counter = counterOpen(state);
-  const value = Math.floor(Number(amount) || 0);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -56,8 +51,8 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         renderer.domElement.remove();
       });
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color("#cfe0fa");
-      const room = buildBankRoom(place.name);
+      scene.background = new THREE.Color(hospitalKind ? "#d6eef0" : "#cfe0fa");
+      const room = hospitalKind ? buildHospitalRoom(place.name) : buildBankRoom(place.name);
       scene.add(room.group);
       scene.add(new THREE.HemisphereLight("#eaf2ff", "#8fa6d0", 1.1));
       const sun = new THREE.DirectionalLight("#ffffff", 2.2);
@@ -95,39 +90,39 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       const manifest = await loadManifest();
       const look = state.look ? parseLook(state.look) : loadSavedLook();
       const me = new Avatar(manifest, look);
-      const teller = new Avatar(manifest, randomNpcLook());
-      await Promise.all([me.load(), teller.load()]);
+      const staff = new Avatar(manifest, randomNpcLook());
+      await Promise.all([me.load(), staff.load()]);
       if (gone) return;
       me.root.position.copy(room.playerAt);
       me.root.rotation.y = Math.PI;
-      teller.root.position.copy(room.tellerAt);
-      scene.add(me.root, teller.root);
+      staff.root.position.copy(room.staffAt);
+      scene.add(me.root, staff.root);
       me.play("Idle_Loop", 0);
-      teller.play("Life_Type_Loop", 0);
+      staff.play(hospitalKind ? "Idle_Loop" : "Life_Type_Loop", 0);
       let bubble: { sprite: THREE.Sprite; until: number } | null = null;
-      tellerRef.current = {
+      staffRef.current = {
         say(text) {
           if (bubble) {
-            teller.root.remove(bubble.sprite);
+            staff.root.remove(bubble.sprite);
             bubble.sprite.material.map?.dispose();
             bubble.sprite.material.dispose();
           }
           const sprite = bubbleSprite(text);
           sprite.position.y = 2.15;
-          teller.root.add(sprite);
+          staff.root.add(sprite);
           bubble = { sprite, until: performance.now() / 1000 + 4 + Math.min(5, text.length * 0.05) };
         },
       };
-      tellerRef.current.say(`Welcome to ${place.name}. How can I help?`);
+      staffRef.current.say(hospitalKind ? `Welcome to ${place.name}. What is the matter?` : `Welcome to ${place.name}. How can I help?`);
       const clock = new THREE.Clock();
       const loop = () => {
         raf = requestAnimationFrame(loop);
         const dt = Math.min(0.1, clock.getDelta());
         me.update(dt);
-        teller.update(dt);
+        staff.update(dt);
         controls.update();
         if (bubble && performance.now() / 1000 > bubble.until) {
-          teller.root.remove(bubble.sprite);
+          staff.root.remove(bubble.sprite);
           bubble = null;
         }
         renderer.render(scene, camera);
@@ -136,30 +131,26 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       setReady(true);
       cleanups.push(() => {
         me.dispose();
-        teller.dispose();
+        staff.dispose();
       });
     })().catch((e) => !gone && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       gone = true;
       cancelAnimationFrame(raf);
-      tellerRef.current = null;
+      staffRef.current = null;
       for (const c of cleanups) c();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const run = (fn: () => { ok: boolean; text?: string; reason?: string }) => {
+  const run = (fn: () => Outcome) => {
     const r = fn();
     const text = r.ok ? (r.text ?? "Done.") : (r.reason ?? "That didn't work.");
     setNote({ ok: r.ok, text });
-    tellerRef.current?.say(r.ok ? "Done. Anything else?" : text.length < 70 ? text : "Sorry, I can't do that.");
+    staffRef.current?.say(r.ok ? (hospitalKind ? "There you go. Take care." : "Done. Anything else?") : text.length < 70 ? text : "Sorry, I can't do that.");
     session.notice(text);
     bump((n) => n + 1);
   };
-  const atm = win === "atm";
-  const closed = !atm && !counter.open;
-  const chips = [1000, 5000, 10000, 50000];
-
   return (
     <div className="place" role="dialog" aria-label={place.name}>
       <div className="place-stage" ref={boxRef}>
@@ -168,46 +159,14 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         <button className="place-leave" onClick={onClose}><GameIcon name="left" size={14} /> Leave</button>
         <div className="place-title">
           <b>{place.name}</b>
-          <small className={counter.open ? "is-open" : ""}>{counter.open ? "Counter open" : `Counter closed · ${counter.text}`}</small>
+          {hospitalKind
+            ? <small className="is-open">Open all day and night</small>
+            : <small className={counter.open ? "is-open" : ""}>{counter.open ? "Counter open" : `Counter closed · ${counter.text}`}</small>}
         </div>
       </div>
 
-      <section className="place-sheet">
-        <div className="place-money">
-          <span><small>Cash</small><b>{naira(cash)}</b></span>
-          <span><small>Savings</small><b>{naira(saved)}</b></span>
-          <span className={loan ? "is-owe" : ""}><small>Loan</small><b>{loan ? naira(loan) : "None"}</b></span>
-        </div>
-        <nav className="place-tabs">
-          <button className={win === "teller" ? "is-on" : ""} onClick={() => setWin("teller")}>Teller</button>
-          <button className={win === "atm" ? "is-on" : ""} onClick={() => setWin("atm")}>Cash machine</button>
-        </nav>
-
-        <label className="place-amount">
-          <span>Amount</span>
-          <i>₦</i>
-          <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))} aria-label="Amount in naira" />
-        </label>
-        <div className="place-chips">
-          {chips.map((c) => <button key={c} onClick={() => setAmount(String(c))}>{naira(c)}</button>)}
-          <button onClick={() => setAmount(String(Math.max(0, atm ? saved : saved)))}>All savings</button>
-        </div>
-
-        {closed && <p className="place-note is-bad">The counter is closed ({counter.text}). The cash machine works any time{`, for ₦${ATM_FEE} each time`}.</p>}
-        {atm && <p className="place-note">The machine charges {naira(ATM_FEE)} each time. It cannot lend.</p>}
-
-        <div className="place-actions">
-          <button disabled={closed || value < 100} onClick={() => run(() => bankDeposit(state, value, atm))}>Save {value >= 100 ? naira(value) : ""}</button>
-          <button disabled={closed || value < 100} onClick={() => run(() => bankWithdraw(state, value, atm))}>Take out {value >= 100 ? naira(value) : ""}</button>
-          {!atm && <button disabled={closed || value < 100 || !!loan} onClick={() => run(() => bankBorrow(state, value))}>Borrow {value >= 100 ? naira(value) : ""}</button>}
-          {!atm && <button disabled={closed || value < 100 || !loan} onClick={() => run(() => bankRepay(state, value))}>Repay loan</button>}
-        </div>
-        {!atm && <p className="place-note">You can borrow up to {naira(loanLimit(state.profile))} at 10%. Savings earn interest every week, here and on your phone.</p>}
-
-        <button className="place-charge" disabled={state.phone.battery >= 100} onClick={() => run(() => plug(state, "wall"))}>
-          <GameIcon name="charging" size={15} /> {state.phone.battery >= 100 ? "Phone is full" : `Charge your phone (${Math.round(state.phone.battery)}%)`}
-        </button>
-        {note && <p className={`place-result${note.ok ? "" : " is-bad"}`} role="status">{note.text}</p>}
+      <section className={`place-sheet${hospitalKind ? " is-hospital" : ""}`}>
+        {hospitalKind ? <HospitalPanel state={state} run={run} note={note} /> : <BankPanel state={state} run={run} note={note} />}
       </section>
     </div>
   );

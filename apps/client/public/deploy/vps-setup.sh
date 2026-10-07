@@ -37,6 +37,7 @@ touch "$ENVF" && chmod 600 "$ENVF"
 setenv() { grep -q "^$1=" "$ENVF" && sed -i "s|^$1=.*|$1=$2|" "$ENVF" || echo "$1=$2" >> "$ENVF"; }
 [ -n "${SUPABASE_URL:-}" ] && setenv SUPABASE_URL "$SUPABASE_URL"
 [ -n "${SUPABASE_ANON_KEY:-}" ] && setenv SUPABASE_ANON_KEY "$SUPABASE_ANON_KEY"
+[ -n "${SUPABASE_SERVICE_KEY:-}" ] && setenv SUPABASE_SERVICE_KEY "$SUPABASE_SERVICE_KEY"   # optional: keeps chat in your Supabase database (docs/supabase-chat.sql)
 [ -n "${ALLOW_GUESTS:-}" ] && setenv ALLOW_GUESTS "$ALLOW_GUESTS"
 
 cat > /etc/systemd/system/thelife.service <<UNIT
