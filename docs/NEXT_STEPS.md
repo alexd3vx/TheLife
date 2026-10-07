@@ -168,5 +168,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Leaderboards (Q54):** richest, level and milestones, hustle rating, photo contest winners, "and others as well" (more boards can be added later, e.g. best business, most visited home). (7 Oct)
 - **Identity (Q55):** username fixed; display name and look changeable (look changes cost money at the barber or boutique). (7 Oct)
 - **Mini-games (Q56):** short tap and timing tasks (10 to 30 s: tap to cook, rhythm for music, typing for office) **and** big mini-games for some jobs, both "but better" than a basic version. (7 Oct)
+- **Phone customisation (Q57):** wallpapers and themes, phone models and cases, app layout, ringtones. **Plus about 5 more phone models** (for example LifePad, LifeDuo and others) and **a special VIP phone**, each with its own battery icon, status bar and look, and a phone-like system and apps per model. (7 Oct)
+- **Elections (Q58):** weekly, Sunday 8pm; campaign during the week, vote in person at the polling unit, news cutscene at the result. (7 Oct)
+- **Finding friends (Q59):** meet in places (Nearby list), share ID or number, invite link with a small reward for both, suggestions, **and by username and by social media** (search a username; follow from LifeGram). (7 Oct)
+- **Chat rules (Q60):** block hate, threats, scams and sexual content; allow banter and slang (swearing allowed in private chats); reports reviewed. (7 Oct)
 
-*Questions asked so far: 56 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 60 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
