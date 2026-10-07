@@ -4,6 +4,10 @@ import { clearPending, getPending } from "../play/pendingLife";
 import { setChargeChecker, setTransport } from "../phone/remote";
 import type { NetStatus } from "./connection";
 import { world } from "./world";
+import { social } from "./social";
+
+// start listening for people and messages as soon as the game connects, so the Social app already has what was said
+social.start();
 
 export type LifePhase = "connecting" | "creating" | "ready" | "offline";
 

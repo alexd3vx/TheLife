@@ -538,7 +538,7 @@ export class IsoRoom {
   /** Tells the page what is selected (null = nothing) so it can show its buttons. */
   onSelect?: (info: { id: string; furniture: string; name: string; bought: boolean; price: number } | null) => void;
   /** Asks the page to make a change real: it runs the game rules, then hands the new layout back through setLayout. */
-  onEditChange?: (c: { kind: "move"; id: string; x: number; z: number; rot: number } | { kind: "sell"; id: string; furniture: string; bought: boolean }) => void;
+  onEditChange?: (c: { kind: "move"; id: string; x: number; z: number; rot: number; /** The piece is already shown in its new place: no need to rebuild the room straight away. */ quiet?: boolean } | { kind: "sell"; id: string; furniture: string; bought: boolean }) => void;
 
   startEdit(): void {
     this.stopDoing();
@@ -697,7 +697,7 @@ export class IsoRoom {
     const kids = this.items.filter((o) => o.def.onTopOf === it.def.id);
     for (const k of kids) k.def = { ...k.def, x: k.def.x + (x - it.def.x), z: k.def.z + (z - it.def.z) };
     it.def = { ...it.def, x, z };
-    this.onEditChange?.({ kind: "move", id: it.def.id, x, z, rot: it.rot * 90 });
+    this.onEditChange?.({ kind: "move", id: it.def.id, x, z, rot: it.rot * 90, quiet: true });
   }
 
   sellSelected(): void {

@@ -478,3 +478,32 @@ button.phone-btn-side { border: 0; padding: 0; cursor: pointer; }
 .ps-compat .is-no { color: #d9534f; opacity: .8; }
 .ps-compat .is-you { outline: 2px solid var(--accent); }
 .ps-sheet-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+
+/* Social app */
+.soc { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #f4f8ff; color: #12233f; }
+.soc-top { display: flex; align-items: center; gap: 8px; padding: 10px 14px 4px; font-size: .86rem; }
+.soc-top small { color: #5c6f92; }
+.soc-dot { width: 9px; height: 9px; border-radius: 50%; background: #9aa6c0; }
+.soc-dot.is-on { background: #2f6bff; box-shadow: 0 0 0 3px rgba(47, 107, 255, .25); }
+.soc-tabs { display: flex; gap: 6px; padding: 6px 14px 8px; }
+.soc-tabs button { border: 0; border-radius: 999px; padding: 8px 14px; background: #e1ebff; color: #34466a; font: 700 .8rem system-ui; cursor: pointer; }
+.soc-tabs button.is-on { background: #12233f; color: #fff; }
+.soc-people { list-style: none; margin: 0; padding: 4px 14px 14px; display: grid; gap: 8px; overflow-y: auto; align-content: start; }
+.soc-people li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 16px; background: #fff; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); }
+.soc-people li div { display: grid; }
+.soc-people small { color: #5c6f92; }
+.soc-people button { border: 0; border-radius: 999px; padding: 8px 14px; background: #2f6bff; color: #fff; font: 700 .78rem system-ui; cursor: pointer; }
+.soc-pic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(145deg, #5b9bff, #2f55d8); color: #fff; font: 800 .8rem system-ui; }
+.soc-empty { color: #5c6f92; text-align: center; font: 600 .84rem/1.4 system-ui; padding: 18px; display: block !important; background: transparent !important; box-shadow: none !important; }
+.soc-who { display: flex; align-items: center; gap: 8px; padding: 0 14px 6px; }
+.soc-who button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: #e1ebff; cursor: pointer; }
+.soc-log { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 14px; display: grid; gap: 6px; align-content: start; }
+.soc-line { max-width: 82%; justify-self: start; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: #fff; box-shadow: 0 1px 6px rgba(18, 35, 63, .08); display: grid; gap: 1px; }
+.soc-line.is-mine { justify-self: end; background: #2f6bff; color: #fff; border-radius: 16px 16px 4px 16px; }
+.soc-line small { color: #2f6bff; font-weight: 800; font-size: .7rem; }
+.soc-line p { margin: 0; font: 500 .88rem/1.3 system-ui; word-break: break-word; }
+.soc-line i { font: 500 .62rem system-ui; opacity: .6; justify-self: end; }
+.soc-form { display: flex; gap: 8px; padding: 8px 14px 12px; }
+.soc-form input { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 11px 14px; background: #e1ebff; font: 600 .86rem system-ui; color: #12233f; outline: none; }
+.soc-form button { border: 0; border-radius: 999px; padding: 0 16px; background: #2f6bff; color: #fff; font: 800 .82rem system-ui; cursor: pointer; }
+.soc-form button:disabled { opacity: .4; }

@@ -94,7 +94,11 @@ export default function IsoPage() {
         }
         if (c.kind === "sell") session.notice(r.text);
         appliedHome.current = JSON.stringify(st.home ?? null);
-        void room.setLayout(layoutWithHome(layoutForTier(tier), st.home));
+        const rebuild = () => void room.setLayout(layoutWithHome(layoutForTier(tier), st.home));
+        window.clearTimeout(rebuildTimer.current);
+        // arrow taps already moved the piece on screen: rebuild the room once, a moment after the last one
+        if (c.kind === "move" && c.quiet) rebuildTimer.current = window.setTimeout(rebuild, 400);
+        else rebuild();
       };
       room.introDone = () => setIntroOn(false);
       await room.load();
@@ -124,6 +128,7 @@ export default function IsoPage() {
     return () => clearInterval(t);
   }, [session, tier]);
 
+  const rebuildTimer = useRef(0);
   const buy = (furniture: string) => {
     const room = roomRef.current;
     if (!room || !session) return;

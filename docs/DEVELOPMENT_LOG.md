@@ -260,3 +260,11 @@ Chronological record of decisions and changes. Newest first.
 - Server: `analytics.ts` counts views, different players, guests vs accounts, online now and the peak (hashed keys only), served at `GET /stats`; `#/stats` is the test page and an online chip shows in the home and the street.
 - Player interaction: tap another player in the street for a card (wave, cheer, message, pay). Chat now carries only 90 m in the city (`HEARING_RANGE`), private messages (`dm`) reach anyone online, gestures (`emote`) show on nearby characters, and what people say floats over their heads as a bubble. Update the VPS for the new messages.
 - Street people are real characters (random looks, real walk) within 30 m; the cheap figures are the far crowd.
+
+## Animation editor, Social app, buy mode, profile
+
+- `#/anim` (owner only): pick the clip for every game move (library clips, or Mixamo/glb files imported and fitted to the body), set speed, loop, freeze, trim, and publish. The map goes to the game server (`PUT /anim/map`, `PUT /anim/clip/<name>`, admin check through Supabase `profiles.is_admin`) and every game reads it on start (`lab/animConfig.ts`). A move whose clip can't be found now uses the built-in clip made in code, not the previous move.
+- Retargeting measures which way a file faces (feet at rest) and turns it to face our body, so a file made facing the other way is no longer backward. The clips were checked: every walk and run slides its planted foot back as it should.
+- Phone: a Social app (nearby chat, private messages, people list) kept by `net/social.ts`.
+- Buy mode (`iso/BuyMode.tsx`), profile sheet (`ui/ProfileSheet.tsx`), bag redesign, arrow nudges that move the piece at once and rebuild the room a moment later.
+- The service worker no longer serves an old `manifest.json` (that is why returning players missed new animation packs and saw cooking as walking).

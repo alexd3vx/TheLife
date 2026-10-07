@@ -150,6 +150,22 @@ export function retargetClip(targetBones: THREE.Bone[], rest: RestPose, sourceRo
     const o = srcByName.get(name);
     if (o) srcRestPos.set(name, o.getWorldPosition(new THREE.Vector3()));
   }
+  // some files face the other way (+Z or -Z, or turned on their root): measure which way each skeleton's feet point at rest and turn the
+  // source's whole movement to face the way our body faces
+  const feetAngle = (foot: (side: "l" | "r") => THREE.Vector3 | undefined, ball: (side: "l" | "r") => THREE.Vector3 | undefined): number | null => {
+    let x = 0, z = 0;
+    for (const side of ["l", "r"] as const) {
+      const f = foot(side), b = ball(side);
+      if (!f || !b) continue;
+      x += b.x - f.x;
+      z += b.z - f.z;
+    }
+    return Math.hypot(x, z) > 1e-4 ? Math.atan2(x, z) : null;
+  };
+  const tgtAng = feetAngle((sd) => rest.position.get(`foot_${sd}`), (sd) => rest.position.get(`ball_${sd}`));
+  const srcAng = feetAngle((sd) => srcRestPos.get(map[`foot_${sd}`] ?? ""), (sd) => srcRestPos.get(map[`ball_${sd}`] ?? ""));
+  const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), tgtAng !== null && srcAng !== null ? tgtAng - srcAng : 0);
+  const yawInv = yawQ.clone().invert();
   const correction = new Map<THREE.Bone, THREE.Quaternion>();
   for (const b of order) {
     const mine = map[b.name];
@@ -159,7 +175,7 @@ export function retargetClip(targetBones: THREE.Bone[], rest: RestPose, sourceRo
     let fix = new THREE.Quaternion();
     if (child) {
       const dt = rest.position.get(child.name)!.clone().sub(rest.position.get(b.name)!).normalize();
-      const ds = srcRestPos.get(map[child.name]!)!.clone().sub(srcRestPos.get(mine)!).normalize();
+      const ds = srcRestPos.get(map[child.name]!)!.clone().sub(srcRestPos.get(mine)!).normalize().applyQuaternion(yawQ);
       if (dt.lengthSq() > 0.5 && ds.lengthSq() > 0.5) fix = new THREE.Quaternion().setFromUnitVectors(dt, ds);
     } else if (!TRUNK.has(b.name) && b.parent && correction.has(b.parent as THREE.Bone)) fix = correction.get(b.parent as THREE.Bone)!.clone();
     correction.set(b, fix);
@@ -189,7 +205,7 @@ export function retargetClip(targetBones: THREE.Bone[], rest: RestPose, sourceRo
       let local: THREE.Quaternion;
       if (src) {
         // how far the source bone has turned from its rest, in world space, applied on top of our bone's own rest world rotation
-        const delta = src.getWorldQuaternion(q).multiply(q2.copy(srcRest.get(map[b.name]!)!).invert());
+        const delta = new THREE.Quaternion().copy(yawQ).multiply(src.getWorldQuaternion(q).multiply(q2.copy(srcRest.get(map[b.name]!)!).invert())).multiply(yawInv);
         const wanted = new THREE.Quaternion().copy(delta).multiply(correction.get(b)!).multiply(restWorld.get(b)!);
         local = new THREE.Quaternion().copy(parentWorld).invert().multiply(wanted);
         const arr = values.get(b.name)!;
@@ -199,7 +215,8 @@ export function retargetClip(targetBones: THREE.Bone[], rest: RestPose, sourceRo
     }
     if (hipsSrc) {
       const p = hipsSrc.getWorldPosition(new THREE.Vector3());
-      hipPos.push((p.x - srcRestHips.x) * scale, (p.y - srcRestHips.y) * scale, (p.z - srcRestHips.z) * scale);
+      const d = new THREE.Vector3((p.x - srcRestHips.x) * scale, (p.y - srcRestHips.y) * scale, (p.z - srcRestHips.z) * scale).applyQuaternion(yawQ);
+      hipPos.push(d.x, d.y, d.z);
     }
   }
   mixer.stopAllAction();

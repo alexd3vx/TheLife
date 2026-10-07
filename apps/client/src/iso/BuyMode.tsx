@@ -93,7 +93,7 @@ export default function BuyMode({ session, sel, onBuy, onTurn, onSell, onNudge, 
             <button className={cat === "all" ? "is-on" : ""} onClick={() => setCat("all")}>All</button>
             {cats.map((c) => (
               <button key={c.id} className={cat === c.id ? "is-on" : ""} onClick={() => setCat(c.id)}>
-                <GameIcon name={c.icon} size={13} /> {c.label}
+                <GameIcon name={c.icon} size={16} /> {c.label}
               </button>
             ))}
           </nav>

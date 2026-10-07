@@ -120,7 +120,7 @@ function cleanName(name) {
 }
 
 // packages/server/src/index.ts
-import { join } from "node:path";
+import { join as join2 } from "node:path";
 
 // packages/server/src/lives.ts
 import { createHash } from "node:crypto";
@@ -4315,17 +4315,159 @@ var Analytics = class {
   }
 };
 
+// packages/server/src/animstore.ts
+import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3, readdirSync, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { join } from "node:path";
+var NAME = /^[A-Za-z0-9_-]{1,48}$/;
+var validName = (n) => NAME.test(n);
+function cleanMap(input) {
+  if (!input || typeof input !== "object") return null;
+  const out = {};
+  const entries = Object.entries(input);
+  if (entries.length > 120) return null;
+  for (const [slot, raw] of entries) {
+    if (!NAME.test(slot) || !raw || typeof raw !== "object") return null;
+    const r = raw;
+    if (typeof r.clip !== "string" || r.clip.length > 80) return null;
+    const s = { clip: r.clip };
+    if (typeof r.speed === "number" && Number.isFinite(r.speed)) s.speed = Math.min(4, Math.max(0.1, r.speed));
+    if (typeof r.loop === "boolean") s.loop = r.loop;
+    if (typeof r.hold === "number" && Number.isFinite(r.hold) && r.hold >= 0) s.hold = Math.min(600, r.hold);
+    if (Array.isArray(r.trim) && r.trim.length === 2 && r.trim.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0)) s.trim = [r.trim[0], r.trim[1]];
+    out[slot] = s;
+  }
+  return out;
+}
+var AnimStore = class {
+  constructor(dir) {
+    this.dir = dir;
+    if (!dir) return;
+    try {
+      mkdirSync3(join(dir, "clips"), { recursive: true });
+      const mapFile = join(dir, "map.json");
+      if (existsSync3(mapFile)) this.map = cleanMap(JSON.parse(readFileSync3(mapFile, "utf8"))) ?? {};
+      for (const f of readdirSync(join(dir, "clips"))) if (f.endsWith(".json")) this.clips.set(f.slice(0, -5), readFileSync3(join(dir, "clips", f), "utf8"));
+    } catch (e) {
+      console.error("animation store failed to load", e);
+    }
+  }
+  dir;
+  map = {};
+  clips = /* @__PURE__ */ new Map();
+  getMap() {
+    return this.map;
+  }
+  putMap(map) {
+    this.map = map;
+    this.write("map.json", JSON.stringify(map));
+  }
+  names() {
+    return [...this.clips.keys()];
+  }
+  getClip(name) {
+    return this.clips.get(name);
+  }
+  putClip(name, json) {
+    if (!NAME.test(name) || json.length > 15e5) return false;
+    try {
+      const parsed = JSON.parse(json);
+      if (!Array.isArray(parsed.tracks) || parsed.tracks.length > 300) return false;
+    } catch {
+      return false;
+    }
+    if (!this.clips.has(name) && this.clips.size >= 200) return false;
+    this.clips.set(name, json);
+    this.write(`clips/${name}.json`, json);
+    return true;
+  }
+  deleteClip(name) {
+    this.clips.delete(name);
+  }
+  write(rel, text) {
+    if (!this.dir) return;
+    try {
+      const file = join(this.dir, rel);
+      writeFileSync3(`${file}.tmp`, text);
+      renameSync3(`${file}.tmp`, file);
+    } catch (e) {
+      console.error("animation store save failed", e);
+    }
+  }
+};
+
 // packages/server/src/index.ts
 var send = (ws, message) => {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
 };
 async function startGameServer(options = {}) {
-  const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
-  const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
+  const store = new LifeStore(options.dataDir ? join2(options.dataDir, "lives.json") : null);
+  const analytics = new Analytics(options.dataDir ? join2(options.dataDir, "analytics.json") : null);
   const room = new Room(options.room ?? "lagos-test", void 0, store);
   const sockets = /* @__PURE__ */ new Map();
   const origins2 = options.origins ?? [];
+  const anim = new AnimStore(options.dataDir ? join2(options.dataDir, "anim") : null);
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, PUT, OPTIONS", "access-control-allow-headers": "authorization, content-type" };
+  const readBody = (req, max) => new Promise((resolve) => {
+    let size = 0;
+    const parts = [];
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > max) {
+        resolve(null);
+        req.destroy();
+      } else parts.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
+    req.on("error", () => resolve(null));
+  });
+  const mayEdit = async (req) => {
+    if (!options.verifyToken) return true;
+    const token = (req.headers.authorization ?? "").replace(/^Bearer /i, "");
+    if (!token || !options.isAdminToken) return false;
+    return await options.verifyToken(token).catch(() => null) !== null && await options.isAdminToken(token);
+  };
   const http = createServer((req, res) => {
+    const url = (req.url ?? "").split("?")[0];
+    if (url.startsWith("/anim/")) {
+      void (async () => {
+        if (req.method === "OPTIONS") {
+          res.writeHead(204, cors);
+          return res.end();
+        }
+        const json = (code, body) => {
+          res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store", ...cors });
+          res.end(body);
+        };
+        if (req.method === "GET" && url === "/anim/map") return json(200, JSON.stringify({ slots: anim.getMap(), clips: anim.names() }));
+        const m = /^\/anim\/clip\/([^/]+)$/.exec(url);
+        if (m && validName(m[1])) {
+          if (req.method === "GET") {
+            const c = anim.getClip(m[1]);
+            return c ? json(200, c) : json(404, "{}");
+          }
+          if (req.method === "PUT") {
+            if (!await mayEdit(req)) return json(403, '{"error":"Only the owner can publish animations."}');
+            const body = await readBody(req, 16e5);
+            return body !== null && anim.putClip(m[1], body) ? json(200, '{"ok":true}') : json(400, '{"error":"That clip was not accepted."}');
+          }
+        }
+        if (req.method === "PUT" && url === "/anim/map") {
+          if (!await mayEdit(req)) return json(403, '{"error":"Only the owner can publish animations."}');
+          const body = await readBody(req, 1e5);
+          let parsed = null;
+          try {
+            parsed = body ? JSON.parse(body).slots : null;
+          } catch {
+          }
+          const clean = cleanMap(parsed);
+          if (!clean) return json(400, '{"error":"That animation map was not accepted."}');
+          anim.putMap(clean);
+          return json(200, '{"ok":true}');
+        }
+        json(404, "{}");
+      })();
+      return;
+    }
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
       res.end(JSON.stringify({ ok: true, room: room.name, players: room.size, protocol: PROTOCOL_VERSION }));
@@ -4599,12 +4741,26 @@ function supabaseVerifier(url, anonKey) {
     return user;
   };
 }
+function supabaseAdminCheck(url, anonKey) {
+  if (!url || !anonKey) return void 0;
+  const base = url.replace(/\/$/, "");
+  return async (token) => {
+    try {
+      const res = await fetch(`${base}/rest/v1/profiles?select=is_admin&limit=1`, { headers: { authorization: `Bearer ${token}`, apikey: anonKey } });
+      if (!res.ok) return false;
+      const rows = await res.json();
+      return rows[0]?.is_admin === true;
+    } catch {
+      return false;
+    }
+  };
+}
 
 // packages/server/src/main.ts
 process.on("uncaughtException", (e) => console.error("uncaught", e));
 process.on("unhandledRejection", (e) => console.error("unhandled", e));
 var port = Number(process.env.PORT ?? 8787);
 var origins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1" });
+var server = await startGameServer({ port, room: process.env.ROOM ?? "lagos-test", origins, dataDir: process.env.DATA_DIR ?? "./data", verifyToken: supabaseVerifier(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY), allowGuests: process.env.ALLOW_GUESTS === "1", isAdminToken: supabaseAdminCheck(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY) });
 console.log(`TheLife game server on port ${server.port} (room ${server.room.name}${origins.length ? `, origins ${origins.join(", ")}` : ", any origin"})`);
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => void server.close().then(() => process.exit(0)));
