@@ -218,3 +218,21 @@ Every everyday clip was captured at 15 / 50 / 85 % of its loop on a male and a f
 **Preview in a place.** Studio, Home (a room with window, rug, sofa, lamp) or Street (road, pavement, buildings), plus the Walk toggle.
 
 **Honest gaps.** No skin undertone or freckles/marks yet (needs the skin shader). The Home and Street backdrops are simple blocks, enough to judge colours in different light, not the real places. Saved looks live in the browser only; they are not tied to the account.
+
+## 16. Phase 7 result (8 Oct 2026): people at scale
+
+**The street crowd is no longer blocks.** The old street people were boxes with swinging limbs. Everybody is now a seeded person (`lab/npcSpec.ts`: the same seed always gives the same look, sex, age, build, face sliders, hair and clothes) and is drawn at one of three levels:
+
+| Level | Distance | What it is | Cost |
+|---|---|---|---|
+| Real character | under 30 m (5 to 9 of them, from a pool) | the full body, hair, cloth, walking animation | about 42,000 triangles each, about 14 draw calls |
+| Crowd, mid | 30 to 48 m | thinned body, 1,500 triangles | one instance |
+| Crowd, far | 48 to 85 m | thinned body, 420 triangles | one instance |
+
+**Crowd bodies** (`tools/character/build_crowd.py`, uses Blender's decimator as a module): the neutral male and female MakeHuman bodies thinned to 1,500 and 420 triangles, each vertex tagged with a zone (skin, top, trousers, shoes, hair, sleeve, lower leg) and a limb. `map/crowd.ts` draws every person with their own colours per zone, hair standing off the scalp by their hairstyle's volume (an afro, a fade, a bald head), height and build, and a walk (legs, knees, arms) all in the vertex shader. Sixty people: 90,000 triangles in 3 draw calls, 0.2 ms to submit. Sixty real characters would be about 2.5 million triangles in about 800 draw calls. `crowd.json` is 74 KB.
+
+**Variety from a small pool.** A person who takes a real body keeps that body's look when they step back into the crowd (no pop). When a real body goes back to the pool it is repainted at once (new skin, hair and clothes colours, 3 ms), and every 45 s one piece (hair, top, trousers or shoes) is swapped (80 to 200 ms on a laptop, so it is rare). Changing a body's shape or any garment costs 80 to 200 ms; colours cost nothing, which is why the repaint is colours only.
+
+**Honest gaps.** The 20-people-at-30-FPS target could only be checked by counting, not on a real phone: 20 mid-level crowd people are 30,000 triangles and one draw call, and the 5 to 9 real characters are the heavy part (about 250 to 380 thousand triangles). If a low phone struggles, the settings page can lower the real-character count (the pool size is one argument). The real characters are still full 42,000-triangle figures; a decimated skinned LOD for them (so 20 could be real at once) needs the morph pack mapped to a thinned mesh and was not done. Long garments (kaftans, gowns) are a single colour on the crowd bodies, with no flowing hem. Crowd people always walk; there are no standing, chatting or sitting crowd people yet.
+
+**Dev page** `#/crowd` (dev or admin): sixty seeded people at street distance, a close view, real characters of the same seeds beside them, triangle and draw-call readout (`window.__crowd`).

@@ -384,3 +384,9 @@ Chronological record of decisions and changes. Newest first.
 - `CharacterStage` got `focus` (full/upper/head), `backdrop` (studio/room/street) and an `apiRef.snapshot()`; camera glides between focus points.
 - Creator: Skin tab, per-tab randomise, undo/redo, 8 saved looks with thumbnails, slimmer phone header, taller stage.
 - New files: `creator/randomise.ts`, `history.ts`, `savedLooks.ts`, `creator.test.ts` (8 tests).
+
+## Phase 7: people at scale
+- `tools/character/build_crowd.py` → `public/assets/characters/crowd.json` (thinned bodies with zone and limb tags).
+- `lab/npcSpec.ts` (seeded looks, crowd look from a look, recolour and restyle), `map/crowd.ts` (instanced crowd with shader walk), `map/pedestrians.ts` rebuilt on both (replaces the box figures), `lab/CrowdLabPage.tsx` (`#/crowd`).
+- Instances are packed to the front of each mesh every frame so hidden people are never drawn (first version drew all four meshes at full capacity: 230k triangles for 60 people instead of 90k).
+- Found while measuring: a garment or hairstyle rebuild costs 80 to 200 ms, a colour change 3 ms.
