@@ -1,6 +1,6 @@
 // TheLife service worker: keeps the game's own files on the device so it opens fast and starts offline. Playing still needs the internet
 // (your life lives on the server). Nothing about the player is stored here, only the app's files.
-const SHELL = "thelife-shell-v1";
+const SHELL = "thelife-shell-v2";
 const FILES = "thelife-files-v1";
 
 self.addEventListener("install", (event) => {

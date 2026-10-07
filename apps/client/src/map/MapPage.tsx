@@ -14,6 +14,7 @@ import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { payRide, setChargeChecker } from "../phone/remote";
+import { BottomNav } from "../play/HudParts";
 import TravelFilm from "../arrival/TravelFilm";
 import { chargingSpotNear, rideOptions } from "@thelife/game-core";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
@@ -196,7 +197,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className={`play${touchOn ? " has-touch" : ""}${mode === "map" ? " map-mode" : ""}`}>
+    <div className={`play hud-on${touchOn ? " has-touch" : ""}${mode === "map" ? " map-mode" : ""}`}>
       <div className="play-stage" ref={containerRef} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">
@@ -323,6 +324,7 @@ export default function MapPage() {
           })()}
         </>
       )}
+      {!bigMap && !trip && <BottomNav active="map" onMap={() => setMode("map")} />}
       {bigMap && (
         <nav className="cm-nav" aria-label="Where to">
           <a href="#/play"><GameIcon name="home" size={20} /><span>Home</span></a>

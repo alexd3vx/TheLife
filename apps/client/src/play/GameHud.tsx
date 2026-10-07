@@ -5,6 +5,7 @@ import PhoneUI from "../phone/PhoneUI";
 import { GameIcon, type FaName } from "../ui/icons";
 import { GameSession, type HudSnapshot } from "./gameSession";
 import "./play.css";
+import { MeCard, TopPill } from "./HudParts";
 
 const NEED_META: { id: NeedId; icon: FaName; label: string }[] = [
   { id: "hunger", icon: "hunger", label: "Hunger" },
@@ -120,38 +121,8 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
 
   return (
     <>
-      <div className="hud-top">
-        <div className="play-clock" aria-label="Time and money">
-          <span><GameIcon name={isNight(hud.hourFloat) ? "moon" : "sun"} /></span>
-          <strong>{hud.date}</strong>
-          <span>{hud.time}</span>
-          <span className="play-money">{naira(hud.money)}</span>
-        </div>
-        {hud.profile && (
-          <span className={`play-who play-who-${hud.profile.tier}`} title={hud.profile.title}>
-            {hud.profile.firstName} {hud.profile.surname}
-          </span>
-        )}
-      </div>
-
-      <div className="play-needs" role="group" aria-label="Needs">
-        {NEED_META.map((need) => (
-          <div key={need.id} className="play-need" title={`${need.label}: ${hud.needs[need.id]}`}>
-            <span className="play-need-icon" aria-hidden="true">
-              <GameIcon name={need.icon} />
-            </span>
-            <span className="play-need-bar">
-              <span style={{ width: `${hud.needs[need.id]}%`, background: needColour(hud.needs[need.id]) }} />
-            </span>
-            <span className="visually-hidden">
-              {need.label} {hud.needs[need.id]} of 100
-            </span>
-          </div>
-        ))}
-        <div className="play-mood">
-          Mood <strong>{hud.moodLabel}</strong>
-        </div>
-      </div>
+      <TopPill hud={hud} />
+      <MeCard hud={hud} />
 
       <div className="play-toasts" aria-live="polite">
         {toasts.map((toast) => (

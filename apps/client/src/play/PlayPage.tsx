@@ -20,6 +20,7 @@ import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
+import { BottomNav, Chips, MeCard, TopPill } from "./HudParts";
 
 interface Toast {
   id: number;
@@ -146,72 +147,27 @@ export default function PlayPage() {
   const banner = status.label ?? hover;
 
   return (
-    <div className="play">
+    <div className="play hud-on">
       <div className="play-stage" ref={containerRef} />
 
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back">
           ←<span className="play-chip-label"> Back</span>
         </a>
-        <a className="play-chip" href="#/map" aria-label="Go outside into Lagos">
-          <GameIcon name="map" /><span className="play-chip-label"> Go outside</span>
-        </a>
         {isAdmin() && (
           <a className="play-chip" href="#/lab" aria-label="Asset lab (test)">
             <GameIcon name="palette" /><span className="play-chip-label"> Lab (test)</span>
           </a>
         )}
-        {hud && (
-          <div className="play-clock" aria-label="Time and money">
-            <span><GameIcon name={isNight(hud.hourFloat) ? "moon" : "sun"} /></span>
-            <strong>{hud.date}</strong>
-            <span>{hud.time}</span>
-            <span className="play-money">{naira(hud.money)}</span>
-          </div>
-        )}
-        {hud?.profile && (
-          <span className={`play-who play-who-${hud.profile.tier}`} title={hud.profile.title}>
-            {hud.profile.firstName} {hud.profile.surname}
-          </span>
-        )}
         {settings.showFps && <span className="play-fps">{stats}</span>}
       </div>
 
-      {hud && (
-        <div className="play-needs" role="group" aria-label="Needs">
-          {NEED_META.map((need) => (
-            <div key={need.id} className="play-need" title={`${need.label}: ${hud.needs[need.id]}`}>
-              <span className="play-need-icon" aria-hidden="true">
-                <GameIcon name={need.icon} />
-              </span>
-              <span className="play-need-bar">
-                <span style={{ width: `${hud.needs[need.id]}%`, background: needColour(hud.needs[need.id]) }} />
-              </span>
-              <span className="visually-hidden">
-                {need.label} {hud.needs[need.id]} of 100
-              </span>
-            </div>
-          ))}
-          <div className="play-mood">
-            Mood <strong>{hud.moodLabel}</strong>
-          </div>
-        </div>
-      )}
-
-      {hud && (
-        <div className="play-info">
-          <span><GameIcon name="cart" /> {hud.portions} {hud.portions === 1 ? "portion" : "portions"}</span>
-          <span><GameIcon name="meal" /> {hud.meals} {hud.meals === 1 ? "meal" : "meals"}</span>
-          <span className={hud.rentOwed > 0 ? "play-bad" : ""}>
-            <GameIcon name="home" /> {hud.rentPerWeek === 0 ? "Family house, no rent" : hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
-          </span>
-          {hud.allowance > 0 && <span><GameIcon name="money" /> {naira(hud.allowance)} a week from {hud.profile?.allowanceFrom || "family"}</span>}
-          {hud.skills.map((skill) => (
-            <span key={skill.id}>
-              <GameIcon name="skill" /> {skill.id} {skill.level}
-            </span>
-          ))}
-        </div>
+      {hud && !editing && (
+        <>
+          <TopPill hud={hud} />
+          <Chips hud={hud} />
+          <MeCard hud={hud} />
+        </>
       )}
 
       {(banner || hud?.action) && (
@@ -264,6 +220,9 @@ export default function PlayPage() {
           onClose={() => setShopOpen(false)}
           onBuy={(f) => void runtimeRef.current?.edit.buy(f).then((err) => (err ? runtimeRef.current?.session?.notice(err) : setShopOpen(false)))}
         />
+      )}
+      {!editing && !phoneOpen && !bagOpen && !kitchen && (
+        <BottomNav active="home" unread={hud?.phone.unread ?? 0} onBuy={() => { runtimeRef.current?.edit.start(); setEditing(true); setShopOpen(true); }} />
       )}
       {!editing && <div className="play-controls">
         <button aria-pressed={follow} onClick={() => setFollow((v) => !v)}>

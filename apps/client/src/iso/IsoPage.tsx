@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import GameHud from "../play/GameHud";
+import { BottomNav } from "../play/HudParts";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import ArrivalFilm from "../arrival/ArrivalFilm";
 import WelcomeBack from "../arrival/WelcomeBack";
@@ -170,19 +171,19 @@ export default function IsoPage() {
   }, [ready, filmShowing, welcome.showing, life.justArrived]);
 
   return (
-    <div className="play">
+    <div className="play hud-on">
       <canvas ref={canvasRef} className="play-stage" style={{ width: "100%", height: "100%", display: "block", touchAction: "none" }} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
       </div>
-      {!editing && <a className="play-chip" href="#/map" style={{ position: "absolute", left: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 3 }}>Go outside</a>}
-      {!editing && <button className="play-chip" aria-label="Settings" onClick={() => setShowSettings(true)} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 52px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
-        Settings
-      </button>}
-      {session && ready && !introOn && !editing && (
-        <button className="play-chip" onClick={toggleEdit} style={{ position: "absolute", left: 12, bottom: "calc(max(16px, env(safe-area-inset-bottom)) + 104px)", zIndex: 3, border: 0, cursor: "pointer", font: "inherit" }}>
-          Edit home
-        </button>
+      {!editing && (
+        <div className="play-controls" style={{ right: 12, left: "auto" }}>
+          <button onClick={() => setShowSettings(true)}>Settings</button>
+          {session && ready && !introOn && <button onClick={toggleEdit}>Edit home</button>}
+        </div>
+      )}
+      {!editing && session && ready && !introOn && (
+        <BottomNav active="home" onBuy={() => { toggleEdit(); setShopOpen(true); }} />
       )}
       {editing && (
         <>

@@ -14,7 +14,7 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, r
   done.current = onDone;
   const [minDone, setMinDone] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setMinDone(true), 4200);
+    const t = window.setTimeout(() => setMinDone(true), 6000);
     return () => window.clearTimeout(t);
   }, []);
   useEffect(() => {

@@ -40,13 +40,12 @@ button, input { font: inherit; color: inherit; }
 }
 .splash::after {
   content: "";
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  width: 64px;
+  height: 64px;
+  background: url("/loading-mark.svg") center / contain no-repeat;
+  animation: splash-pulse 1.4s ease-in-out infinite;
 }
+@keyframes splash-pulse { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn {

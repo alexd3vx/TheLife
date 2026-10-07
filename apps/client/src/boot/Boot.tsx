@@ -202,7 +202,7 @@ export function Boot({ children }: { children: ReactNode }) {
                 <defs>
                   <linearGradient id="boot-grad" x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0" stopColor="#a8c8ff" />
-                    <stop offset="1" stopColor="#e8782a" />
+                    <stop offset="1" stopColor="#5b9bff" />
                   </linearGradient>
                 </defs>
                 <path className="boot-mark-a" pathLength="1" d="M20 84 L50 14 L80 84" />
@@ -251,7 +251,7 @@ export function Boot({ children }: { children: ReactNode }) {
                       <svg viewBox="0 0 100 100" aria-hidden="true">
                         <defs>
                           <linearGradient id="boot-fill" x1="0" y1="1" x2="1" y2="0">
-                            <stop offset="0" stopColor="#e8782a" />
+                            <stop offset="0" stopColor="#5b9bff" />
                             <stop offset="1" stopColor="#a8c8ff" />
                           </linearGradient>
                         </defs>
