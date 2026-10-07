@@ -27,9 +27,11 @@ export function npcLookFromSeed(seed: number): Look {
     shape: {
       ...shape,
       age: Math.round(18 + r() * r() * 50),
-      height: (r() - 0.5) * 1.1,
-      weight: (r() - 0.45) * 1.1,
-      muscle: (r() - 0.45) * (female ? 0.6 : 1.1),
+      // ordinary people: a hand's breadth either side of average, never lanky
+      // the body model's "average" is 1.82 m for a man and 1.68 m for a woman, tall for Lagos; people here run about 1.70 and 1.60
+      height: (female ? -0.25 : -0.4) + (r() - 0.5) * 0.4,
+      weight: (r() - 0.4) * 0.7,
+      muscle: (r() - 0.4) * (female ? 0.5 : 0.8),
       bust: female ? (r() - 0.4) * 1.1 : 0,
       detail,
     },
@@ -74,8 +76,9 @@ export function crowdLookOf(look: Look): CrowdLook {
     shoe: look.shoes ? colour(CLOTH_COLORS, look.shoesColor) : skin,
     hair: look.hair ? colour(HAIR_COLORS, look.hairColor, "#241d19") : skin,
     hairVolume: look.hair ? (HAIR_VOLUME[look.hair] ?? 0.01) : 0.002,
-    height: 1 + shape.height * 0.05,
-    width: 1 + shape.weight * 0.16 + shape.muscle * 0.05,
+    height: 1 + shape.height * 0.2, // the model is 1.82 m at 0 and about 1.46 m at -1
+    // the thinned bodies are an average build; a little extra width keeps the limbs from looking spindly
+    width: 1.07 + shape.weight * 0.16 + shape.muscle * 0.05,
     shorts: !!look.bottom && SHORT_BOTTOM.has(look.bottom) && !onePiece,
     longSleeve: !!look.top && LONG_SLEEVE.has(look.top),
   };

@@ -2,6 +2,7 @@ import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
 import { DEFAULT_LOOK, sexOf, type Look } from "../lab/looks";
+import { DEFAULT_SHAPE } from "../lab/bodyShape";
 import CharacterStage, { type StageApi, type StageBackdrop, type StageFocus } from "../ui/CharacterStage";
 import StudioPanel from "./StudioPanel";
 import type { Tab } from "./randomise";
@@ -19,8 +20,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(r
 
 /** Make your person, then roll the background that decides how life starts: lapo, middle or nepo. */
 export default function CreatorPage() {
-  const lookRef = useRef<Look>({ ...DEFAULT_LOOK });
-  const [look, setLook] = useState<Look>(() => ({ ...DEFAULT_LOOK }));
+  // a new person starts at an ordinary Lagos height (about 1.70 m), not the body model's tall 1.82 m average
+  const lookRef = useRef<Look>({ ...DEFAULT_LOOK, shape: { ...DEFAULT_SHAPE, sex: 1, height: -0.35 } });
+  const [look, setLook] = useState<Look>(() => lookRef.current);
   const [walking, setWalking] = useState(false);
   const [step, setStep] = useState<"look" | "background" | "traits">("look");
   const [traits, setTraits] = useState<string[]>([]);

@@ -13,7 +13,8 @@ describe("seeded people", () => {
       const shape = npcLookFromSeed(s).shape!;
       expect(shape.age).toBeGreaterThanOrEqual(18);
       expect(shape.age).toBeLessThanOrEqual(70);
-      expect(Math.abs(shape.height)).toBeLessThanOrEqual(1);
+      expect(shape.height).toBeGreaterThanOrEqual(-0.7);
+      expect(shape.height).toBeLessThanOrEqual(-0.05);
       expect(Math.abs(shape.weight)).toBeLessThanOrEqual(1);
       for (const v of Object.values(shape.detail)) expect(Math.abs(v)).toBeLessThanOrEqual(1);
     }
