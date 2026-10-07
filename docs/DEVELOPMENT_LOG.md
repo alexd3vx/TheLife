@@ -315,3 +315,12 @@ Chronological record of decisions and changes. Newest first.
 - Switch-type pieces (lamps) look for a free spot all round the piece, not just four sides.
 - **Lock the front door.** Tap the front door of your home, "Lock the door" (you walk up and turn the key; the leaf swings shut) or "Unlock the door". `homeLock` RPC keeps it with the life (`home.locked`); `visitorMayEnter(owner, letIn)` is the rule visiting will use: a visitor waits outside until the owner opens or lets them in. Visiting itself (live in the home) is still to build.
 - **The on-screen stick is faster and easier to use.** A stick is analog: a gentle push now walks at a steady pace and pushing further out eases into a run (before, anything short of the very edge was slower than a walk, while a tap ran for long trips). Keys keep walk, and run with the run key. Same curve inside buildings.
+
+## Phase 0: one character everywhere
+
+- **One look source.** `lab/character.ts` `resolveLook(lifeLook)`: the look kept with the life is the person; the copy saved on the device is only the fall-back for the creator and dev tools. The street (`map/runtime.ts`), the home (`play/runtime.ts`), the profile, the creator and the arrival film all go through it, so it is the same person on every screen.
+- **One set of walking rules.** `lab/locomotion.ts` (walk 1.55 m/s, run 3.3 m/s, clip choice and clip playback rate) is shared by the home controller and the street runtime, so the house and the street animate the same way at the same speed.
+- **Live 3D stage** (`ui/CharacterStage.tsx`) replaces the flat preview in the creator and the profile sheet; it shows the real avatar and can walk.
+- **The arrival film is real 3D now** (`arrival/film3d.ts`, used by `ArrivalFilm.tsx`; the old 2D `filmCanvas.ts` stays only for its types). Dusk flight over the lagoon and city, landing with tyre smoke, the terminal, a ride home in a tier-matched vehicle (nepo luxury SUV, middle taxi, lapo tinted van) through traffic, then the player's own character walks up the path to the front door as it opens. Captions and timing are unchanged. Vehicle models are meshopt-compressed, so the film loader sets the decoder. In dev, `window.__film` exposes the film for frame tests.
+- Checked at 420x860 by stepping each beat; typecheck and all tests pass (shared 18, game-core 151, client 43, server 23).
+- Known rough edges: the parked car is out of frame in the door beat; the plane model is plain; headless software GL is too slow to judge the film's frame rate, so it needs a check on a real phone.

@@ -29,14 +29,12 @@ type Mode = "idle" | "walking" | "driving" | "settling" | "doing" | "leaving";
 /** How the player asked to get there: "auto" runs when it is far. */
 export type Pace = "auto" | "walk" | "run";
 
-const WALK_SPEED = 1.55; // metres per second
-const RUN_SPEED = 3.3;
+import { JOG_CLIP_SPEED, RUN_SPEED, WALK_CLIP_SPEED, WALK_SPEED, locomotionClip, locomotionRate } from "../lab/locomotion";
+
 const RUN_DISTANCE = 7; // runs when the trip is longer than this
 const TURN_RATE = 9; // radians per second
 const ACCEL = 4.5; // metres per second squared: how quickly the character gets up to speed
 const DECEL = 5.5; // and slows down for a stop
-const WALK_CLIP_SPEED = 1.35; // ground speed the Walk clip was authored for; the clip is sped up or slowed to match
-const JOG_CLIP_SPEED = 3.0;
 const SLIDE_TIME = 0.5; // seconds to step in front of a seat (or into the shower) from where you stood
 
 /**
@@ -581,14 +579,14 @@ export class CharacterController {
 
   /** Picks idle, walk or jog from the actual speed and times the clip to the ground speed so the feet don't skate. */
   private updateLocomotion() {
-    const jogging = this.clip === "Jog_Fwd_Loop" ? this.speed > 2.1 : this.speed > 2.6;
-    if (this.speed < 0.12) {
+    const clip = locomotionClip(this.speed, this.clip);
+    if (clip === "Idle_Loop") {
       this.setClip("Idle_Loop");
       this.avatar.setSpeed(1);
       return;
     }
-    this.setClip(jogging ? "Jog_Fwd_Loop" : "Walk_Loop");
-    this.avatar.setSpeed(THREE.MathUtils.clamp(this.speed / (jogging ? JOG_CLIP_SPEED : WALK_CLIP_SPEED), 0.35, 1.7));
+    this.setClip(clip);
+    this.avatar.setSpeed(locomotionRate(this.speed, clip));
   }
 
   /** Where the head points: ahead along the path when walking, at the thing being used, or an occasional glance around. */

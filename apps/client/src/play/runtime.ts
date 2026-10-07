@@ -8,7 +8,7 @@ import { getSettings, shadowMapSize, subscribeSettings } from "../settings/setti
 import { PostFX } from "../settings/postfx";
 import { bodyFor, sexOf } from "../lab/looks";
 import { Avatar } from "../lab/avatar";
-import { loadSavedLook, parseLook } from "../lab/looks";
+import { resolveLook } from "../lab/character";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge, type Status } from "./controller";
 import { GameSession, type HudSnapshot } from "./gameSession";
@@ -135,7 +135,7 @@ export async function startPlay(container: HTMLElement, manifest: AssetManifest,
   const world = await buildWorld(manifest, layout, renderer, small ? 1024 : 2048);
   // the character looks the way it was made in the creator (kept with the life on the server), not like whatever this device last tried on
   const lookJson = options.session?.sim.state.look;
-  const avatar = new Avatar(manifest, lookJson ? parseLook(lookJson) : loadSavedLook());
+  const avatar = new Avatar(manifest, resolveLook(lookJson));
   await avatar.load();
   world.scene.add(avatar.root);
   // a soft contact shadow under the character, so they stand on the floor instead of hovering over it

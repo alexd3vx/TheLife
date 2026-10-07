@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { FilmRenderer, type FilmBeat } from "./filmCanvas";
+import type { FilmBeat } from "./filmCanvas";
+import { Film3D } from "./film3d";
 import "./arrival.css";
 
 type Tier = "lapo" | "middle" | "nepo";
@@ -51,15 +52,15 @@ const WORDS: Record<Tier, { flight: string; flightSub: string; landed: string; l
 
 /**
  * The opening film, played once when a new character is made: the flight into Lagos, a real landing (glide, touchdown, tyre smoke, roll-out),
- * the taxi to the terminal, the ride to the front door in a vehicle that matches the person's background, and the door itself. It is drawn
- * on one canvas from a few pre-painted layers, so it runs smoothly on weak phones. Tap to skip.
+ * the taxi to the terminal, the ride to the front door in a vehicle that matches the person's background, and the door itself. It is real 3D
+ * with the player's own character (a few simple sets, so it runs on weak phones). Tap to skip.
  */
-export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): void }) {
+export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?: string | null; onDone(): void }) {
   const [i, setI] = useState(0);
   const beat = TIMELINE[i]!;
   const words = WORDS[tier];
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderer = useRef<FilmRenderer | null>(null);
+  const renderer = useRef<Film3D | null>(null);
 
   // The page around the film redraws all the time; the film's own clock must not restart each time it does.
   const done = useRef(onDone);
@@ -73,8 +74,9 @@ export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): vo
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const r = new FilmRenderer(canvas, tier);
+    const r = new Film3D(canvas, tier, look ?? undefined);
     renderer.current = r;
+    if (import.meta.env.DEV) (window as unknown as { __film?: Film3D }).__film = r;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -84,7 +86,13 @@ export default function ArrivalFilm({ tier, onDone }: { tier: Tier; onDone(): vo
       r.draw(dt);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      r.dispose();
+      renderer.current = null;
+    };
+    // the look is read once when the film starts; changing it mid-film would restart the clock
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier]);
   useEffect(() => {
     if (beat.kind !== "title") renderer.current?.setBeat(beat.kind);

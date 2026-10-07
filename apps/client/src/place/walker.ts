@@ -1,14 +1,13 @@
 import * as THREE from "three";
 import type { Avatar } from "../lab/avatar";
+import { RUN_SPEED, WALK_SPEED, locomotionClip, locomotionRate } from "../lab/locomotion";
 import type { PlaceRoom, Rect, Spot } from "./roomKit";
 
 /** Walking around inside a room: the player's body, the people who wander, and which spot you are standing at. */
 
 const RADIUS = 0.28;
-const WALK = 1.55;
-const RUN = 3.1;
-const WALK_CLIP = 1.35;
-const JOG_CLIP = 3.0;
+const WALK = WALK_SPEED;
+const RUN = RUN_SPEED;
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const turn = (cur: number, target: number, step: number) => cur + Math.max(-step, Math.min(step, wrap(target - cur)));
@@ -192,12 +191,12 @@ export class Walker {
     } else if (this.faceTo !== null) {
       this.yaw = turn(this.yaw, this.faceTo, 6 * dt);
     }
-    const next = this.speed > 2.2 ? "Jog_Fwd_Loop" : this.speed > 0.3 ? "Walk_Loop" : "Idle_Loop";
+    const next = locomotionClip(this.speed, this.clip);
     if (next !== this.clip) {
       this.clip = next;
       this.avatar.play(next, 0.18);
     }
-    this.avatar.setSpeed(this.speed > 0.3 ? THREE.MathUtils.clamp(this.speed / (next === "Jog_Fwd_Loop" ? JOG_CLIP : WALK_CLIP), 0.4, 1.6) : 1);
+    this.avatar.setSpeed(locomotionRate(this.speed, next));
     this.avatar.root.position.set(this.pos.x, 0, this.pos.z);
     this.avatar.root.rotation.y = this.yaw;
   }
@@ -222,6 +221,8 @@ export class Walker {
 }
 
 /** One visitor: wanders between the room's waypoints, stops for a while at each. */
+const VISITOR_SPEED = 1.05;
+
 export class Visitor {
   x: number;
   z: number;
@@ -253,7 +254,7 @@ export class Visitor {
         this.target = null;
         this.wait = 3 + Math.random() * 7;
       } else {
-        const step = Math.min(d, 1.05 * dt);
+        const step = Math.min(d, VISITOR_SPEED * dt);
         const nx = this.x + (dx / d) * step, nz = this.z + (dz / d) * step;
         if (clear(this.room, nx, nz, 0.2)) {
           this.x = nx;
@@ -269,7 +270,7 @@ export class Visitor {
     if (next !== this.clip) {
       this.clip = next;
       this.avatar.play(next, 0.25);
-      this.avatar.setSpeed(next === "Walk_Loop" ? 1.05 / WALK_CLIP : 1);
+      this.avatar.setSpeed(locomotionRate(next === "Walk_Loop" ? VISITOR_SPEED : 0, next));
     }
     this.avatar.root.position.set(this.x, 0, this.z);
     this.avatar.root.rotation.y = this.yaw;

@@ -102,3 +102,4 @@
 .studio-actions button { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
 .studio-actions button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .studio-hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px; border-radius: 99px; background: rgba(11, 20, 38, .7); font-size: .8rem; z-index: 2; pointer-events: none; }
+.creator-stage .studio-hint { top: 12px; bottom: auto; }

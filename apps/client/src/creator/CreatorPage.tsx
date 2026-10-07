@@ -2,7 +2,7 @@ import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
 import { DEFAULT_LOOK, sexOf, type Look } from "../lab/looks";
-import StudioStage from "../iso/StudioStage";
+import CharacterStage from "../ui/CharacterStage";
 import StudioPanel from "./StudioPanel";
 import { setPending, takeRestart } from "../play/pendingLife";
 import "./creator.css";
@@ -85,7 +85,7 @@ export default function CreatorPage() {
   return (
     <div className={`creator${step === "look" ? "" : " is-full"}`}>
       <div className="creator-stage">
-        <StudioStage look={look} walking={walking} onBusy={setBusy} />
+        <CharacterStage look={look} walking={walking} onBusy={setBusy} />
         {busy && <div className="creator-busy">Dressing…</div>}
         <div className="studio-hint">Drag to turn around</div>
       </div>

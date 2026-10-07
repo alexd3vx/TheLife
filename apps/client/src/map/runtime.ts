@@ -5,7 +5,8 @@ import { hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotI
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
-import { loadSavedLook } from "../lab/looks";
+import { resolveLook } from "../lab/character";
+import { locomotionClip } from "../lab/locomotion";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
@@ -124,7 +125,7 @@ export interface MapEvents {
 const TAP_MAX_MOVE = 8;
 const TAP_MAX_TIME = 450;
 
-export async function startMap(container: HTMLElement, manifest: AssetManifest, events: MapEvents): Promise<MapRuntime | null> {
+export async function startMap(container: HTMLElement, manifest: AssetManifest, events: MapEvents, options: { look?: string | null } = {}): Promise<MapRuntime | null> {
   let renderer: THREE.WebGLRenderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: getSettings().antialias, powerPreference: "high-performance" });
@@ -247,7 +248,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   let navCentre = { x: district.spawn.x, z: district.spawn.z };
   let nav = buildNav(navCentre.x, navCentre.z);
 
-  const avatar = new Avatar(manifest, loadSavedLook());
+  const avatar = new Avatar(manifest, resolveLook(options.look));
   await avatar.load();
   scene.add(avatar.root);
   const bridge: GameBridge = {
@@ -918,7 +919,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
         y: controller.position.y,
         z: controller.position.z,
         yaw: controller.yaw,
-        clip: localSpeed > 2.6 ? "Jog_Fwd_Loop" : localSpeed > 0.4 ? "Walk_Loop" : "Idle_Loop",
+        clip: locomotionClip(localSpeed),
         level: floorLevel,
       }),
       emote: (name) => {

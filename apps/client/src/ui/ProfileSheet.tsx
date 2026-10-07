@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { TRAITS, contactsFor, type NeedId } from "@thelife/game-core";
 import { useAuth } from "../auth/AuthProvider";
-import { loadSavedLook, parseLook } from "../lab/looks";
-import StudioStage from "../iso/StudioStage";
+import { resolveLook } from "../lab/character";
+import CharacterStage from "./CharacterStage";
 import type { GameSession, HudSnapshot } from "../play/gameSession";
 import { GameIcon, type FaName } from "./icons";
 import "./profile.css";
@@ -30,7 +30,7 @@ export default function ProfileSheet({ session, hud, onClose }: { session: GameS
   const { user } = useAuth();
   const p = hud.profile;
   const state = session.sim.state;
-  const look = useMemo(() => (state.look ? parseLook(state.look) : loadSavedLook()), [state.look]);
+  const look = useMemo(() => resolveLook(state.look), [state.look]);
   const traits = (p?.traits ?? []).map((id) => TRAITS.find((t) => t.id === id)).filter((t): t is NonNullable<typeof t> => !!t);
   const initials = p ? `${p.firstName[0] ?? ""}${p.surname[0] ?? ""}`.toUpperCase() : "?";
   const [copied, setCopied] = useState(false);
@@ -86,7 +86,7 @@ export default function ProfileSheet({ session, hud, onClose }: { session: GameS
           {tab === "profile" && (
             <>
               <div className="prof-stage">
-                <StudioStage look={look} walking={false} />
+                <CharacterStage look={look} walking={false} />
                 <small>Drag to turn</small>
               </div>
               <dl className="prof-fields">

@@ -4,7 +4,7 @@ import { counterOpen, schoolOpen, serviceOn, shopOpen, type Faith, type Landmark
 import { input } from "../controls/input";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
 import { Avatar } from "../lab/avatar";
-import { loadSavedLook, parseLook } from "../lab/looks";
+import { resolveLook } from "../lab/character";
 import { loadManifest } from "../lab/manifest";
 import { randomNpcLook } from "../lab/npcLooks";
 import { bubbleSprite } from "../map/remotePlayers";
@@ -136,7 +136,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       cleanups.push(() => ro.disconnect());
 
       const manifest = await loadManifest();
-      const look = state.look ? parseLook(state.look) : loadSavedLook();
+      const look = resolveLook(state.look);
       const me = new Avatar(manifest, look);
       const staff = room.staff.map(() => new Avatar(manifest, randomNpcLook()));
       const crowd = Array.from({ length: room.visitors }, () => new Avatar(manifest, randomNpcLook()));

@@ -1,4 +1,4 @@
-import { parseLook } from "../lab/looks";
+import { resolveLook } from "../lab/character";
 import { isAdmin } from "../ui/admin";
 import GameHud from "../play/GameHud";
 import { GameIcon } from "../ui/icons";
@@ -63,6 +63,8 @@ export default function MapPage() {
   const admin = isAdmin();
   const district = getDistrict();
   const life = useOnlineLife();
+  const lookRef = useRef<string | null | undefined>(undefined);
+  lookRef.current = life.session?.sim.state.look;
   const [intro, setIntro] = useState<"off" | "playing">("off");
   const welcome = useWelcomeBack(life);
   const introPlayed = useRef(false);
@@ -72,7 +74,7 @@ export default function MapPage() {
     if (!container) return;
     let disposed = false;
     loadManifest()
-      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu, onPlace: setPlace, onPlayer: (p) => setCardId(p?.id ?? null) }))
+      .then((manifest) => startMap(container, manifest, { onStats: setStats, onMenu: setMenu, onPlace: setPlace, onPlayer: (p) => setCardId(p?.id ?? null) }, { look: lookRef.current }))
       .then((runtime) => {
         if (disposed) {
           runtime?.dispose();
@@ -140,7 +142,7 @@ export default function MapPage() {
   // the street character is the life's own look (the same one at home and inside), not whatever this device last saved
   const lifeLook = life.session?.sim.state.look;
   useEffect(() => {
-    if (lifeLook && !loading) runtimeRef.current?.setLook(parseLook(lifeLook));
+    if (lifeLook && !loading) runtimeRef.current?.setLook(resolveLook(lifeLook));
   }, [lifeLook, loading]);
   const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip || !!inside;
   useEffect(() => {

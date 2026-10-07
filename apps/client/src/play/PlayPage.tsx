@@ -330,7 +330,7 @@ export default function PlayPage() {
 
       {welcome.node}
       {life.justArrived && life.session && !filmDone && (
-        <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} onDone={() => setFilmDone(true)} />
+        <ArrivalFilm tier={(life.session.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"} look={life.session.sim.state.look} onDone={() => setFilmDone(true)} />
       )}
       {(loading || !life.session) && !error && !(life.justArrived && !filmDone) && <div className="play-loading" role="status"><span className="iso-wait" aria-label="Loading" /></div>}
       {error && <div className="play-error">{error}</div>}
