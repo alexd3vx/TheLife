@@ -188,6 +188,18 @@ export function loft(rest: BodyRest, sil: Silhouette, o: LoftOptions): THREE.Buf
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute("skinIndex", new THREE.BufferAttribute(new Uint16Array(sIdx), 4));
   g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(sW, 4));
+  // how freely this vertex moves when the person does (nothing at the top, most at the hem), and baked shading: a darker stitched hem
+  const sway: number[] = [], shade: number[] = [];
+  for (let j = 0; j <= rows; j++) for (let i = 0; i < nu; i++) {
+    const t = j / rows;
+    sway.push(Math.pow(t, 1.3));
+    const hem = t > 0.96 ? 0.82 : t > 0.92 ? 0.94 : 1;
+    const top = t < 0.05 ? 0.9 : 1;
+    const fold = 0.93 + 0.07 * Math.sin((i / nu) * Math.PI * 2 * (o.folds ?? 9) + t * 4);
+    shade.push(hem * top * fold, hem * top * fold, hem * top * fold);
+  }
+  g.setAttribute("sway", new THREE.Float32BufferAttribute(sway, 1));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(shade, 3));
   g.setIndex(indices);
   g.computeVertexNormals();
   return g.toNonIndexed();

@@ -9,7 +9,7 @@ import "./bodylab.css";
 /** A developer page for hair: one person, a close camera (front, side, back, top), every style and colour. Open it at #/hair. */
 export default function HairLabPage() {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void> } | null>(null);
+  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void>; walk(on: boolean): void } | null>(null);
   const [look, setLook] = useState<Look>({ ...DEFAULT_LOOK, top: null, bottom: null, shoes: null, hair: "p_afro" });
   const [view, setView] = useState("front");
   const [ready, setReady] = useState(false);
@@ -61,6 +61,12 @@ export default function HairLabPage() {
       live.current = {
         set: (p) => (chain = chain.then(async () => { await a.setLook(p); frame(); })),
         view: (nv) => { v = nv; frame(); },
+        walk: (on) => {
+          walking = on;
+          a.play(on ? "Walk_Loop" : "Idle_Loop", 0.2);
+          a.setSpeed(on ? 1.15 : 1);
+          if (!on) a.root.position.set(0, 0, 0);
+        },
         state: (st) => (chain = chain.then(async () => { await a.setOutfitState(st); })),
       };
       (window as unknown as { __hair?: unknown }).__hair = live.current;
@@ -68,9 +74,18 @@ export default function HairLabPage() {
       setReady(true);
     });
     let last = performance.now();
+    let walking = false;
+    let dir = 1;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      avatar?.update(Math.min(0.05, (now - last) / 1000));
+      const dt = Math.min(0.05, (now - last) / 1000);
+      if (walking && avatar) {
+        // walk back and forth across the stage at the game's walking speed (the stage is stepped in fixed slices so the cloth sees real speeds)
+        avatar.root.position.x += dir * 1.55 * dt;
+        if (Math.abs(avatar.root.position.x) > 1.2) dir = -dir;
+        avatar.root.rotation.y = dir * Math.PI / 2;
+      }
+      avatar?.update(dt);
       last = now;
       renderer.render(scene, cam);
     };

@@ -504,13 +504,9 @@ const SPECS: Record<string, Spec> = {
     slot: "top",
     offset: 0.04,
     smooth: 8,
-    covers: ["spine_01", "spine_02", "spine_03", "pelvis", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y - 0.1;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.085, 0.02);
-      return cutSleeves(out, rest, "lowerarm", "hand", 0.88);
-    },
+    covers: [],
+    cut: bodiceCut((r) => jointPos(r, "pelvis").y + 0.06, [0.085, 0.02], ["lowerarm", "hand", 0.88]),
+    lower: hanging({ from: (r) => jointPos(r, "pelvis").y + 0.06, hem: (r) => jointPos(r, "pelvis").y - 0.14, offset: 0.05, top: 0.04, flare: (t) => 0.02 * t, hang: true, follow: 0.5 }),
     open: jacketOpening,
     extras: [
       { select: shirtUnderJacket, offset: 0.024, smooth: 3, color: "#f2efe8" },

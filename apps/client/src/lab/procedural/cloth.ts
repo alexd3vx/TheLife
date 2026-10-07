@@ -22,7 +22,7 @@ const NATURAL: Record<string, Weave | "ankara"> = {
 };
 
 /** Tiles per metre: one tile of the picture covers about this much cloth. */
-const TILE: Record<Weave, number> = { cotton: 12, poplin: 12, linen: 9, denim: 8, knit: 6, fleece: 5, wool: 3.5, satin: 6, suiting: 8, towel: 4, pique: 5, brocade: 3, check: 5 };
+const TILE: Record<Weave, number> = { cotton: 8, poplin: 8, linen: 7, denim: 6, knit: 6, fleece: 5, wool: 3.5, satin: 6, suiting: 6, towel: 4, pique: 5, brocade: 3, check: 5 };
 const SHEEN: Partial<Record<Weave, number>> = { satin: 0.3, brocade: 0.2 };
 /** The base roughness is scaled by the roughness picture: how dull each cloth is. */
 const ROUGH: Record<Weave, number> = { cotton: 1, poplin: 0.9, linen: 1, denim: 1, knit: 1, fleece: 1, wool: 1, satin: 0.7, suiting: 0.95, towel: 1, pique: 1, brocade: 0.8, check: 1 };

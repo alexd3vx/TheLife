@@ -7,6 +7,7 @@ import { MorphBody } from "./bodyMorph";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import type { FabricId } from "./procedural/fabrics";
 import { clothFor } from "./procedural/cloth";
+import { Sway, applySway } from "./procedural/clothSway";
 import { buildGarment, coversLegs, isProceduralGarment, tieTriangles } from "./procedural/garments";
 import { buildGeometry } from "./procedural/geometryClip";
 import { buildHair } from "./procedural/hair";
@@ -138,6 +139,7 @@ export class Avatar {
     }
     this.morph?.dispose();
     this.morph = morph;
+    this.pelvisBone = null;
 
     const wasPlaying = this.currentAction?.getClip().name;
     this.clearParts();
@@ -540,6 +542,8 @@ export class Avatar {
     this.partRoots.clear();
   }
 
+  private sway = new Sway();
+  private pelvisBone: THREE.Bone | null = null;
   private outfitState: "none" | "underwear" | "towel" | "night" = "none";
 
   /**
@@ -778,7 +782,12 @@ export class Avatar {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
     const result = buildGarment(this.bodyRest, id);
     if (!result) return null;
-    const make = () => new THREE.MeshPhysicalMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+    const make = () => {
+      const m = new THREE.MeshPhysicalMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide, vertexColors: true });
+      applySway(m, this.sway.uniforms);
+      return m;
+    };
+    this.sway.uniforms.uAxis.value.set(0, this.bodyRest.joint.get("pelvis")?.z ?? 0);
     const material = result.layers.length > 1 ? result.layers.map(() => make()) : make();
     const skinned = new THREE.SkinnedMesh(result.geometry, material);
     skinned.frustumCulled = false;
@@ -1060,8 +1069,18 @@ export class Avatar {
     for (const [bone, mark] of this.lookMarks) if (bone.quaternion.equals(mark.after)) bone.quaternion.copy(mark.before);
     this.lookMarks.clear();
     this.mixer?.update(delta);
+    this.updateSway(delta);
     this.applyLook(delta);
     this.applyBlink(delta);
+  }
+
+  /** Hanging garments follow the person's movement (see clothSway.ts). */
+  private updateSway(delta: number): void {
+    if (!this.skeleton) return;
+    this.pelvisBone ??= this.skeleton.bones.find((b) => b.name === "pelvis") ?? null;
+    if (!this.pelvisBone) return;
+    this.root.updateMatrixWorld(true);
+    this.sway.update(delta, this.pelvisBone.getWorldPosition(new THREE.Vector3()), this.root.getWorldQuaternion(new THREE.Quaternion()));
   }
 
   // ------------------------------------------------------------------ blinking

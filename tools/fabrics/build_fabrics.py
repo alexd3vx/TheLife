@@ -45,6 +45,8 @@ def main() -> None:
         if grey:
             d = np.repeat(d.mean(axis=2, keepdims=True), 3, axis=2)
         d = d / d.reshape(-1, 3).mean(axis=0) * 0.9
+        # stretch the contrast around the mean so the weave reads at a distance
+        d = 0.9 + (d - 0.9) * 1.7
         Image.fromarray((np.clip(d, 0, 1) * 255).astype(np.uint8)).save(os.path.join(OUT, f"{ours}_d.webp"), quality=86)
         pic("nor_gl").convert("RGB").resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, f"{ours}_n.webp"), quality=86)
         pic("Rough").convert("L").resize((256, 256), Image.LANCZOS).save(os.path.join(OUT, f"{ours}_r.webp"), quality=80)

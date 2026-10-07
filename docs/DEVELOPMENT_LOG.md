@@ -351,3 +351,10 @@ Chronological record of decisions and changes. Newest first.
 - `lab/procedural/loft.ts` (silhouette from the body's vertices, lofted hanging cloth with row-to-row smoothing so skirts do not copy the legs), `hanging(...)` and `legCut(...)` in `garments.ts`; new garments: gown, buba, senator, skirt, long skirt, wrapper; nightwear, towel and pyjamas as game states. `neckBase` fixes necklines. Tops that cover the legs hide the bottom (`coversLegs`).
 - `Avatar.setOutfitState`; the controller's `actionId` setter switches it for `shower` and `sleep`.
 - Tests: wardrobe lists, state garments hidden from the wardrobe, long garments (`garments.test.ts`). Whole repo typechecks; client tests 58.
+
+## Cloth pass: detail and movement
+
+- Owner: the cloth did not look real enough, wants more detail that stays fast, and cloth physics if possible.
+- Baked shading on every garment (`shade` vertex colour): darker where the cloth bridges a hollow, along cut edges and one ring in (hems, cuffs and necklines look stitched), folds and a stitched hem on lofted skirts. More contrast in the fabric pictures (`build_fabrics.py` stretches it) and coarser weave tiles so the weave reads.
+- Cloth movement (`lab/procedural/clothSway.ts`): one spring per person driven by the hips' movement; the vertex shader moves each cloth vertex by it in proportion to a `sway` attribute (0 at the waist, 1 at the hem), plus billow and a ripple that grow with speed. A gown trails behind when you walk and swings forward when you stop. It costs one spring per person and a few shader lines, no per-vertex simulation. Lofted garments carry the attribute; garments cut from the body do not move (sleeves and tight tops do not swing).
+- Blazer now hangs over the hips instead of ending as a bodysuit. `#/hair` has a walk button (`__hair.walk`) for checking cloth in motion.

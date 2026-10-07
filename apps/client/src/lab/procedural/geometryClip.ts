@@ -8,6 +8,8 @@ export interface Vertex {
   uv: [number, number];
   si: [number, number, number, number];
   sw: [number, number, number, number];
+  /** Baked shading: 1 open cloth, lower in creases and along stitched edges (set by the smoothing pass). */
+  shade?: number;
 }
 
 export type Triangle = [Vertex, Vertex, Vertex];
@@ -156,6 +158,15 @@ function smoothTriangles(triangles: Triangle[], rounds: number): void {
     for (const j of nbr[i]!) avg.add(nn[j]!);
     return avg.normalize();
   });
+  // baked shading: darker where the cloth bridges a hollow (the smoothed surface stands off the body), and along the cut edges and one
+  // ring inside them (hems, cuffs, necklines look stitched)
+  const nearBorder = new Set<number>(border);
+  for (const b of border) for (const j of nbr[b]!) nearBorder.add(j);
+  triangles.forEach((t, ti) => t.forEach((v, k) => {
+    const id = tri[ti]![k]!;
+    const stand = Math.max(0, cur[id]!.clone().sub(pos[id]!).dot(nor[id]!));
+    v.shade = Math.max(0.55, 1 - Math.min(0.4, stand * 14)) * (border.has(id) ? 0.8 : nearBorder.has(id) ? 0.93 : 1);
+  }));
   triangles.forEach((t, ti) => t.forEach((v, k) => {
     const id = tri[ti]![k]!;
     // never move inward past the body: only keep a point if it is at or outside where the body was along its normal
@@ -180,6 +191,7 @@ export function buildGeometry(triangles: Triangle[], options: BuildOptions): THR
   const uv = new Float32Array(count * 2);
   const skinIndex = new Uint16Array(count * 4);
   const skinWeight = new Float32Array(count * 4);
+  const color = new Float32Array(count * 3);
   const p = new THREE.Vector3();
   const n = new THREE.Vector3();
 
@@ -204,6 +216,8 @@ export function buildGeometry(triangles: Triangle[], options: BuildOptions): THR
       const s = options.uvScale;
       const coords = mode === 0 ? [p.z * s, p.y * s] : mode === 1 ? [p.x * s, p.z * s] : [p.x * s, p.y * s];
       uv.set(coords, v * 2);
+      const shade = vert.shade ?? 1;
+      color.set([shade, shade, shade], v * 3);
       skinIndex.set(vert.si, v * 4);
       skinWeight.set(vert.sw, v * 4);
       v++;
@@ -216,5 +230,7 @@ export function buildGeometry(triangles: Triangle[], options: BuildOptions): THR
   geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   geometry.setAttribute("skinIndex", new THREE.BufferAttribute(skinIndex, 4));
   geometry.setAttribute("skinWeight", new THREE.BufferAttribute(skinWeight, 4));
+  geometry.setAttribute("color", new THREE.BufferAttribute(color, 3));
+  geometry.setAttribute("sway", new THREE.BufferAttribute(new Float32Array(count), 1));
   return geometry;
 }
