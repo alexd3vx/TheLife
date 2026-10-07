@@ -1,0 +1,21 @@
+.bl { position: fixed; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 46%); background: #0b1428; color: #e8f0ff; font: 500 .85rem system-ui; }
+@media (orientation: landscape) and (min-width: 700px) { .bl { grid-template-rows: none; grid-template-columns: minmax(0, 1fr) 380px; } }
+.bl-stage { position: relative; background: radial-gradient(120% 90% at 50% 20%, #27447f, #0b1428); min-height: 0; }
+.bl-stage canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.bl-wait { position: absolute; inset: 0; display: grid; place-items: center; color: #9fb7e8; pointer-events: none; }
+.bl-err { color: #ff9a9a; padding: 20px; text-align: center; }
+.bl-views { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+.bl-views button, .bl-bar button, .bl-tabs button { border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(255, 255, 255, .12); color: #e8f0ff; font: 700 .78rem system-ui; text-transform: capitalize; cursor: pointer; }
+.bl-views button.is-on, .bl-tabs button.is-on { background: #3f7bff; color: #fff; }
+.bl-stats { position: absolute; left: 10px; bottom: 8px; right: 10px; color: #9fb7e8; font: 600 .7rem system-ui; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.bl-panel { display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: #12203f; border-radius: 22px 22px 0 0; padding: 10px 14px 0; gap: 8px; min-height: 0; }
+@media (orientation: landscape) and (min-width: 700px) { .bl-panel { border-radius: 0; } }
+.bl-bar, .bl-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.bl-sliders { overflow-y: auto; display: grid; gap: 10px; align-content: start; padding: 4px 2px 24px; }
+.bl-slider { display: grid; gap: 2px; }
+.bl-slider span { display: flex; justify-content: space-between; color: #b9cbf2; font-size: .76rem; }
+.bl-slider b { color: #fff; }
+.bl-slider input { width: 100%; accent-color: #5b95ff; height: 28px; }
+.bl-swatches { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
+.bl-swatches button { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.bl-swatches button.is-on { border-color: #fff; }

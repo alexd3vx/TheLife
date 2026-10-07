@@ -144,3 +144,20 @@ I searched on 7 Oct for a free, CC0, realistic, African-featured base with morph
 3. **Body range:** wide from day one (slim to heavy, soft to muscular, age 18 to 70, all garments fitting).
 4. **Order after Phase 0:** the morphable body first; hair and clothes after, fitted to the final body.
 5. **Still open:** underwear and nudity wording (section 8, item 4); assumed modest unless the owner says otherwise.
+
+## 10. Phase 1 result (7 Oct 2026): the morphable base, proved
+
+**What exists.** `tools/character/build_body.py` turns the MPFB2 / MakeHuman data (CC0) into `apps/client/public/assets/characters/body_mpfb.glb` plus a morph pack. `#/body` is the slider page: 9 body controls (sex, age 18 to 70, height, weight, muscle, proportions, bust, two feature blends), 76 face and body sliders in four tabs, 12 skin tones, hair colour, a random button, face / full / back cameras and the same retargeted walk the game uses.
+
+**What changed from the plan.**
+- MPFB2 was used for its *data* (base mesh, targets, rig, weights), not as a Blender add-on: the add-on would not load headless, and a build script is repeatable and needs no Blender. The result is the same body.
+- Morphs are **not glTF morph targets**. There are 173 of them; GPU morph targets would make every person on a street carry all of them. A person is made by adding up only the morphs their look needs, once, on the CPU (`lab/bodyMorph.ts`, 5 to 30 ms in headless software GL), after which they are an ordinary skinned mesh. The pack is gzipped sparse int16 (0.2 mm steps).
+- Sex is handled exactly rather than as one slider: build, age, height, proportions and features are measured on a fully masculine and a fully feminine body and mixed by the sex value, which brought the error of mixed bodies from about 22 mm to about 1 mm (heavy plus muscular together is the worst case, about 6 mm on average). Detail sliders add up directly.
+- The skeleton is MPFB's game-engine rig (same bone names as our UE-style skeleton): **53 bones with fingers**, plus two eye bones. Joints come from helper cubes that morph with the body, so every body gets its own fitted skeleton (bone positions and inverse binds are updated with the sliders). The existing retargeting (`lab/retarget.ts`) works on it unchanged, so all current clips play, and clips that use the same bone names as the UE skeleton (the Quaternius libraries) now also move the fingers.
+- Eyes, eyebrows and eyelashes are fitted to the body with MakeHuman's proxy fitting, so they follow every slider. The modest base layer (shorts for everyone, a bandeau top for feminine bodies) is cut from the body itself; this is the prototype of how clothes will be made in Phase 3.
+
+**Numbers.** Body 26,756 triangles (budget for a close-up body: 25,000; 7% over, to be trimmed in Phase 7 with the LOD set), whole figure 30,414 with eyes, brows, lashes and base layer in 7 draw calls, 55 bones. Download: glb 1.56 MB, morph pack 0.67 MB, slider list 15 KB gzipped, about 2.3 MB in all, once. Skin detail maps are 1024 px (2048 px for the creator close-up later).
+
+**Not done yet (each has a place in the plan).** Hair and clothes (Phases 2 and 3). The face rig, teeth, tongue, blinking and talking (Phase 4). Lips look pale on dark skin and the iris is too red: the skin and eye shaders are Phase 4 work. Skin tone is one colour times a neutral detail map; undertones, freckles and marks come with the skin shader. The new body is not in the game yet: `lab/avatar.ts` still builds the old bodies, and moving the creator, the home, the street and the buildings onto `MorphBody` is the first step of Phase 2 so hair and clothes are fitted once, to the final body. The base-layer edges are rough where the cut crosses uneven rings of the mesh.
+
+**Needs the owner:** nothing blocks; the open question from section 8 (underwear wording) is still assumed modest.

@@ -15,6 +15,7 @@ Every third-party asset is CC0 (public domain). Credit is not required but is sh
 | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 1.0 | 12 vehicles |
 | [Human Base Meshes](https://studio.blender.org/projects/human-base-meshes/) | Blender Studio / Blender Foundation | CC0 1.0 | Realistic male and female body meshes (anatomy, face, hands, feet, eyes), rigged to our skeleton by us |
 | [Poly Haven models](https://polyhaven.com/models) | Poly Haven contributors | CC0 1.0 | 60 realistic photoscanned furniture and props (sofas, chairs, tables, shelves, lamps, TV, radio, stove, fan...) |
+| [MPFB2 / MakeHuman data and system assets](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html) | MakeHuman Community (Data Collection AB, J. Palmius, J. Hauquier and others) | CC0 1.0 | The morphable body: base mesh, shape targets, rig and skin weights (from the MPFB2 repository), skin textures, eyes, eyebrows, eyelashes (system assets pack). Built by `tools/character/build_body.py`. The MPFB2 add-on *code* is GPLv3 and is not used or shipped. |
 
 Rule: nothing goes in without its licence recorded in `tools/assets/sources.mjs` (`CREDITS`).
 
