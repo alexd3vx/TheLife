@@ -14,7 +14,7 @@ import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { payRide, setChargeChecker } from "../phone/remote";
-import { BottomNav } from "../play/HudParts";
+import { BottomNav, MoreMenu } from "../play/HudParts";
 import TravelFilm from "../arrival/TravelFilm";
 import { chargingSpotNear, rideOptions } from "@thelife/game-core";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
@@ -324,7 +324,7 @@ export default function MapPage() {
           })()}
         </>
       )}
-      {!bigMap && !trip && <BottomNav active="map" onMap={() => setMode("map")} />}
+      {!bigMap && !trip && <BottomNav active="map" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onMap={() => setMode("map")} />}
       {bigMap && (
         <nav className="cm-nav" aria-label="Where to">
           <a href="#/play"><GameIcon name="home" size={20} /><span>Home</span></a>
@@ -345,18 +345,21 @@ export default function MapPage() {
         </div>
       )}
 
-      {!bigMap && <div className="play-controls">
-        <button onClick={() => runtimeRef.current?.resetView()}>Reset view</button>
-        {admin && <button onClick={() => runtimeRef.current?.zoomOut()}>Zoom out (test)</button>}
-        <button onClick={() => setBigMap(true)}><GameIcon name="map" /> Map</button>
-        <button onClick={() => setShowSettings(true)}><GameIcon name="settings" /> Settings</button>
-        {admin && <button aria-pressed={night} onClick={() => { runtimeRef.current?.setNight(!night); setNight(!night); }}>{night ? "Day (test)" : "Night (test)"}</button>}
-        {admin && (
-          <button onClick={runTour} disabled={touring !== null}>
-            {touring === null ? "Performance tour (test)" : `Touring… ${touring}%`}
-          </button>
-        )}
-      </div>}
+      {!bigMap && !phoneOpen && (
+        <MoreMenu
+          items={[
+            { label: "Reset view", icon: "walk", run: () => runtimeRef.current?.resetView() },
+            { label: "Settings", icon: "settings", run: () => setShowSettings(true) },
+            ...(admin
+              ? [
+                  { label: "Zoom out (test)", icon: "map" as const, run: () => runtimeRef.current?.zoomOut() },
+                  { label: night ? "Day (test)" : "Night (test)", icon: "sun" as const, run: () => { runtimeRef.current?.setNight(!night); setNight(!night); } },
+                  { label: touring === null ? "Performance tour (test)" : `Touring… ${touring}%`, icon: "play" as const, run: () => { if (touring === null) runTour(); } },
+                ]
+              : []),
+          ]}
+        />
+      )}
 
       {result && (
         <div className="play-modal" role="dialog" aria-label="Tour result">

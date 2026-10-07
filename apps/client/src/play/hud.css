@@ -9,18 +9,24 @@
 .hud-money { font-weight: 800; padding: 5px 4px 5px 10px; }
 .hud-plus { width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--hud-blue); color: #fff; font: 700 20px/1 system-ui; cursor: pointer; display: grid; place-items: center; padding: 0 0 2px; }
 
-.hud-chips { position: absolute; z-index: 2; left: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 54px); display: grid; gap: 6px; justify-items: start; pointer-events: none; max-width: min(300px, calc(100% - 24px)); }
-.hud-chips span { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: var(--hud-bg); color: var(--hud-ink); font-size: .78rem; font-weight: 600; box-shadow: var(--hud-shadow); }
+.hud-chips { position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); top: calc(max(12px, env(safe-area-inset-top)) + 96px); display: flex; gap: 6px; pointer-events: none; }
+.hud-chips span { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: var(--hud-bg); color: var(--hud-ink); font-size: .76rem; font-weight: 700; box-shadow: var(--hud-shadow); white-space: nowrap; }
 .hud-chips .is-bad { color: #d6453d; }
 
-.hud-me { position: absolute; z-index: 3; left: 12px; bottom: calc(86px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; pointer-events: none; }
-.hud-avatar { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font: 800 1.1rem system-ui; color: #fff; background: linear-gradient(145deg, #5b9bff, #2f55d8); border: 4px solid #fff; box-shadow: var(--hud-shadow); }
-.hud-avatar.tier-lapo { border-color: #9fd0ff; } .hud-avatar.tier-nepo { border-color: #d3b8ff; }
-.hud-needs { display: grid; grid-template-columns: repeat(3, 62px); gap: 6px 10px; padding: 9px 12px; border-radius: 22px; background: var(--hud-bg); box-shadow: var(--hud-shadow); }
-.hud-need { display: flex; align-items: center; gap: 5px; color: var(--hud-muted); }
-.hud-need i { flex: 1; height: 7px; border-radius: 6px; background: rgba(18, 35, 63, .12); overflow: hidden; }
-.hud-need b { display: block; height: 100%; border-radius: 6px; background: var(--hud-blue); transition: width .4s ease, background .4s ease; }
-.hud-need.is-mid b { background: #f0a43a; } .hud-need.is-low b { background: #e0483f; } .hud-need.is-low { color: #e0483f; }
+.hud-needs-row { position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); top: calc(max(12px, env(safe-area-inset-top)) + 54px); display: flex; gap: 8px; padding: 5px 8px; border-radius: 999px; background: rgba(244, 248, 255, .55); backdrop-filter: blur(6px); pointer-events: none; }
+.hud-ring { --c: #2f6bff; position: relative; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--hud-ink); background: conic-gradient(var(--c) var(--p), rgba(18, 35, 63, .16) 0); }
+.hud-ring::before { content: ""; position: absolute; inset: 3.5px; border-radius: 50%; background: #f4f8ff; }
+.hud-ring > svg { position: relative; }
+.hud-ring.is-mid { --c: #f0a43a; } .hud-ring.is-low { --c: #e0483f; animation: hud-pulse 1.2s ease-in-out infinite; }
+.hud-ring.is-low > svg { color: #e0483f; }
+@keyframes hud-pulse { 50% { transform: scale(1.12); } }
+
+.hud-more { position: absolute; z-index: 5; right: 12px; top: max(12px, env(safe-area-inset-top)); }
+.hud-round { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); display: grid; place-items: center; cursor: pointer; }
+.hud-more-list { position: absolute; right: 0; top: 50px; display: grid; gap: 2px; min-width: 190px; padding: 6px; border-radius: 18px; background: var(--hud-bg); box-shadow: var(--hud-shadow); }
+.hud-more-list button { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: var(--hud-ink); padding: 11px 12px; border-radius: 12px; font: 600 .88rem system-ui; text-align: left; cursor: pointer; }
+.hud-more-list button:hover, .hud-more-list button.is-on { background: #e1ebff; }
+.hud-more-list button.is-danger { color: #d6453d; }
 
 .hud-nav { position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 2px; padding: 6px; border-radius: 26px; background: var(--hud-bg); box-shadow: var(--hud-shadow); backdrop-filter: blur(8px); }
 .hud-nav a, .hud-nav button { position: relative; display: grid; justify-items: center; gap: 2px; min-width: 70px; padding: 8px 10px; border: 0; border-radius: 20px; background: none; color: var(--hud-muted); font: 700 11.5px system-ui; text-decoration: none; cursor: pointer; }
@@ -28,16 +34,14 @@
 .hud-nav button:disabled { opacity: .4; cursor: default; }
 .hud-nav em { position: absolute; top: 3px; right: 12px; min-width: 17px; height: 17px; border-radius: 9px; padding: 0 4px; background: #e0483f; color: #fff; font: 700 10.5px/17px system-ui; text-align: center; font-style: normal; }
 
-/* what was there before: the old clock, needs panel, info chips and floating phone are replaced by the above */
-.hud-on .play-clock, .hud-on .play-needs, .hud-on .play-info, .hud-on .play-phone, .hud-on .play-who { display: none; }
-.hud-on .play-top .play-chip { background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); margin-top: 0; }
-.hud-on .play-top { top: calc(max(12px, env(safe-area-inset-top)) + 0px); }
-.hud-on .play-controls { left: auto; right: 12px; bottom: calc(86px + env(safe-area-inset-bottom)); flex-direction: column; align-items: flex-end; flex-wrap: nowrap; }
-.hud-on .play-controls button { background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); border-radius: 999px; min-height: 40px; font-size: .82rem; }
-.hud-on .play-controls button[aria-pressed="true"] { background: var(--hud-blue); color: #fff; }
-.hud-on .play-bag { right: 12px; bottom: calc(86px + env(safe-area-inset-bottom) + 190px); background: var(--hud-bg); color: var(--hud-ink); border: 0; box-shadow: var(--hud-shadow); border-radius: 50%; }
-.hud-on .play-toasts { bottom: calc(160px + env(safe-area-inset-bottom)); }
-.hud-on .play-banner { top: calc(max(12px, env(safe-area-inset-top)) + 54px); background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); }
+/* what was there before: the old clock, needs panel, info chips, floating phone and bag, and the button row are replaced by the above */
+.hud-on .play-clock, .hud-on .play-needs, .hud-on .play-info, .hud-on .play-phone, .hud-on .play-who, .hud-on .play-bag, .hud-on .play-controls { display: none; }
+.hud-on .play-top { left: 12px; right: auto; top: max(12px, env(safe-area-inset-top)); }
+.hud-on .play-top .play-chip { width: 42px; height: 42px; min-height: 0; padding: 0; justify-content: center; border-radius: 50%; background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); }
+.hud-on .play-top .play-chip-label { display: none; }
+.hud-on .play-toasts { bottom: calc(92px + env(safe-area-inset-bottom)); }
+.hud-on .play-banner { top: calc(max(12px, env(safe-area-inset-top)) + 100px); background: var(--hud-bg); color: var(--hud-ink); box-shadow: var(--hud-shadow); }
 .hud-on .play-banner span { color: var(--hud-muted); }
 .hud-on .play-ring-track { stroke: rgba(18, 35, 63, .15); } .hud-on .play-ring-fill { stroke: var(--hud-blue); }
-@media (max-width: 520px) { .hud-needs { grid-template-columns: repeat(3, 52px); padding: 8px 10px; } .hud-time b { display: none; } .hud-on .play-top .play-chip-label { display: none; } .hud-on .play-controls button { padding: 0 12px; } }
+.hud-on .play-intro { bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--hud-bg); color: var(--hud-ink); }
+@media (max-width: 520px) { .hud-time b, .hud-mood-label { display: none; } .hud-nav a, .hud-nav button { min-width: 58px; padding: 8px 6px; } }

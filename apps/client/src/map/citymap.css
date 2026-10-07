@@ -56,3 +56,5 @@
 .map-mode .map-rides button small { opacity: .75; }
 @media (max-width: 700px) { .cm-tools { bottom: calc(100px + 0px); } .cm-panel:not(.is-hidden) ~ .cm-tools { bottom: calc(42% + 104px); } }
 .map-mode .net-chip.is-online .net-dot { background: #6aa8ff; }
+.map-mode .hud-more { display: none; }
+.map-mode .hud-needs-row, .map-mode .hud-chips { display: none; }

@@ -161,27 +161,22 @@ export class Avatar {
   }
 
   private async loadAnimations(): Promise<void> {
-    const gltf = await loadGLTF(assetUrl(this.asset("ual1").file));
-    this.libraryClips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
-    // The animation libraries are real, hand-made clips (Quaternius and KayKit, free). They are never played raw: each clip is
+    // The animation libraries are real, hand-made clips (Quaternius, KayKit and Mixamo, free). They are never played raw: each clip is
     // retargeted onto this body (measured against both skeletons' rest poses) the first time it is needed, so any body moves right.
-    this.sources = [{ prefix: "", scene: SkeletonUtils.clone(gltf.scene), clips: gltf.animations, restName: "A_TPose", map: null }];
-    if (this.find("ual2")) {
-      const u2 = await loadGLTF(assetUrl(this.asset("ual2").file));
-      this.sources.push({ prefix: "U2_", scene: SkeletonUtils.clone(u2.scene), clips: u2.animations, restName: "A_TPose", map: null });
-    }
-    for (const id of ["kaykit_sim", "kaykit_general", "kaykit_tools", "kaykit_move"]) {
-      if (!this.find(id)) continue;
-      const k = await loadGLTF(assetUrl(this.asset(id).file));
-      this.sources.push({ prefix: "KK_", scene: SkeletonUtils.clone(k.scene), clips: k.animations, restName: "T-Pose", map: KAYKIT_BONES });
-    }
-    if (this.find("mixamo_soldier")) {
-      const m = await loadGLTF(assetUrl(this.asset("mixamo_soldier").file));
-      this.sources.push({ prefix: "MX_", scene: SkeletonUtils.clone(m.scene), clips: m.animations, restName: "TPose", map: MIXAMO_BONES });
-    }
-    if (this.find("mixamo_xbot")) {
-      const m = await loadGLTF(assetUrl(this.asset("mixamo_xbot").file));
-      this.sources.push({ prefix: "XB_", scene: SkeletonUtils.clone(m.scene), clips: m.animations, restName: "", map: MIXAMO_BONES });
+    // All the files download together, and whatever the character was asked to play starts the moment they are in.
+    const wanted: { prefix: string; id: string; restName: string; map: Record<string, string> | null }[] = [
+      { prefix: "", id: "ual1", restName: "A_TPose", map: null },
+      { prefix: "U2_", id: "ual2", restName: "A_TPose", map: null },
+      { prefix: "XB_", id: "mixamo_xbot", restName: "", map: MIXAMO_BONES },
+      { prefix: "MX_", id: "mixamo_soldier", restName: "TPose", map: MIXAMO_BONES },
+      ...["kaykit_sim", "kaykit_general", "kaykit_tools", "kaykit_move"].map((id) => ({ prefix: "KK_", id, restName: "T-Pose", map: KAYKIT_BONES as Record<string, string> | null })),
+    ].filter((w) => this.find(w.id));
+    const loaded = await Promise.all(wanted.map(async (w) => ({ w, gltf: await loadGLTF(assetUrl(this.asset(w.id).file)).catch(() => null) })));
+    this.sources = [];
+    for (const { w, gltf } of loaded) {
+      if (!gltf) continue;
+      if (w.id === "ual1") this.libraryClips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
+      this.sources.push({ prefix: w.prefix, scene: SkeletonUtils.clone(gltf.scene), clips: gltf.animations, restName: w.restName, map: w.map });
     }
     this.addLifeClips();
   }
@@ -235,7 +230,8 @@ export class Avatar {
     }
     this.clips.clear();
     for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) if (!this.lazy.has(clip.name) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
-    if (playing) this.play(playing, 0);
+    const resume = playing ?? this.wanted;
+    if (resume) this.play(resume, 0);
   }
 
   async setLook(patch: Partial<Look>): Promise<void> {
@@ -705,6 +701,9 @@ export class Avatar {
   // ------------------------------------------------------------------ animation
 
   play(name: string, fade = 0.25): boolean {
+    // remembered even when it can't play yet (the animation files may still be downloading): it starts the moment they arrive,
+    // instead of leaving the body in its bind pose (a T-pose)
+    this.wanted = name;
     const clip = this.getClip(name);
     if (!clip || !this.mixer) return false;
     const next = this.mixer.clipAction(clip);
@@ -869,6 +868,9 @@ export class Avatar {
   }
 
   update(delta: number): void {
+    // a bone the playing clip has no track for keeps whatever we left on it: take last frame's head turn off first, or it piles up
+    for (const [bone, mark] of this.lookMarks) if (bone.quaternion.equals(mark.after)) bone.quaternion.copy(mark.before);
+    this.lookMarks.clear();
     this.mixer?.update(delta);
     this.applyLook(delta);
     this.applyBlink(delta);
@@ -938,7 +940,9 @@ export class Avatar {
   private lookTarget: THREE.Vector3 | null = null;
   private lookYaw = 0;
   private lookPitch = 0;
+  private wanted: string | null = null;
   private lookBones: { neck: THREE.Bone; head: THREE.Bone } | null = null;
+  private lookMarks = new Map<THREE.Bone, { before: THREE.Quaternion; after: THREE.Quaternion }>();
 
   /** Makes the head (and a little of the neck) turn toward a world point. Null looks straight ahead. */
   setLookTarget(point: THREE.Vector3 | null): void {
@@ -987,7 +991,9 @@ export class Avatar {
       const delta = new THREE.Quaternion()
         .setFromAxisAngle(up, this.lookYaw * share)
         .multiply(new THREE.Quaternion().setFromAxisAngle(right, this.lookPitch * share));
+      const before = bone.quaternion.clone();
       bone.quaternion.copy(parentQ.invert().multiply(delta.multiply(worldQ)));
+      this.lookMarks.set(bone, { before, after: bone.quaternion.clone() });
       bone.updateMatrixWorld(true);
     };
     turn(neck, 0.4);

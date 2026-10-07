@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { NeedId } from "@thelife/game-core";
 import { GameIcon, type FaName } from "../ui/icons";
 import type { HudSnapshot } from "./gameSession";
@@ -28,7 +29,7 @@ export function TopPill({ hud }: { hud: HudSnapshot }) {
       </span>
       <i className="hud-sep" />
       <span className={`hud-mood is-${moodTone(hud.moodLabel)}`}>
-        <GameIcon name={moodFace(hud.moodLabel)} size={15} /> {hud.moodLabel}
+        <GameIcon name={moodFace(hud.moodLabel)} size={15} /> <span className="hud-mood-label">{hud.moodLabel}</span>
       </span>
       <i className="hud-sep" />
       <span className="hud-money">{naira(hud.money)}</span>
@@ -39,50 +40,68 @@ export function TopPill({ hud }: { hud: HudSnapshot }) {
   );
 }
 
-/** Bottom left: who you are and what you need right now. */
-export function MeCard({ hud }: { hud: HudSnapshot }) {
-  const p = hud.profile;
-  const initials = p ? `${p.firstName[0] ?? ""}${p.surname[0] ?? ""}`.toUpperCase() : "?";
+/** Under the time pill: the five needs as small rings. Calm when fine, they colour and pulse when something needs doing. */
+export function NeedsRow({ hud }: { hud: HudSnapshot }) {
   return (
-    <div className="hud-me" role="group" aria-label="You and your needs">
-      <span className={`hud-avatar tier-${p?.tier ?? "middle"}`} title={p ? `${p.firstName} ${p.surname}` : undefined}>
-        {initials}
-      </span>
-      <div className="hud-needs">
-        {NEEDS.map((n) => (
-          <span key={n.id} className={`hud-need is-${level(hud.needs[n.id])}`} title={`${n.label}: ${hud.needs[n.id]}`}>
+    <div className="hud-needs-row" role="group" aria-label="Your needs">
+      {NEEDS.map((n) => {
+        const v = hud.needs[n.id];
+        return (
+          <span key={n.id} className={`hud-ring is-${level(v)}`} style={{ ["--p" as string]: `${v}%` }} title={`${n.label}: ${v}`}>
             <GameIcon name={n.icon} size={13} />
-            <i><b style={{ width: `${hud.needs[n.id]}%` }} /></i>
-            <span className="visually-hidden">{n.label} {hud.needs[n.id]} of 100</span>
+            <span className="visually-hidden">{n.label} {v} of 100</span>
           </span>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
 /** Left side: small chips for what is on your plate (food in the house, rent, allowance, skills). */
 export function Chips({ hud }: { hud: HudSnapshot }) {
+  const soon = hud.rentPerWeek > 0 && (hud.rentOwed > 0 || hud.rentInDays <= 1);
+  const hungry = hud.needs.hunger < 35 && hud.portions + hud.meals === 0;
+  if (!soon && !hungry) return null;
   return (
     <div className="hud-chips">
-      <span><GameIcon name="cart" size={14} /> {hud.portions} {hud.portions === 1 ? "portion" : "portions"} · {hud.meals} {hud.meals === 1 ? "meal" : "meals"}</span>
-      <span className={hud.rentOwed > 0 ? "is-bad" : ""}>
-        <GameIcon name="home" size={14} /> {hud.rentPerWeek === 0 ? "Family house, no rent" : hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)}` : `Rent ${naira(hud.rentPerWeek)} in ${hud.rentInDays} day${hud.rentInDays === 1 ? "" : "s"}`}
-      </span>
-      {hud.allowance > 0 && <span><GameIcon name="money" size={14} /> {naira(hud.allowance)} a week from {hud.profile?.allowanceFrom || "family"}</span>}
-      {hud.skills.map((s) => (
-        <span key={s.id}><GameIcon name="skill" size={14} /> {s.id} {s.level}</span>
-      ))}
+      {soon && (
+        <span className={hud.rentOwed > 0 ? "is-bad" : ""}>
+          <GameIcon name="home" size={14} /> {hud.rentOwed > 0 ? `Owe ${naira(hud.rentOwed)} rent` : `Rent ${naira(hud.rentPerWeek)} due ${hud.rentInDays <= 0 ? "today" : "tomorrow"}`}
+        </span>
+      )}
+      {hungry && <span className="is-bad"><GameIcon name="hunger" size={14} /> No food at home</span>}
+    </div>
+  );
+}
+
+/** A small round menu in the top corner that holds the rarely used buttons, so the view stays clear. */
+export function MoreMenu({ items }: { items: { label: string; icon: FaName; run(): void; pressed?: boolean; danger?: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="hud-more">
+      <button className="hud-round" aria-label="Menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <GameIcon name={open ? "close" : "settings"} size={17} />
+      </button>
+      {open && (
+        <div className="hud-more-list" role="menu">
+          {items.map((it) => (
+            <button key={it.label} role="menuitem" className={`${it.pressed ? "is-on" : ""}${it.danger ? " is-danger" : ""}`} onClick={() => { setOpen(false); it.run(); }}>
+              <GameIcon name={it.icon} size={16} /> {it.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 /** Bottom centre: Home, Buy (furniture), Map and Phone. */
-export function BottomNav({ active, unread = 0, onBuy, onMap }: { active: "home" | "map"; unread?: number; onBuy?: () => void; onMap?: () => void }) {
+export function BottomNav({ active, unread = 0, onBuy, onMap, onBag }: { active: "home" | "map"; unread?: number; onBuy?: () => void; onMap?: () => void; onBag?: () => void }) {
   return (
     <nav className="hud-nav" aria-label="Where to">
       <a className={active === "home" ? "is-on" : ""} href="#/play"><GameIcon name="home" size={20} /><span>Home</span></a>
       <button onClick={onBuy} disabled={!onBuy}><GameIcon name="cart" size={20} /><span>Buy</span></button>
+      {onBag && <button onClick={onBag}><GameIcon name="bag" size={20} /><span>Bag</span></button>}
       {onMap ? (
         <button className={active === "map" ? "is-on" : ""} onClick={onMap}><GameIcon name="map" size={20} /><span>Map</span></button>
       ) : (

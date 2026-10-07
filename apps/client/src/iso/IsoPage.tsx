@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import GameHud from "../play/GameHud";
-import { BottomNav } from "../play/HudParts";
+import { BottomNav, MoreMenu } from "../play/HudParts";
 import KitchenPanel from "../kitchen/KitchenPanel";
 import ArrivalFilm from "../arrival/ArrivalFilm";
 import WelcomeBack from "../arrival/WelcomeBack";
@@ -177,13 +177,15 @@ export default function IsoPage() {
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
       </div>
       {!editing && (
-        <div className="play-controls" style={{ right: 12, left: "auto" }}>
-          <button onClick={() => setShowSettings(true)}>Settings</button>
-          {session && ready && !introOn && <button onClick={toggleEdit}>Edit home</button>}
-        </div>
+        <MoreMenu
+          items={[
+            ...(session && ready && !introOn ? [{ label: "Edit home", icon: "home" as const, run: toggleEdit }] : []),
+            { label: "Settings", icon: "settings" as const, run: () => setShowSettings(true) },
+          ]}
+        />
       )}
       {!editing && session && ready && !introOn && (
-        <BottomNav active="home" onBuy={() => { toggleEdit(); setShopOpen(true); }} />
+        <BottomNav active="home" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onBuy={() => { toggleEdit(); setShopOpen(true); }} />
       )}
       {editing && (
         <>

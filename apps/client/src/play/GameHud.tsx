@@ -5,7 +5,7 @@ import PhoneUI from "../phone/PhoneUI";
 import { GameIcon, type FaName } from "../ui/icons";
 import { GameSession, type HudSnapshot } from "./gameSession";
 import "./play.css";
-import { MeCard, TopPill } from "./HudParts";
+import { NeedsRow, TopPill } from "./HudParts";
 
 const NEED_META: { id: NeedId; icon: FaName; label: string }[] = [
   { id: "hunger", icon: "hunger", label: "Hunger" },
@@ -122,7 +122,7 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
   return (
     <>
       <TopPill hud={hud} />
-      <MeCard hud={hud} />
+      <NeedsRow hud={hud} />
 
       <div className="play-toasts" aria-live="polite">
         {toasts.map((toast) => (

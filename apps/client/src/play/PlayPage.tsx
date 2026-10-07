@@ -20,7 +20,7 @@ import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
-import { BottomNav, Chips, MeCard, TopPill } from "./HudParts";
+import { BottomNav, Chips, MoreMenu, NeedsRow, TopPill } from "./HudParts";
 
 interface Toast {
   id: number;
@@ -166,7 +166,7 @@ export default function PlayPage() {
         <>
           <TopPill hud={hud} />
           <Chips hud={hud} />
-          <MeCard hud={hud} />
+          <NeedsRow hud={hud} />
         </>
       )}
 
@@ -222,7 +222,18 @@ export default function PlayPage() {
         />
       )}
       {!editing && !phoneOpen && !bagOpen && !kitchen && (
-        <BottomNav active="home" unread={hud?.phone.unread ?? 0} onBuy={() => { runtimeRef.current?.edit.start(); setEditing(true); setShopOpen(true); }} />
+        <BottomNav active="home" unread={hud?.phone.unread ?? 0} onBag={() => setBagOpen(true)} onBuy={() => { runtimeRef.current?.edit.start(); setEditing(true); setShopOpen(true); }} />
+      )}
+      {!editing && !phoneOpen && !bagOpen && (
+        <MoreMenu
+          items={[
+            { label: "Follow camera", icon: "walk", pressed: follow, run: () => setFollow((v) => !v) },
+            { label: "Reset view", icon: "map", run: () => runtimeRef.current?.resetView() },
+            { label: "Edit home", icon: "home", run: () => { runtimeRef.current?.edit.start(); setEditing(true); } },
+            { label: "Settings", icon: "settings", run: () => setShowSettings(true) },
+            { label: "New game", icon: "close", danger: true, run: () => { if (window.confirm("Start a brand new game? Your current progress will be erased.")) runtimeRef.current?.newGame(); } },
+          ]}
+        />
       )}
       {!editing && <div className="play-controls">
         <button aria-pressed={follow} onClick={() => setFollow((v) => !v)}>
