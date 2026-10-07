@@ -169,6 +169,8 @@ def main() -> int:
             entry["dec"] = f"{sid}-"
             morphs.append({"id": f"{sid}-", "label": label + " -", "group": group, "delta": shapes.detail_delta(dec, n_base)})
         sliders.append(entry)
+    for fid, parts in shapes.FACE_UNITS.items():
+        morphs.append({"id": fid, "label": fid[3:], "group": "Expression", "delta": shapes.face_unit_delta(parts, n_base)})
     log(f"{len(morphs)} morphs in {time.time() - t0:.1f}s")
 
     # how well does a weighted sum of macros match the true combined body?
@@ -343,6 +345,27 @@ def main() -> int:
         add_mesh(name, pos, N0[o2], uv_all[u2], J[o2], W[o2], o2, ti, mat_under, "base")
         log(f"  layer {name}: {len(ti)} triangles")
 
+    # teeth and tongue: the base mesh's own helper shapes, so every face unit (the jaw above all) moves them with the lips
+    mat_teeth = g.material({"name": "teeth", "pbrMetallicRoughness": {"baseColorFactor": [0.93, 0.9, 0.82, 1], "metallicFactor": 0, "roughnessFactor": 0.35}})
+    mat_tongue = g.material({"name": "tongue", "pbrMetallicRoughness": {"baseColorFactor": [0.62, 0.22, 0.24, 1], "metallicFactor": 0, "roughnessFactor": 0.5}})
+
+    def helper_mesh(name: str, groups: list[str], material: int):
+        keep_h = [gn in groups for gn in obj.face_group]
+        ht, htu = triangulate(obj.faces, obj.face_uvs, keep_h)
+        o2, u2, ti = split_by_uv(ht, htu)
+        nrm = face_normals_acc(Pw, ht)
+        jj = np.zeros((len(o2), 4), dtype=np.uint8)
+        ww = np.zeros((len(o2), 4), dtype=np.float32)
+        jj[:, 0] = bidx["Head"]
+        ww[:, 0] = 1
+        add_mesh(name, Pw[o2], nrm[o2], uv_all[u2], jj, ww, o2, ti, material, "base")
+        helper_verts.update(int(v) for v in np.unique(ht))
+        log(f"  {name}: {len(ti)} triangles")
+
+    helper_verts: set[int] = set()
+    helper_mesh("Teeth", ["helper-upper-teeth", "helper-lower-teeth"], mat_teeth)
+    helper_mesh("Tongue", ["helper-tongue"], mat_tongue)
+
     layer("Shorts", short_sel, 0.005)
     layer("Top", top_sel, 0.005)
 
@@ -410,6 +433,7 @@ def main() -> int:
     pmc = {"eyes": mc_eye, "brows": mc_b, "lashes": mc_l}
     used_base = np.zeros(n_base, dtype=bool)
     used_base[body_verts] = True
+    used_base[list(helper_verts)] = True
     blob = bytearray()
     targets_meta = []
     bone_names = list(order)

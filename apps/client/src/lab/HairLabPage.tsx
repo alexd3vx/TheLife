@@ -9,7 +9,7 @@ import "./bodylab.css";
 /** A developer page for hair: one person, a close camera (front, side, back, top), every style and colour. Open it at #/hair. */
 export default function HairLabPage() {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void>; walk(on: boolean): void } | null>(null);
+  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void>; walk(on: boolean): void; mood(m: string): void; speak(on: boolean): void; wink(): void; look(x: number, y: number, z: number): void } | null>(null);
   const [look, setLook] = useState<Look>({ ...DEFAULT_LOOK, top: null, bottom: null, shoes: null, hair: "p_afro" });
   const [view, setView] = useState("front");
   const [ready, setReady] = useState(false);
@@ -61,6 +61,10 @@ export default function HairLabPage() {
       live.current = {
         set: (p) => (chain = chain.then(async () => { await a.setLook(p); frame(); })),
         view: (nv) => { v = nv; frame(); },
+        mood: (m) => a.setMood(m as never),
+        speak: (on) => a.face?.speak(on),
+        look: (x, y, z) => a.setLookTarget(new THREE.Vector3(x, y, z)),
+        wink: () => a.face?.wink1("l"),
         walk: (on) => {
           walking = on;
           a.play(on ? "Walk_Loop" : "Idle_Loop", 0.2);

@@ -137,7 +137,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
 
       const manifest = await loadManifest();
       const look = resolveLook(state.look);
-      const me = new Avatar(manifest, look);
+      const me = new Avatar(manifest, look, { face: true });
       const staff = room.staff.map(() => new Avatar(manifest, randomNpcLook()));
       const crowd = Array.from({ length: room.visitors }, () => new Avatar(manifest, randomNpcLook()));
       await Promise.all([me.load(), ...staff.map((a) => a.load()), ...crowd.map((a) => a.load())]);

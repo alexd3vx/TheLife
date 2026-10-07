@@ -202,3 +202,37 @@ def detail_delta(spec: str, n: int) -> np.ndarray:
         idx, d = _target(rel)
         np.add.at(out, idx, d)
     return out
+
+
+# Face units (the building blocks of an expression, as in FACS): id -> the MakeHuman expression targets that make it (African variants).
+# Left and right eyes and brows are separate where a wink or a raised brow needs them, together where they always move as one.
+FACE_UNITS: dict[str, list[str]] = {
+    "fu_blinkL": ["eye-left-closure"],
+    "fu_blinkR": ["eye-right-closure"],
+    "fu_eyeWide": ["eye-left-opened-up", "eye-right-opened-up"],
+    "fu_eyeSlit": ["eye-left-slit", "eye-right-slit"],
+    "fu_browDown": ["eyebrows-left-down", "eyebrows-right-down"],
+    "fu_browUp": ["eyebrows-left-up", "eyebrows-right-up"],
+    "fu_browInner": ["eyebrows-left-inner-up", "eyebrows-right-inner-up"],
+    "fu_browOuter": ["eyebrows-left-extern-up", "eyebrows-right-extern-up"],
+    "fu_browUpL": ["eyebrows-left-up"],
+    "fu_jawOpen": ["mouth-open"],
+    "fu_smile": ["mouth-corner-puller"],
+    "fu_frown": ["mouth-depression"],
+    "fu_lipRaise": ["mouth-elevation"],
+    "fu_pucker": ["mouth-pursing"],
+    "fu_press": ["mouth-compression"],
+    "fu_protrude": ["mouth-protusion"],
+    "fu_stretch": ["mouth-retraction"],
+    "fu_noseWrinkle": ["nose-compression"],
+    "fu_nostrils": ["nose-left-dilatation", "nose-right-dilatation"],
+    "fu_chinDown": ["mouth-depression-retraction"],
+}
+
+
+def face_unit_delta(parts: list[str], n: int) -> np.ndarray:
+    out = np.zeros((n, 3))
+    for name in parts:
+        idx, d = mh.load_target(mh.target_path(f"expression/units/african/{name}"))
+        np.add.at(out, idx, d)
+    return out

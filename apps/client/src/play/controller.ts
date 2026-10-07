@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ACTIONS } from "@thelife/game-core";
+import { mood as moodOf, ACTIONS } from "@thelife/game-core";
 import { findPath, isFree, pathLength, type NavGrid, type Point } from "@thelife/shared";
 import type { Avatar } from "../lab/avatar";
 import type { Interaction } from "./interactions";
@@ -453,6 +453,7 @@ export class CharacterController {
     }
     this.followGame();
     this.updateLook(dt);
+    this.updateFace(dt);
     this.idleBehaviour();
     if (this.queued && !this.tween && !this.wait && (this.mode === "doing" || this.mode === "idle")) {
       const next = this.queued;
@@ -668,6 +669,24 @@ export class CharacterController {
       target = this.glance?.point ?? null;
     }
     this.avatar.setLookTarget(target);
+  }
+
+  private faceClock = 0;
+
+  /** The face shows how the person feels: how they are doing (their needs), every couple of seconds. */
+  private updateFace(dt: number) {
+    if (!this.avatar.face) return;
+    this.faceClock -= dt;
+    if (this.faceClock > 0) return;
+    this.faceClock = 2;
+    const needs = this.game.needs();
+    const m = moodOf(needs);
+    if (needs.energy < 22) this.avatar.setMood("tired", 1);
+    else if (m >= 80) this.avatar.setMood("happy", 0.9);
+    else if (m >= 62) this.avatar.setMood("happy", 0.45);
+    else if (m >= 45) this.avatar.setMood("neutral");
+    else if (m >= 28) this.avatar.setMood("worried", 0.8);
+    else this.avatar.setMood("sad", 1);
   }
 
   private setClip(name: string) {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { BODY_SLIDERS } from "./bodySliders";
+import { MOODS, VISEMES } from "./face";
 import { DEFAULT_SHAPE, shapeWeights, type BodyShape, type MorphMeta } from "./bodyMorph";
 
 const dir = new URL("../../public/assets/characters/", import.meta.url);
@@ -74,6 +75,14 @@ describe("the body pack", () => {
         expect(at, `${t.id}/${space}`).toBeLessThan(n);
       }
     }
+  });
+
+  it("has every face unit the moods and mouth shapes use, on the face meshes", () => {
+    const units = new Set(meta.targets.filter((t) => t.id.startsWith("fu_")).map((t) => t.id));
+    for (const w of [...Object.values(MOODS), ...Object.values(VISEMES)]) for (const u of Object.keys(w)) expect(units.has(u), u).toBe(true);
+    for (const id of units) expect(meta.targets.find((t) => t.id === id)!.blocks["base"], id).toBeDefined();
+    expect(meta.meshes["Teeth"]).toBeDefined();
+    expect(meta.meshes["Tongue"]).toBeDefined();
   });
 
   it("describes a full skeleton with fingers and eye bones", () => {

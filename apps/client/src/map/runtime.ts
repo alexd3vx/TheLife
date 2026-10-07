@@ -248,7 +248,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   let navCentre = { x: district.spawn.x, z: district.spawn.z };
   let nav = buildNav(navCentre.x, navCentre.z);
 
-  const avatar = new Avatar(manifest, resolveLook(options.look));
+  const avatar = new Avatar(manifest, resolveLook(options.look), { face: true });
   await avatar.load();
   scene.add(avatar.root);
   const bridge: GameBridge = {

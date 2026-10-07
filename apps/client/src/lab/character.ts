@@ -21,9 +21,9 @@ export function resolveLook(lifeLook?: string | null): Look {
 }
 
 /** A loaded person, ready to play clips. */
-export async function createCharacter(look: Look): Promise<Avatar> {
+export async function createCharacter(look: Look, options: { face?: boolean } = { face: true }): Promise<Avatar> {
   const manifest = await loadManifest();
-  const avatar = new Avatar(manifest, look);
+  const avatar = new Avatar(manifest, look, options);
   await avatar.load();
   return avatar;
 }

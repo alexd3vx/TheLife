@@ -247,6 +247,55 @@ export class MorphBody {
     return b;
   }
 
+  /**
+   * Gives the meshes that carry a face (skin, brows, lashes, teeth, tongue) the face units as real GPU morph targets, so an expression
+   * can change every frame without rebuilding the person. Returns, per unit, the meshes and target index to drive. Costs memory per person
+   * (about 20 copies of the face meshes), so only the people you look at close up get it.
+   */
+  enableFace(): Map<string, { mesh: THREE.SkinnedMesh; index: number }[]> {
+    const units = this.meta.targets.filter((t) => t.id.startsWith("fu_"));
+    const out = new Map<string, { mesh: THREE.SkinnedMesh; index: number }[]>();
+    for (const name of ["Body", "Brows", "Lashes", "Teeth", "Tongue"]) {
+      const p = this.parts.get(name);
+      if (!p) continue;
+      const g = p.mesh.geometry;
+      const attrs: THREE.BufferAttribute[] = [];
+      const ids: string[] = [];
+      for (const t of units) {
+        const blk = t.blocks[p.space];
+        if (!blk) continue;
+        const { idx, x, y, z } = this.block(t.id, p.space, blk);
+        // delta by original vertex id, then spread to this mesh's vertices
+        const dense = new Float32Array(this.meta.spaces[p.space]! * 3);
+        const step = this.meta.step;
+        for (let i = 0; i < idx.length; i++) {
+          dense[idx[i]! * 3] = x[i]! * step;
+          dense[idx[i]! * 3 + 1] = y[i]! * step;
+          dense[idx[i]! * 3 + 2] = z[i]! * step;
+        }
+        const arr = new Float32Array(p.orig.length * 3);
+        for (let v = 0; v < p.orig.length; v++) {
+          const o = p.orig[v]! * 3;
+          arr[v * 3] = dense[o]!;
+          arr[v * 3 + 1] = dense[o + 1]!;
+          arr[v * 3 + 2] = dense[o + 2]!;
+        }
+        attrs.push(new THREE.BufferAttribute(arr, 3));
+        ids.push(t.id);
+      }
+      if (!attrs.length) continue;
+      g.morphAttributes.position = attrs;
+      g.morphTargetsRelative = true;
+      p.mesh.updateMorphTargets();
+      ids.forEach((id, index) => {
+        const list = out.get(id) ?? [];
+        list.push({ mesh: p.mesh, index });
+        out.set(id, list);
+      });
+    }
+    return out;
+  }
+
   private smoothNormals(p: Part, n: number): void {
     const arr = (p.mesh.geometry.getAttribute("position") as THREE.BufferAttribute).array as Float32Array;
     const acc = new Float32Array(n * 3);

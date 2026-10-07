@@ -4,6 +4,7 @@ import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, lookShape, sexOf, type Look } from "./looks";
 import { MorphBody } from "./bodyMorph";
+import { FaceRig, type Mood } from "./face";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import type { FabricId } from "./procedural/fabrics";
 import { clothFor } from "./procedural/cloth";
@@ -102,9 +103,13 @@ export class Avatar {
   private loadToken = 0;
   look: Look;
 
+  /** The face (expressions, blinking, speech) of the morphable body; only the people looked at close up get one (it costs memory). */
+  face: FaceRig | null = null;
+
   constructor(
     private readonly manifest: AssetManifest,
     initial: Look,
+    private readonly options: { face?: boolean } = {},
   ) {
     this.look = { ...initial };
   }
@@ -161,7 +166,9 @@ export class Avatar {
     }
     this.prepareBodyMask();
     this.eyelids = [];
-    if (isRealistic(this.look.body)) this.buildEyelids();
+    this.face = null;
+    if (morph && this.options.face) this.face = new FaceRig(morph);
+    else if (isRealistic(this.look.body)) this.buildEyelids(); // a crowd face: a cheap eyelid that blinks, no expressions
 
     this.mixer = new THREE.AnimationMixer(this.bodyScene);
     this.currentAction = null;
@@ -950,6 +957,16 @@ export class Avatar {
     }
   }
 
+  /** Talks (or stops): the mouth moves like speech; pass the loudness of real speech (0 to 1) to follow it. */
+  speak(on: boolean, level: number | null = null): void {
+    this.face?.setSpeechLevel(level);
+    this.face?.speak(on);
+  }
+
+  setMood(mood: Mood, amount = 1): void {
+    this.face?.setMood(mood, amount);
+  }
+
   /** The height of the head bone above the character's feet (for cameras). */
   headHeight(): number {
     const head = this.skeleton?.bones.find((b) => b.name === "Head");
@@ -1071,7 +1088,44 @@ export class Avatar {
     this.mixer?.update(delta);
     this.updateSway(delta);
     this.applyLook(delta);
+    this.face?.update(delta);
+    this.updateEyes(delta);
     this.applyBlink(delta);
+  }
+
+  private eyeBones: THREE.Bone[] | null = null;
+  private eyeYaw = 0;
+  private eyePitch = 0;
+  private saccade = { x: 0, y: 0, next: 1 };
+
+  /** The eyes follow the look target by themselves (a little ahead of the head), and flick about a little when nothing is being looked at. */
+  private updateEyes(delta: number): void {
+    if (!this.morph || !this.skeleton) return;
+    this.eyeBones ??= ["eye_l", "eye_r"].map((n) => this.skeleton!.bones.find((b) => b.name === n)).filter((b): b is THREE.Bone => !!b);
+    if (!this.eyeBones.length) return;
+    const sac = this.saccade;
+    sac.next -= delta;
+    if (sac.next <= 0) {
+      sac.next = 0.8 + Math.random() * 2.2;
+      sac.x = (Math.random() - 0.5) * 0.12;
+      sac.y = (Math.random() - 0.5) * 0.07;
+    }
+    let yawGoal = sac.x, pitchGoal = sac.y;
+    const first = this.eyeBones[0]!;
+    if (this.lookTarget && first.parent) {
+      first.parent.updateWorldMatrix(true, false);
+      const local = first.parent.worldToLocal(this.lookTarget.clone()).sub(first.position);
+      const horizontal = Math.hypot(local.x, local.z);
+      if (horizontal > 0.05) {
+        yawGoal += THREE.MathUtils.clamp(Math.atan2(local.x, local.z), -0.5, 0.5);
+        pitchGoal += THREE.MathUtils.clamp(Math.atan2(-local.y, horizontal), -0.3, 0.35);
+      }
+    }
+    const k = 1 - Math.exp(-18 * delta);
+    this.eyeYaw += (yawGoal - this.eyeYaw) * k;
+    this.eyePitch += (pitchGoal - this.eyePitch) * k;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.eyePitch, this.eyeYaw, 0, "YXZ"));
+    for (const b of this.eyeBones) b.quaternion.copy(q);
   }
 
   /** Hanging garments follow the person's movement (see clothSway.ts). */

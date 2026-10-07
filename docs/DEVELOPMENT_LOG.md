@@ -358,3 +358,11 @@ Chronological record of decisions and changes. Newest first.
 - Baked shading on every garment (`shade` vertex colour): darker where the cloth bridges a hollow, along cut edges and one ring in (hems, cuffs and necklines look stitched), folds and a stitched hem on lofted skirts. More contrast in the fabric pictures (`build_fabrics.py` stretches it) and coarser weave tiles so the weave reads.
 - Cloth movement (`lab/procedural/clothSway.ts`): one spring per person driven by the hips' movement; the vertex shader moves each cloth vertex by it in proportion to a `sway` attribute (0 at the waist, 1 at the hem), plus billow and a ripple that grow with speed. A gown trails behind when you walk and swings forward when you stop. It costs one spring per person and a few shader lines, no per-vertex simulation. Lofted garments carry the attribute; garments cut from the body do not move (sleeves and tight tops do not swing).
 - Blazer now hangs over the hips instead of ending as a bodysuit. `#/hair` has a walk button (`__hair.walk`) for checking cloth in motion.
+
+## Phase 4: the face
+
+- `tools/character`: 20 face units from `targets/expression/units/african` added to the morph pack (group `Expression`, ids `fu_*`), teeth and tongue meshes from the base mesh's helper groups. Pack 0.70 MB, glb 1.59 MB.
+- `MorphBody.enableFace` (GPU morph targets for the face meshes), `lab/face.ts` (`FaceRig`: moods, mouth shapes, blinking, wink, speech), `Avatar.face / setMood / speak`, eye look-at in `Avatar.updateEyes`, `createCharacter(look, {face})`; the player's avatars ask for a face, crowds do not.
+- The home controller sets the mood from the needs (`updateFace`).
+- `#/hair` has mood, speak, wink and look buttons for checking faces (`__hair.mood`, `.speak`, `.wink`, `.look`).
+- Test: every unit a mood or mouth shape uses exists in the pack; teeth and tongue exist.
