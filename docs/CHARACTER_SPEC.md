@@ -202,3 +202,19 @@ Every everyday clip was captured at 15 / 50 / 85 % of its loop on a male and a f
 - Acceptable but not great: `Life_Cook` (KK_Work_A) holds the arms wide, and `Life_Type` is still the Driving loop. Both are placeholders until a proper kitchen and desk clip is sourced.
 - Cloth: tops are simulated while the avatar is close up. Right after a hard pose jump (what the capture does) the hem is ragged for a few frames, then settles. Continuous play in the game does not show this.
 - Still missing clips (not on the new body, simply not in the library yet): open/close door, unlock, sit-in-vehicle, ATM, shower with water.
+
+## 15. Phase 6 result (8 Oct 2026): a creator made for a phone
+
+**Camera.** The stage camera glides to a focus per tab: whole person for Body and Clothes, head and shoulders for Skin, Hair and Extras, a face close-up for Face. The stage is taller on phones (46%) and the header is slim, so the person is no longer a small figure above a long list.
+
+**Tabs.** Body, Face, Skin, Hair, Clothes, Extras. Skin holds skin tone, eye colour and beard (moved out of Body).
+
+**Randomise.** A dice button per tab re-rolls only that tab (`creator/randomise.ts`; sliders stay inside their ranges, a male gets no bust); "Surprise me" rolls all six.
+
+**Undo / redo.** `creator/history.ts`: a burst of slider changes is one step, 40 steps deep, a new change clears redo.
+
+**My looks.** Up to 8 looks saved on the device (`creator/savedLooks.ts`, localStorage) with a small picture taken from the stage; tap to wear, × to delete. Nothing is sent to the server.
+
+**Preview in a place.** Studio, Home (a room with window, rug, sofa, lamp) or Street (road, pavement, buildings), plus the Walk toggle.
+
+**Honest gaps.** No skin undertone or freckles/marks yet (needs the skin shader). The Home and Street backdrops are simple blocks, enough to judge colours in different light, not the real places. Saved looks live in the browser only; they are not tied to the account.

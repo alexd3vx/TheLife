@@ -1,13 +1,41 @@
 import { useRef, useState } from "react";
+import { GameIcon } from "../ui/icons";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, bodyFor, lookShape, sexOf, type Look } from "../lab/looks";
+import type { StageBackdrop } from "../ui/CharacterStage";
+import { BODY_DETAILS, randomAll, randomFor, type Tab } from "./randomise";
+import type { SavedLook } from "./savedLooks";
 import type { BodyShape } from "../lab/bodyShape";
 import { BODY_SLIDERS } from "../lab/bodySliders";
 import { FABRICS } from "../lab/procedural/fabrics";
 import { ACCESSORY_OPTIONS, BOTTOMS, HAIR_STYLES, SHOES, TOPS } from "../iso/wardrobe";
 
-type Tab = "body" | "face" | "hair" | "clothes" | "extras";
 const FACE_GROUPS = ["Face", "Eyes", "Nose", "Mouth"] as const;
-const BODY_DETAILS = ["shoulders", "chest_width", "waist", "belly", "hip_width", "glutes", "arm_muscle", "thigh_fat"];
+const TABS: readonly (readonly [Tab, string])[] = [["body", "Body"], ["face", "Face"], ["skin", "Skin"], ["hair", "Hair"], ["clothes", "Clothes"], ["extras", "Extras"]];
+const BACKDROPS: { id: StageBackdrop; label: string }[] = [
+  { id: "studio", label: "Studio" },
+  { id: "room", label: "Home" },
+  { id: "street", label: "Street" },
+];
+
+export interface StudioProps {
+  look: Look;
+  update(patch: Partial<Look>): void;
+  walking: boolean;
+  setWalking(on: boolean): void;
+  onNext(): void;
+  tab: Tab;
+  onTab(tab: Tab): void;
+  undo(): void;
+  redo(): void;
+  canUndo: boolean;
+  canRedo: boolean;
+  backdrop: StageBackdrop;
+  setBackdrop(b: StageBackdrop): void;
+  saved: SavedLook[];
+  onSave(): void;
+  onLoad(entry: SavedLook): void;
+  onRemove(id: string): void;
+}
 
 function Slider({ label, value, min = -1, max = 1, step = 0.05, onChange }: { label: string; value: number; min?: number; max?: number; step?: number; onChange(v: number): void }) {
   return (
@@ -45,11 +73,8 @@ function Chips({ list, value, onPick, none }: { list: { id: string; label: strin
   );
 }
 
-const pickOne = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)]!;
-
 /** Everything about how the person looks. Changes show on the stage straight away. */
-export default function StudioPanel({ look, update, walking, setWalking, onNext }: { look: Look; update(patch: Partial<Look>): void; walking: boolean; setWalking(on: boolean): void; onNext(): void }) {
-  const [tab, setTab] = useState<Tab>("body");
+export default function StudioPanel({ look, update, walking, setWalking, onNext, tab, onTab, undo, redo, canUndo, canRedo, backdrop, setBackdrop, saved, onSave, onLoad, onRemove }: StudioProps) {
   const [faceGroup, setFaceGroup] = useState<(typeof FACE_GROUPS)[number]>("Face");
   const male = sexOf(look.body) === "male";
   const shape = lookShape(look);
@@ -65,39 +90,29 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
     update({ shape: latest.current });
   };
   const sliderLabel = (id: string) => BODY_SLIDERS.find((s) => s.id === id)?.label ?? id;
-  const surprise = () =>
-    update({
-      skinTone: pickOne(SKIN_TONES).id,
-      hair: pickOne(HAIR_STYLES).id,
-      hairColor: pickOne(HAIR_COLORS).id,
-      top: pickOne(TOPS).id,
-      topColor: pickOne(CLOTH_COLORS).id,
-      topFabric: pickOne(FABRICS).id,
-      bottom: pickOne(BOTTOMS).id,
-      bottomColor: pickOne(CLOTH_COLORS).id,
-      bottomFabric: pickOne(FABRICS).id,
-      shoes: pickOne(SHOES).id,
-      shoesColor: pickOne(CLOTH_COLORS).id,
-      accessory: Math.random() < 0.4 ? pickOne(ACCESSORY_OPTIONS).id : null,
-      shape: {
-        ...shape,
-        height: (Math.random() - 0.5) * 1.2,
-        weight: (Math.random() - 0.45) * 1.2,
-        muscle: (Math.random() - 0.4) * 1.2,
-        age: Math.round(18 + Math.random() * 30),
-        bust: male ? 0 : (Math.random() - 0.4) * 1.2,
-        detail: Object.fromEntries(BODY_SLIDERS.filter(() => Math.random() < 0.3).map((s) => [s.id, Math.round((s.oneWay ? Math.random() * 0.7 : (Math.random() - 0.5) * 1.2) * 20) / 20])),
-      },
-    });
+  const roll = (t: Tab) => update(randomFor(t, { ...look, shape: latest.current }));
+  const rollAll = () => update(randomAll({ ...look, shape: latest.current }));
+  const tabName = TABS.find(([id]) => id === tab)![1];
   return (
     <div className="creator-body studio">
       <nav className="studio-tabs" role="tablist">
-        {([["body", "Body"], ["face", "Face"], ["hair", "Hair"], ["clothes", "Clothes"], ["extras", "Extras"]] as const).map(([id, label]) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+        {TABS.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => onTab(id)}>
             {label}
           </button>
         ))}
       </nav>
+      <div className="studio-bar">
+        <button onClick={undo} disabled={!canUndo} aria-label="Undo">
+          ↶ Undo
+        </button>
+        <button onClick={redo} disabled={!canRedo} aria-label="Redo">
+          Redo ↷
+        </button>
+        <button className="studio-dice" onClick={() => roll(tab)} aria-label={`Randomise ${tabName}`}>
+          <GameIcon name="dice" /> {tabName}
+        </button>
+      </div>
 
       {tab === "body" && (
         <>
@@ -111,8 +126,6 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
               ))}
             </div>
             <p className="studio-note">Pick the one that is really you. Your voice, in calls and in the city, will match it.</p>
-            <h3>Skin tone</h3>
-            <Swatches list={SKIN_TONES.map((t) => ({ id: t.id, label: t.label, color: t.base }))} value={look.skinTone} onPick={(id) => update({ skinTone: id })} label="Skin tone" />
           </section>
           <section>
             <h2>Shape</h2>
@@ -124,15 +137,6 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
             {BODY_DETAILS.map((id) => (
               <Slider key={id} label={sliderLabel(id)} value={shape.detail[id] ?? 0} onChange={(v) => setDetail(id, v)} />
             ))}
-          </section>
-          <section>
-            <h2>Eyes and beard</h2>
-            <Swatches list={EYE_COLORS.map((c) => ({ ...c, color: c.id === "brown" ? "#5a3a22" : c.color }))} value={look.eyeColor} onPick={(id) => update({ eyeColor: id })} label="Eye colour" />
-            {male && (
-              <label className="creator-check">
-                <input type="checkbox" checked={look.beard} onChange={(e) => update({ beard: e.target.checked })} /> Beard
-              </label>
-            )}
           </section>
         </>
       )}
@@ -154,6 +158,24 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
             Reset these
           </button>
         </section>
+      )}
+
+      {tab === "skin" && (
+        <>
+          <section>
+            <h2>Skin tone</h2>
+            <Swatches list={SKIN_TONES.map((t) => ({ id: t.id, label: t.label, color: t.base }))} value={look.skinTone} onPick={(id) => update({ skinTone: id })} label="Skin tone" />
+          </section>
+          <section>
+            <h2>Eyes{male ? " and beard" : ""}</h2>
+            <Swatches list={EYE_COLORS.map((c) => ({ ...c, color: c.id === "brown" ? "#5a3a22" : c.color }))} value={look.eyeColor} onPick={(id) => update({ eyeColor: id })} label="Eye colour" />
+            {male && (
+              <label className="creator-check">
+                <input type="checkbox" checked={look.beard} onChange={(e) => update({ beard: e.target.checked })} /> Beard
+              </label>
+            )}
+          </section>
+        </>
       )}
 
       {tab === "hair" && (
@@ -199,11 +221,42 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
         </section>
       )}
 
+      <section>
+        <h2>Preview</h2>
+        <div className="creator-chips">
+          {BACKDROPS.map((b) => (
+            <button key={b.id} aria-pressed={backdrop === b.id} onClick={() => setBackdrop(b.id)}>
+              {b.label}
+            </button>
+          ))}
+          <button aria-pressed={walking} onClick={() => setWalking(!walking)}>
+            {walking ? "Stand still" : "Walk"}
+          </button>
+        </div>
+      </section>
+      <section>
+        <h2>My looks</h2>
+        <div className="studio-shelf">
+          {saved.map((e) => (
+            <div key={e.id} className="studio-saved">
+              <button className="studio-saved-pic" onClick={() => onLoad(e)} aria-label="Use this saved look">
+                {e.img ? <img src={e.img} alt="" /> : <span>Look</span>}
+              </button>
+              <button className="studio-saved-x" onClick={() => onRemove(e.id)} aria-label="Delete this saved look">
+                ×
+              </button>
+            </div>
+          ))}
+          <button className="studio-save" onClick={onSave}>
+            + Save this look
+          </button>
+        </div>
+        {saved.length === 0 && <p className="studio-note">Save a few looks and try them again later. They stay on this device.</p>}
+      </section>
       <div className="studio-actions">
-        <button onClick={() => setWalking(!walking)} aria-pressed={walking}>
-          {walking ? "Stand still" : "See them walk"}
+        <button onClick={rollAll}>
+          <GameIcon name="dice" /> Surprise me
         </button>
-        <button onClick={surprise}>Surprise me</button>
       </div>
       <button className="btn btn-primary creator-next" onClick={onNext}>
         Next: your background

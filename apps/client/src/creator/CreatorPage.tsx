@@ -2,14 +2,19 @@ import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
 import { DEFAULT_LOOK, sexOf, type Look } from "../lab/looks";
-import CharacterStage from "../ui/CharacterStage";
+import CharacterStage, { type StageApi, type StageBackdrop, type StageFocus } from "../ui/CharacterStage";
 import StudioPanel from "./StudioPanel";
+import type { Tab } from "./randomise";
+import { LookHistory } from "./history";
+import { addSavedLook, loadSavedLooks, removeSavedLook, type SavedLook } from "./savedLooks";
 import { setPending, takeRestart } from "../play/pendingLife";
 import "./creator.css";
 
 const naira = (n: number) => `₦${n.toLocaleString()}`;
 const TIERS: Tier[] = ["lapo", "middle", "nepo"];
 const PHONE_LABEL = { basic: "LifePhone Go (cracked screen)", mid: "LifePhone Plus", flagship: "LifePhone Max" } as const;
+/** Where the camera goes for each tab: the face for face work, head and shoulders for hair and skin, the whole person for the rest. */
+const FOCUS: Record<Tab, StageFocus> = { body: "full", face: "head", skin: "upper", hair: "upper", clothes: "full", extras: "upper" };
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 /** Make your person, then roll the background that decides how life starts: lapo, middle or nepo. */
@@ -27,13 +32,43 @@ export default function CreatorPage() {
   const [firstName, setFirstName] = useState("");
   const [surname, setSurname] = useState("");
 
+  const [tab, setTab] = useState<Tab>("body");
+  const [backdrop, setBackdrop] = useState<StageBackdrop>("studio");
+  const [saved, setSaved] = useState<SavedLook[]>(() => loadSavedLooks());
+  const stageApi = useRef<StageApi | null>(null);
+  const history = useRef(new LookHistory<Look>());
+  const [, bump] = useState(0);
+
   const update = useCallback((patch: Partial<Look>) => {
-    setLook((prev) => {
-      const next = { ...prev, ...patch };
-      lookRef.current = next;
-      return next;
-    });
+    const prev = lookRef.current;
+    history.current.record(prev);
+    const next = { ...prev, ...patch };
+    lookRef.current = next;
+    setLook(next);
   }, []);
+  /** Swap the whole look (undo, redo, a saved look) without adding a history step of its own. */
+  const replace = useCallback((next: Look) => {
+    lookRef.current = next;
+    setLook(next);
+    bump((n) => n + 1);
+  }, []);
+  const undo = useCallback(() => {
+    const prev = history.current.undo(lookRef.current);
+    if (prev) replace(prev);
+  }, [replace]);
+  const redo = useCallback(() => {
+    const next = history.current.redo(lookRef.current);
+    if (next) replace(next);
+  }, [replace]);
+  const loadSaved = useCallback(
+    (entry: SavedLook) => {
+      history.current.record(lookRef.current, 0);
+      replace({ ...DEFAULT_LOOK, ...entry.look });
+    },
+    [replace],
+  );
+  const saveCurrent = useCallback(() => setSaved(addSavedLook(lookRef.current, stageApi.current?.snapshot() ?? null)), []);
+  const removeSaved = useCallback((id: string) => setSaved(removeSavedLook(id)), []);
 
   const roll = useCallback(async () => {
     if (rolling) return;
@@ -85,7 +120,7 @@ export default function CreatorPage() {
   return (
     <div className={`creator${step === "look" ? "" : " is-full"}`}>
       <div className="creator-stage">
-        <CharacterStage look={look} walking={walking} onBusy={setBusy} />
+        <CharacterStage look={look} walking={walking} onBusy={setBusy} focus={FOCUS[tab]} backdrop={backdrop} apiRef={stageApi} />
         {busy && <div className="creator-busy">Dressing…</div>}
         <div className="studio-hint">Drag to turn around</div>
       </div>
@@ -113,7 +148,25 @@ export default function CreatorPage() {
           </div>
         </header>
 
-        {step === "look" && <StudioPanel look={look} update={update} walking={walking} setWalking={setWalking} onNext={() => setStep("background")} />}
+        {step === "look" && <StudioPanel
+            look={look}
+            update={update}
+            walking={walking}
+            setWalking={setWalking}
+            onNext={() => setStep("background")}
+            tab={tab}
+            onTab={setTab}
+            undo={undo}
+            redo={redo}
+            canUndo={history.current.canUndo}
+            canRedo={history.current.canRedo}
+            backdrop={backdrop}
+            setBackdrop={setBackdrop}
+            saved={saved}
+            onSave={saveCurrent}
+            onLoad={loadSaved}
+            onRemove={removeSaved}
+          />}
 
         {step === "background" && (
           <div className="creator-body">

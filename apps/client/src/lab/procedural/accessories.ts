@@ -40,6 +40,12 @@ const torus = (centre: THREE.Vector3, r: number, tubeR: number, tilt = 0) => {
 };
 
 /** Builds one accessory in the space of the bone it rides on. */
+/** A part built from a primitive has no vertex colours (RGBA, like the hair shapes); give it white ones so it can be merged with a dome that does. */
+function withWhiteColor(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  if (!g.getAttribute("color")) g.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute("position").count * 4).fill(1), 4));
+  return g;
+}
+
 export function buildAccessory(rest: BodyRest, id: string): AccessoryResult | null {
   const choice = accessoryById(id);
   if (!choice) return null;
@@ -90,14 +96,14 @@ export function buildAccessory(rest: BodyRest, id: string): AccessoryResult | nu
       brim.rotateY(Math.PI);
       brim.translate(h.c.x, h.c.y + h.ry * 0.28, h.c.z + h.rz * 0.92);
       brim.rotateX(0);
-      geometry = mergeGeometries([dome.toNonIndexed(), brim.toNonIndexed()], false);
+      geometry = mergeGeometries([dome.toNonIndexed(), withWhiteColor(brim.toNonIndexed())], false);
       roughness = 0.85;
       break;
     }
     case "a_beanie": {
       const dome = cap(h, { scale: [1.12, 1.14, 1.13], front: 0.55, side: 0.2, back: 0.0, bump: 0.002, lift: 0.006 });
       const pom = sphere(new THREE.Vector3(h.c.x, h.c.y + h.ry * 1.16, h.c.z), [0.03, 0.03, 0.03], 0.04);
-      geometry = mergeGeometries([dome.toNonIndexed(), pom.toNonIndexed()], false);
+      geometry = mergeGeometries([dome.toNonIndexed(), withWhiteColor(pom.toNonIndexed())], false);
       roughness = 0.95;
       break;
     }

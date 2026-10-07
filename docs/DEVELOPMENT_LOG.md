@@ -379,3 +379,8 @@ Chronological record of decisions and changes. Newest first.
 - Added `clipAt(name, frac)` to the hair lab page to pause any clip at a fraction of its loop for contact sheets.
 - Captured 17 clips on a male and 9 on a female body. All retarget cleanly; no skeleton changes needed.
 - Known gaps listed in CHARACTER_SPEC §14 (cook arms, typing clip, missing door/ATM clips).
+
+## Phase 6: creator for phones
+- `CharacterStage` got `focus` (full/upper/head), `backdrop` (studio/room/street) and an `apiRef.snapshot()`; camera glides between focus points.
+- Creator: Skin tab, per-tab randomise, undo/redo, 8 saved looks with thumbnails, slimmer phone header, taller stage.
+- New files: `creator/randomise.ts`, `history.ts`, `savedLooks.ts`, `creator.test.ts` (8 tests).
