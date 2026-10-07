@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { useEffect, useRef, useState } from "react";
-import { counterOpen, serviceOn, shopOpen, type Faith, type Landmark } from "@thelife/game-core";
+import { counterOpen, schoolOpen, serviceOn, shopOpen, type Faith, type Landmark } from "@thelife/game-core";
 import { input } from "../controls/input";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
 import { Avatar } from "../lab/avatar";
@@ -13,6 +13,7 @@ import { GameIcon } from "../ui/icons";
 import BankPanel from "./BankPanel";
 import HospitalPanel from "./HospitalPanel";
 import PolicePanel from "./PolicePanel";
+import SchoolPanel from "./SchoolPanel";
 import ShopPanel from "./ShopPanel";
 import WorshipPanel from "./WorshipPanel";
 import { buildBankRoom } from "./bankScene";
@@ -20,13 +21,14 @@ import { buildHospitalRoom } from "./hospitalScene";
 import { ChargeButton, type Outcome } from "./panel";
 import { buildPoliceRoom } from "./policeScene";
 import type { PlaceRoom, Spot } from "./roomKit";
+import { buildSchoolRoom } from "./schoolScene";
 import { buildShopRoom } from "./shopScene";
 import { Visitor, Walker } from "./walker";
 import { buildWorshipRoom } from "./worshipScene";
 import "./place.css";
 
 /** The kinds of place with an inside you can walk into. */
-export const INSIDE_KINDS = ["bank", "hospital", "market", "fuel", "police", "church", "mosque"];
+export const INSIDE_KINDS = ["bank", "hospital", "market", "fuel", "police", "church", "mosque", "school"];
 
 /**
  * Inside a place you walked into: a 3D room you move around in (stick, arrow keys or WASD), with staff at their counters and other
@@ -87,9 +89,9 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         renderer.domElement.remove();
       });
       const busy = faith ? serviceOn(state, faith).on : false;
-      const room: PlaceRoom = faith ? buildWorshipRoom(place.name, faith, busy) : kind === "hospital" ? buildHospitalRoom(place.name) : kind === "police" ? buildPoliceRoom(place.name) : shopKind ? buildShopRoom(place.name, shopKind) : buildBankRoom(place.name);
+      const room: PlaceRoom = faith ? buildWorshipRoom(place.name, faith, busy) : kind === "hospital" ? buildHospitalRoom(place.name) : kind === "police" ? buildPoliceRoom(place.name) : kind === "school" ? buildSchoolRoom(place.name) : shopKind ? buildShopRoom(place.name, shopKind) : buildBankRoom(place.name);
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(faith ? "#e8dfcb" : kind === "hospital" ? "#d6eef0" : kind === "police" ? "#d3dbe9" : kind === "market" ? "#f1e3c6" : "#cfe0fa");
+      scene.background = new THREE.Color(faith ? "#e8dfcb" : kind === "hospital" ? "#d6eef0" : kind === "police" ? "#d3dbe9" : kind === "school" ? "#e8f0dc" : kind === "market" ? "#f1e3c6" : "#cfe0fa");
       scene.add(room.group);
       scene.add(new THREE.HemisphereLight("#f3f6ff", "#9aa8c4", 1.15));
       const sun = new THREE.DirectionalLight("#ffffff", 2.0);
@@ -259,13 +261,13 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
     const r = fn();
     const text = r.ok ? (r.text ?? "Done.") : (r.reason ?? "That didn't work.");
     setNote({ ok: r.ok, text });
-    const thanks = kind === "hospital" ? "There you go. Take care." : kind === "police" ? "Noted. Stay safe." : shopKind ? "Thank you! Anything else?" : faith ? "God bless you." : "Done. Anything else?";
+    const thanks = kind === "hospital" ? "There you go. Take care." : kind === "school" ? "Well done. Keep it up!" : kind === "police" ? "Noted. Stay safe." : shopKind ? "Thank you! Anything else?" : faith ? "God bless you." : "Done. Anything else?";
     staffRef.current?.say(r.ok ? thanks : text.length < 70 ? text : "Sorry, I can't do that.");
     session.notice(text);
     bump((n) => n + 1);
   };
 
-  const hours = kind === "bank" ? counterOpen(state) : shopKind ? shopOpen(state, shopKind) : null;
+  const hours = kind === "bank" ? counterOpen(state) : kind === "school" ? schoolOpen(state) : shopKind ? shopOpen(state, shopKind) : null;
   const sv = faith ? serviceOn(state, faith) : null;
   const headline = sv ? (sv.on ? "Service is on" : `Service ${sv.text}`) : hours ? (hours.open ? (kind === "bank" ? "Counter open" : "Open now") : `Closed · ${hours.text}`) : "Open all day and night";
   const headlineOpen = sv ? sv.on : hours ? hours.open : true;
@@ -279,6 +281,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
   ) : faith ? <WorshipPanel faith={faith} {...panelProps} />
     : kind === "hospital" ? <HospitalPanel {...panelProps} />
     : kind === "police" ? <PolicePanel {...panelProps} />
+    : kind === "school" ? <SchoolPanel {...panelProps} />
     : shopKind ? <ShopPanel kind={shopKind} {...panelProps} />
     : <BankPanel {...panelProps} />;
 

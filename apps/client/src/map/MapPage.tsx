@@ -31,7 +31,7 @@ import "./map.css";
 
 /** The neighbourhood, streamed in chunks. A test bench for the map engine: walk around, zoom out, and run the performance tour. */
 /** Kinds of place that have an inside you can walk into. */
-const INSIDE = new Set<string>(["bank", "hospital", "market", "fuel", "police", "church", "mosque"]);
+const INSIDE = new Set<string>(["bank", "hospital", "market", "fuel", "police", "church", "mosque", "school"]);
 /** How close to a door you must walk to go in, and how far you must walk off before the same door lets you in again. */
 const DOOR_REACH = 2.4;
 const DOOR_RESET = 6;

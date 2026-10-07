@@ -137,3 +137,6 @@ export const police = remote("police", core.policeService as (s: GameState, id: 
 
 // ---- church and mosque (in person)
 export const worship = remote("worship", core.worshipService as (s: GameState, faith: core.Faith, id: string) => core.WorshipResult, (a) => [a[1], a[2]]);
+
+// ---- the school (in person)
+export const school = remote("school", core.schoolService as (s: GameState, id: string) => core.SchoolResult);

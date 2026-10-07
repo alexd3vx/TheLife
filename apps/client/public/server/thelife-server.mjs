@@ -2639,7 +2639,7 @@ function parseRecords(raw) {
   const reports = Array.isArray(r.reports) ? r.reports.filter((x) => x && typeof x.no === "string" && typeof x.minute === "number").slice(-MAX_REPORTS).map((x) => ({ no: x.no.slice(0, 30), text: String(x.text ?? "").slice(0, 120), minute: x.minute })) : [];
   const num = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : void 0;
   const keep = (k, v) => v === void 0 ? {} : { [k]: v };
-  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), reports };
+  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), ...keep("lastSchool", num(r.lastSchool)), reports };
 }
 function deskOpen(state) {
   const clock = clockOf(state.minute);
@@ -4050,6 +4050,44 @@ function worshipService(state, faith, id) {
   return { ok: true, text: `Thank you. May it come back to you many times. Fun +${fun}. You have given \u20A6${rec.giving.toLocaleString()} in all.` };
 }
 
+// packages/game-core/src/school.ts
+var SCHOOL_GAP = 60;
+var SCHOOL_SERVICES = [
+  { id: "library", name: "Read in the library", blurb: "A quiet hour with the school's books. Free.", price: 0, skill: "knowledge", xp: 10, energy: 3, fun: 4 },
+  { id: "lab", name: "Computer lab hour", blurb: "Typing, spreadsheets and the internet on the school's machines.", price: 300, skill: "computer", xp: 12, energy: 4, fun: 0 },
+  { id: "evening", name: "Evening class: English and maths", blurb: "A teacher takes the class through a full lesson.", price: 1500, skill: "knowledge", xp: 30, energy: 8, fun: 0 }
+];
+function schoolOpen(state) {
+  const clock = clockOf(state.minute);
+  return openStatus("school", clock.hourFloat, (clock.day + 3) % 7);
+}
+function schoolWait(state) {
+  const last = state.records?.lastSchool;
+  return last === void 0 ? 0 : Math.max(0, Math.ceil(last + SCHOOL_GAP - state.minute));
+}
+function schoolService(state, id) {
+  const s = SCHOOL_SERVICES.find((x) => x.id === id);
+  if (!s) return { ok: false, reason: "The school does not offer that." };
+  const open = schoolOpen(state);
+  if (!open.open) return { ok: false, reason: `The school is closed (${open.text}).` };
+  const wait2 = schoolWait(state);
+  if (wait2 > 0) return { ok: false, reason: `Rest your mind first. You can study again in ${wait2} minute${wait2 === 1 ? "" : "s"}.` };
+  if (state.needs.energy < 20) return { ok: false, reason: "You are too tired to focus." };
+  if (s.price > 0) {
+    const r = transfer(state.ledger, PLAYER, SINK, s.price, s.name, state.minute);
+    if (!r.ok) return { ok: false, reason: `${s.name} costs \u20A6${s.price.toLocaleString()}. You have \u20A6${balance(state.ledger, PLAYER).toLocaleString()}.` };
+    state.stats.totalSpent += s.price;
+  }
+  const rec = state.records ??= { reports: [] };
+  rec.lastSchool = state.minute;
+  const before = skillLevel(state.skills[s.skill] ?? 0);
+  state.skills[s.skill] = (state.skills[s.skill] ?? 0) + s.xp;
+  const level = skillLevel(state.skills[s.skill]);
+  state.needs.energy = clampNeed(state.needs.energy - s.energy);
+  state.needs.fun = clampNeed(state.needs.fun + s.fun);
+  return { ok: true, text: `${s.name}${s.price ? ` (\u20A6${s.price.toLocaleString()})` : ""}: +${s.xp} ${s.skill} xp${level > before ? `, level ${level}!` : "."}` };
+}
+
 // packages/game-core/src/bank.ts
 var ATM_FEE = 65;
 var MIN_AMOUNT = 100;
@@ -4141,6 +4179,7 @@ var HANDLERS = {
   hospital: (sim, [id]) => str(id, 20) ? hospitalService(sim.state, id) : no(bad),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
   worship: (sim, [faith, id]) => str(faith, 10) && str(id, 20) ? worshipService(sim.state, faith, id) : no(bad),
+  school: (sim, [id]) => str(id, 20) ? schoolService(sim.state, id) : no(bad),
   police: (sim, [id]) => str(id, 20) ? policeService(sim.state, id) : no(bad),
   shopSnack: (sim, [kind, id]) => str(kind, 10) && str(id, 20) ? shopSnack(sim.state, kind, id, sim.traits.groceries) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),

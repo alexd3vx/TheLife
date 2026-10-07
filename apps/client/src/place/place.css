@@ -70,3 +70,6 @@
 .place-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .place-sheet-head b { font: 800 1.05rem system-ui; }
 .place-sheet-head button { border: 0; border-radius: 999px; padding: 9px 18px; background: #12233f; color: #fff; font: 800 .86rem system-ui; cursor: pointer; }
+.place-skills { grid-template-columns: 1fr 1fr; }
+.place-skills span { gap: 2px; }
+.place-skills b { font: 800 1.1rem system-ui; color: #12233f; }

@@ -45,6 +45,8 @@ export interface PlayerRecords {
   lastService?: number;
   lastCounsel?: number;
   giving?: number;
+  /** When you last studied at the school (game minutes). */
+  lastSchool?: number;
 }
 
 export interface GameState {

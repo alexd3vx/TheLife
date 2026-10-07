@@ -296,3 +296,7 @@ Chronological record of decisions and changes. Newest first.
 - A room is a function returning a `PlaceRoom` (`place/roomKit.ts`): the 3D group, spawn, walkable bounds, blockers, door, spots, staff and visitor waypoints. To add a place: build the room, add a panel, add its kind to `INSIDE` in `MapPage.tsx` and `PlaceInterior.tsx`.
 - Church and mosque (`game-core/worship.ts`, RPC `worship`, `place/worshipScene.ts`, `WorshipPanel.tsx`): pray quietly (every 3 hours), talk with the pastor or imam (every 6 hours), light a candle (₦200), give ₦500/₦2,000/₦10,000, join the main service (church Sunday 8-11AM, mosque Friday 12-2PM, once; the room fills with people while it is on). It all lifts fun, with a little rest. What you have given is kept in `state.records` (renamed `PlayerRecords`).
 - Not done yet: other online players do not appear inside a place (the server does not track who is in which building).
+
+## School
+
+- Schools can be walked into (`place/schoolScene.ts`, `SchoolPanel.tsx`, `game-core/school.ts`, RPC `school`). Open weekdays 7AM-4PM. Library hour (free, knowledge xp), computer lab hour (₦300, computer xp), evening class (₦1,500, bigger knowledge gain). One session per 60 minutes, needs energy over 20. Same skills as the phone courses and jobs.

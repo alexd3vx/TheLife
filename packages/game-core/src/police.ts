@@ -43,7 +43,7 @@ export function parseRecords(raw: unknown): PlayerRecords {
   const reports = Array.isArray(r.reports) ? r.reports.filter((x) => x && typeof x.no === "string" && typeof x.minute === "number").slice(-MAX_REPORTS).map((x) => ({ no: x.no.slice(0, 30), text: String(x.text ?? "").slice(0, 120), minute: x.minute })) : [];
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : undefined);
   const keep = <K extends string>(k: K, v: number | undefined) => (v === undefined ? {} : ({ [k]: v } as Record<K, number>));
-  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), reports };
+  return { ...keep("clearance", num(r.clearance)), ...keep("lastPrayer", num(r.lastPrayer)), ...keep("lastService", num(r.lastService)), ...keep("lastCounsel", num(r.lastCounsel)), ...keep("giving", num(r.giving)), ...keep("lastSchool", num(r.lastSchool)), reports };
 }
 
 /** Is the records desk open now? */
