@@ -300,3 +300,10 @@ Chronological record of decisions and changes. Newest first.
 ## School
 
 - Schools can be walked into (`place/schoolScene.ts`, `SchoolPanel.tsx`, `game-core/school.ts`, RPC `school`). Open weekdays 7AM-4PM. Library hour (free, knowledge xp), computer lab hour (₦300, computer xp), evening class (₦1,500, bigger knowledge gain). One session per 60 minutes, needs energy over 20. Same skills as the phone courses and jobs.
+
+## Portrait and landscape, no overlaps, tap to move indoors
+
+- PWA: the manifest now says `"orientation": "any"` (it was landscape only), so the installed app turns with the phone. An already installed app may need to be removed and added to the home screen again before the phone picks up the new manifest. Service worker caches bumped to v3.
+- Overlap fixes found by looking at the game at 390x844, 844x390, 360x640 and 820x1180: the online count no longer sits on the needs row on small screens (it shrinks to its number under the settings button; the need rings are smaller under 400 px); the Buy catalogue keeps its category row and header (they were squeezed to nothing by the item grid) and its search box is not clipped on small phones; long bag item names wrap and clip inside their tile; the profile character preview fills its box (its stylesheet was only loaded by the creator page).
+- Tap to move inside places: tap the floor and the character walks round the furniture (A* route in `place/walker.ts`), tap a ring, counter or the person behind it and the character walks up and opens that menu, tap beyond the front wall to walk out. The stick or keys still work and cancel a tapped route. The front doorway lane is now reachable (it was cut off by the wall check). The on-screen stick and buttons now default to Off (Settings, "On-screen stick and buttons (optional)"); players who already saved the setting keep theirs.
+- Seen but not fixed yet: the new-player film is still the flat 2D canvas one (`arrival/filmCanvas.ts`); the home toilet nook behind its partition has no door; the profile preview is a baked sprite, not the 3D character.

@@ -55,3 +55,4 @@
 .hud-avatar.tier-lapo { border-color: #9fd0ff; } .hud-avatar.tier-nepo { border-color: #d3b8ff; }
 .hud-on .play-top { display: none; }
 .is-buying .hud-avatar { display: none; }
+@media (max-width: 400px) { .hud-ring { width: 26px; height: 26px; } .hud-needs-row { gap: 5px; padding: 4px 6px; } }

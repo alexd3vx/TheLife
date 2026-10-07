@@ -145,7 +145,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       scene.add(me.root);
       const walker = new Walker(me, room);
       walkerRef.current = walker;
-      if (import.meta.env.DEV) (window as unknown as { __place: unknown }).__place = { walker, room };
+      if (import.meta.env.DEV) (window as unknown as { __place: unknown }).__place = { walker, room, project: (x: number, z: number) => { const v = new THREE.Vector3(x, 0, z).project(camera); const r = renderer.domElement.getBoundingClientRect(); return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height }; } };
       room.staff.forEach((spec, i) => {
         const a = staff[i]!;
         a.root.position.set(spec.x, spec.y ?? 0, spec.z);
@@ -191,6 +191,52 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       };
       follow(0, true);
 
+      // tap to move: tap the floor to walk there, tap a ring, a counter or the person behind it to walk up and use it
+      const ray = new THREE.Raycaster();
+      const ndc = new THREE.Vector2();
+      const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const hit = new THREE.Vector3();
+      const marker = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.18, 24), new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0, depthWrite: false }));
+      marker.rotation.x = -Math.PI / 2;
+      scene.add(marker);
+      let markerAge = 9;
+      const showMarker = (x: number, z: number) => {
+        marker.position.set(x, 0.04, z);
+        markerAge = 0;
+      };
+      const el = renderer.domElement;
+      let press: { x: number; y: number; t: number } | null = null;
+      const onDown = (e: PointerEvent) => {
+        press = { x: e.clientX, y: e.clientY, t: performance.now() };
+      };
+      const onUp = (e: PointerEvent) => {
+        const p = press;
+        press = null;
+        if (!p || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10 || performance.now() - p.t > 500) return;
+        if (openRef.current || leavingRef.current) return;
+        const box2 = el.getBoundingClientRect();
+        ndc.set(((e.clientX - box2.left) / box2.width) * 2 - 1, -((e.clientY - box2.top) / box2.height) * 2 + 1);
+        ray.setFromCamera(ndc, camera);
+        if (!ray.ray.intersectPlane(floor, hit)) return;
+        let spot = room.spots.find((s2) => Math.hypot(s2.x - hit.x, s2.z - hit.z) < 1.0) ?? null;
+        if (!spot) {
+          const person = room.staff.find((st) => Math.hypot(st.x - hit.x, st.z - hit.z) < 0.9);
+          if (person) spot = room.spots.filter((s2) => s2.focus !== "charge").sort((a2, b2) => Math.hypot(a2.x - person.x, a2.z - person.z) - Math.hypot(b2.x - person.x, b2.z - person.z))[0] ?? null;
+        }
+        if (spot) {
+          const target = spot;
+          if (walker.goTo(target.x, target.z, () => openSpot(target))) showMarker(target.x, target.z);
+        } else if (hit.z > room.bounds.maxZ + 0.1) {
+          if (walker.goTo(0, room.door.minZ + 0.4)) showMarker(0, room.bounds.maxZ);
+        } else if (walker.goTo(hit.x, hit.z)) showMarker(hit.x, hit.z);
+      };
+      el.addEventListener("pointerdown", onDown);
+      el.addEventListener("pointerup", onUp);
+      cleanups.push(() => {
+        el.removeEventListener("pointerdown", onDown);
+        el.removeEventListener("pointerup", onUp);
+      });
+
       const clock = new THREE.Clock();
       const loop = () => {
         raf = requestAnimationFrame(loop);
@@ -223,6 +269,9 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           bubble = null;
         }
         if (!leavingRef.current && walker.atDoor()) leave();
+        markerAge += dt;
+        (marker.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 - markerAge * 1.6);
+        marker.scale.setScalar(1 + markerAge * 2.2);
         follow(dt, false);
         renderer.render(scene, camera);
       };
@@ -295,7 +344,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           <b>{place.name}</b>
           <small className={headlineOpen ? "is-open" : ""}>{headline}</small>
         </div>
-        {ready && !open && !near && <p className="place-tip">Walk up to a counter to use it</p>}
+        {ready && !open && !near && <p className="place-tip">Tap the floor to walk, tap a counter to use it</p>}
         {ready && !open && near && (
           <button className="place-prompt" onClick={() => openSpot(near)}>
             <GameIcon name="hand" size={16} /> {near.label}

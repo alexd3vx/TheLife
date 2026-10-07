@@ -77,7 +77,7 @@ const KEY = "thelife.settings.v1";
 
 export function defaultSettings(): Settings {
   const base = GRAPHICS[recommendedPreset()];
-  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, homeView: "3d", cameraSpeed: 1, tapToWalk: true, keys: structuredClone(DEFAULT_KEYS), touchControls: "auto", touchOpacity: 0.7, touch: structuredClone(DEFAULT_TOUCH), haptics: true, invertLook: false, serverUrl: "" };
+  return { preset: "recommended", ...base, textureStyle: "realistic", showFps: true, showStats: false, nameTags: true, homeView: "3d", cameraSpeed: 1, tapToWalk: true, keys: structuredClone(DEFAULT_KEYS), touchControls: "off", touchOpacity: 0.7, touch: structuredClone(DEFAULT_TOUCH), haptics: true, invertLook: false, serverUrl: "" };
 }
 
 function clamp(v: unknown, lo: number, hi: number, d: number): number {

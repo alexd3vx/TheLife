@@ -42,3 +42,5 @@ i > u { display: block; height: 100%; border-radius: 6px; background: #2f6bff; t
 .prof-pic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(145deg, #5b9bff, #2f55d8); color: #fff; font: 800 .85rem system-ui; }
 .prof-people button { border: 0; border-radius: 999px; padding: 9px 14px; background: #e1ebff; color: #12233f; font: 700 .8rem system-ui; cursor: pointer; }
 .prof-empty { display: block !important; text-align: center; color: #5c6f92; background: transparent !important; box-shadow: none !important; font: 600 .84rem system-ui; }
+/* the character preview fills its box even when the creator's stylesheet has not been loaded */
+.prof-stage .studio-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }

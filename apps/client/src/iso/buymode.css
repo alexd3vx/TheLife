@@ -44,3 +44,8 @@
 .is-buying .edit-pad button { background: #e1ebff; color: #12233f; }
 .is-buying .edit-pad button:active { background: #2f6bff; color: #fff; }
 .is-buying .edit-pad .turn { background: #cfe0ff; }
+
+/* the sheet's rows never squeeze each other: header and categories keep their height, only the grid scrolls */
+.buy-grab, .buy-sheet header, .buy-cats { flex: none; }
+.buy-grid { flex: 1 1 auto; min-height: 0; }
+@media (max-width: 420px) { .buy-sheet h3 { font-size: 1.15rem; } .buy-sheet header { gap: 8px; padding-left: 14px; padding-right: 14px; } .buy-sheet header button { padding: 0 14px; } .buy-sheet header input { padding: 13px 14px; } }

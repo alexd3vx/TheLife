@@ -214,7 +214,7 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
               <Toggle on={s.invertLook} onChange={(v) => set({ invertLook: v })} label="Flip camera drag" />
             </Row>
             <Row title="On-screen controls" hint="The stick and buttons. Auto shows them on phones and tablets.">
-              <Segments label="On-screen controls" value={s.touchControls} options={[{ id: "auto", label: "Auto" }, { id: "on", label: "On" }, { id: "off", label: "Off" }]} onChange={(v) => set({ touchControls: v })} />
+              <Segments label="On-screen stick and buttons (optional)" value={s.touchControls} options={[{ id: "auto", label: "Auto" }, { id: "on", label: "On" }, { id: "off", label: "Off" }]} onChange={(v) => set({ touchControls: v })} />
             </Row>
             <Row title="Button see-through" hint="How faint the on-screen controls are.">
               <Slider label="Button see-through" value={s.touchOpacity} min={0.25} max={1} step={0.05} onChange={(v) => set({ touchOpacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
