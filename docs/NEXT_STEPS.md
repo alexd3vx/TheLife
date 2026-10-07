@@ -172,5 +172,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Elections (Q58):** weekly, Sunday 8pm; campaign during the week, vote in person at the polling unit, news cutscene at the result. (7 Oct)
 - **Finding friends (Q59):** meet in places (Nearby list), share ID or number, invite link with a small reward for both, suggestions, **and by username and by social media** (search a username; follow from LifeGram). (7 Oct)
 - **Chat rules (Q60):** block hate, threats, scams and sexual content; allow banter and slang (swearing allowed in private chats); reports reviewed. (7 Oct)
+- **Day and night (Q61):** all four: opening hours, danger and risk at night, a sleep cycle (tired players are slower; night sleep restores more), and real sunrise and sunset with golden hour, street lamps and outages dimming blocks. (7 Oct)
+- **Power cuts (Q62):** area-based outages (rich areas cut less); generator or inverter keeps lights and fridge on at a fuel cost; the governor's weekly promise changes frequency. (7 Oct)
+- **Fast travel (Q63):** pay and ride; watch the 3D ride or skip it; the clock still moves. (7 Oct)
+- **Food (Q64):** recipes with real ingredients (fridge, spoilage, cooking), plus eating out and delivery. (7 Oct)
 
-*Questions asked so far: 60 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 64 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
