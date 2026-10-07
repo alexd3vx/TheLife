@@ -8,8 +8,7 @@ import { ExtraApp } from "./PhoneExtras";
 import { LifeStore, Ring, Settings } from "./PhoneSystem";
 import { Icon } from "./icons";
 import { nameOf, styleOf, type ClientApp } from "./appStyle";
-import SocialApp from "./PhoneSocial";
-import { social, useSocial } from "../net/social";
+import { useSocial } from "../net/social";
 import { AppActive, AppBack } from "./active";
 import "./phone.css";
 
@@ -18,7 +17,7 @@ const LOOK = { basic: "go", mid: "plus", flagship: "max" } as const;
 const APP_NAME = nameOf;
 /** The dock holds four apps on every model; the grid holds the rest, then anything you download. */
 const DOCK: ClientApp[] = ["chat", "pay", "shop", "news"];
-const GRID: ClientApp[] = ["social", "store", "jobs", "maps", "settings", "battery"];
+const GRID: ClientApp[] = ["store", "jobs", "maps", "settings", "battery"];
 const PAGE_SIZE: Record<PhoneTier, number> = { basic: 20, mid: 16, flagship: 16 };
 
 /** If an app throws while drawing, show what happened and a restart button instead of a blank screen. */
@@ -282,7 +281,6 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
                       <AppActive.Provider value={app === current && !switcher}>
                       <AppBoundary name={APP_NAME(app)}>
                       {app === "chat" && <Chat state={state} act={act} startCall={startCall} refresh={refresh} />}
-                      {app === "social" && <SocialApp />}
                       {app === "pay" && <Pay state={state} act={act} />}
                       {app === "shop" && <Shop state={state} act={act} session={session} />}
                       {app === "jobs" && <Jobs state={state} act={act} />}
@@ -465,7 +463,7 @@ function LockScreen({ state, onUnlock, onOpen }: { state: GameState; onUnlock():
 }
 
 function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTier; onOpen(a: ClientApp): void; hidden: boolean }) {
-  useSocial();
+  const soc = useSocial();
   const phone = state.phone;
   const clock = clockOf(state.minute);
   const apps: ClientApp[] = [...GRID, ...phone.installed];
@@ -484,8 +482,8 @@ function Home({ state, tier, onOpen, hidden }: { state: GameState; tier: PhoneTi
   const cut = powerCutOn(clock.day);
   const upcoming = cut && state.minute < cut.endMinute ? cut : null;
   const icon = (id: ClientApp, isNew = false) => {
-    const supported = id === "battery" || id === "social" || hasApp(phone, id as AnyAppId);
-    const badge = id === "chat" ? Object.values(phone.threads).reduce((s, t) => s + t.unread, 0) : id === "social" ? social.unread : 0;
+    const supported = id === "battery" || hasApp(phone, id as AnyAppId);
+    const badge = id === "chat" ? Object.values(phone.threads).reduce((s, t) => s + t.unread, 0) + soc.unread : 0;
     return (
       <button key={id} className={`phone-icon${supported ? "" : " is-locked"}${isNew ? " is-new" : ""}`} onClick={() => onOpen(id)} tabIndex={hidden ? -1 : 0}>
         <span className="phone-icon-tile" style={{ background: `linear-gradient(150deg, ${styleOf(id).from}, ${styleOf(id).to})` }}>
@@ -572,7 +570,6 @@ function Switcher({ running, state, onOpen, onClose, onCloseAll, onDismiss }: { 
     if (app === "news") return `${lagosDateLabel(clockOf(state.minute).day)} headlines`;
     if (app === "maps") return "Around you";
     if (app === "battery") return `${Math.round(p.battery)}% battery`;
-    if (app === "social") return "People and messages";
     return appInfo(app).blurb;
   };
   const cards = [...running].reverse();

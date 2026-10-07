@@ -1,3 +1,5 @@
+import PlayerChats, { type PlayersView } from "./PhonePlayers";
+import { useSocial } from "../net/social";
 import { useBackHandler } from "./active";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -77,7 +79,10 @@ function Amount({ value, onChange, quick }: { value: string; onChange(v: string)
 
 export function Chat({ state, act, startCall, refresh }: { state: GameState; act: Act; startCall(id: string): void; refresh(): void }) {
   const [current, setCurrent] = useState<string | null>(null);
-  useBackHandler(current ? () => setCurrent(null) : null);
+  const [players, setPlayers] = useState<PlayersView | null>(null);
+  const social = useSocial();
+  // Back from a conversation with a player goes to the list of people, then to the list of chats
+  useBackHandler(players ? () => setPlayers(players.kind === "thread" ? null : null) : current ? () => setCurrent(null) : null);
   const contacts = contactsFor(state.profile);
   const endRef = useRef<HTMLDivElement>(null);
   const t = current ? state.phone.threads[current] : undefined;
@@ -87,9 +92,47 @@ export function Chat({ state, act, startCall, refresh }: { state: GameState; act
     if (list) list.scrollTop = list.scrollHeight;
   }, [t?.messages.length, current]);
 
+  useEffect(() => {
+    if (social.pendingThread) {
+      setPlayers({ kind: "thread", uid: social.pendingThread });
+      social.pendingThread = null;
+    }
+  }, [social.version, social]);
+
+  if (players) return <PlayerChats view={players} go={setPlayers} />;
+
   if (!current) {
+    const threads = [...social.threads.values()].sort((a, b) => (b.lines.at(-1)?.at ?? 0) - (a.lines.at(-1)?.at ?? 0));
     return (
       <div className="pa-page">
+        <p className="pa-section">Players</p>
+        <div className="pa-group">
+          <button className="pa-chat-row" onClick={() => setPlayers({ kind: "nearby" })}>
+            <span className="pa-avatar tone-2"><Icon name="chat" size={18} /></span>
+            <span className="pa-row-main">
+              <strong>Nearby</strong>
+              <small>{social.nearby.at(-1) ? `${social.nearby.at(-1)!.mine ? "You: " : `${social.nearby.at(-1)!.name}: `}${social.nearby.at(-1)!.text}` : "Talk to people close to you in the city"}</small>
+            </span>
+            <span className="pa-chat-meta">{social.nearbyUnread > 0 && <span className="pa-badge">{social.nearbyUnread}</span>}</span>
+          </button>
+          {threads.map((t) => (
+            <button key={t.uid} className="pa-chat-row" onClick={() => setPlayers({ kind: "thread", uid: t.uid })}>
+              <span className={`pa-avatar tone-${t.uid.charCodeAt(0) % 5}`}>{t.name[0]}</span>
+              <span className="pa-row-main">
+                <strong>{t.name}</strong>
+                <small>{t.lines.at(-1) ? `${t.lines.at(-1)!.mine ? "You: " : ""}${t.lines.at(-1)!.text}` : `ID ${t.uid}`}</small>
+              </span>
+              <span className="pa-chat-meta">
+                {t.lines.at(-1) && <small>{new Date(t.lines.at(-1)!.at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lagos" })}</small>}
+                {t.unread > 0 && <span className="pa-badge">{t.unread}</span>}
+              </span>
+            </button>
+          ))}
+          <button className="pa-chat-row" onClick={() => setPlayers({ kind: "people" })}>
+            <span className="pa-avatar tone-4">+</span>
+            <span className="pa-row-main"><strong>Find people</strong><small>Your ID is {social.selfUid || "…"} · add friends by ID</small></span>
+          </button>
+        </div>
         <p className="pa-section">Messages</p>
         <div className="pa-group">
           {contacts.map((c) => {

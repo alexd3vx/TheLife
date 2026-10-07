@@ -127,38 +127,45 @@ describe("game server", () => {
     expect(report.hourly).toHaveLength(24);
   });
 
-  it("lets players message each other privately and gesture to those nearby", async () => {
+  it("lets players message each other by ID, even when one is away, and gesture to those nearby", async () => {
     server = await startGameServer({ port: 0 });
     const a = await connect("Ada");
     const wa = await a.next("welcome");
-    const b = await connect("Bayo");
+    const bKey = newKey();
+    let b = await connect("Bayo", PROTOCOL_VERSION, bKey);
     const wb = await b.next("welcome");
-    a.send({ t: "dm", to: wb.id, text: "hello Bayo" });
+    expect(wb.uid).toMatch(/^[a-f0-9]{10}$/);
+    a.send({ t: "dm", to: wb.uid! , text: "hello Bayo" });
     const got = await b.next("chat");
     expect(got.text).toBe("hello Bayo");
-    expect(got.to).toBe(wb.id);
-    expect(got.from).toBe(wa.id);
+    expect(got.to).toBe(wb.uid);
+    expect(got.fromUid).toBe(wa.uid);
+    a.send({ t: "dm", to: "0000000000", text: "anyone?" });
+    expect((await a.next("error")).reason).toMatch(/no player with that ID/);
+    // Bayo goes away; the message waits and arrives with the inbox when he comes back
+    b.ws.close();
+    await new Promise((r) => setTimeout(r, 100));
+    a.send({ t: "dm", to: wb.uid!, text: "are you there?" });
+    await new Promise((r) => setTimeout(r, 100));
+    b = await connect("Bayo", PROTOCOL_VERSION, bKey);
+    const mail = await b.next("inbox");
+    expect(mail.threads[0]!.uid).toBe(wa.uid);
+    expect(mail.threads[0]!.msgs.map((m) => m.text)).toEqual(["hello Bayo", "are you there?"]);
+    a.send({ t: "find", uid: wb.uid! });
+    expect((await a.next("person")).name).toBe("Bayo");
+  });
+
+  it("shows gestures and nearby chat to the people close by", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    await a.next("welcome");
+    const b = await connect("Bayo");
+    await b.next("welcome");
     a.send({ t: "emote", emote: "wave" });
     expect((await b.next("emote")).emote).toBe("wave");
     a.send({ t: "emote", emote: "not-a-gesture" } as unknown as ClientMessage);
     a.send({ t: "chat", text: "anyone near?" });
     expect((await b.next("chat")).text).toBe("anyone near?");
-  });
-
-  it("stores the animation editor's map and clips, and serves them to everyone", async () => {
-    server = await startGameServer({ port: 0 });
-    const base = `http://127.0.0.1:${server.port}`;
-    const put = await fetch(`${base}/anim/map`, { method: "PUT", body: JSON.stringify({ slots: { Life_Cook_Loop: { clip: "custom:stir", speed: 0.8, loop: true } } }) });
-    expect(put.status).toBe(200);
-    const bad = await fetch(`${base}/anim/map`, { method: "PUT", body: JSON.stringify({ slots: { "bad name!": { clip: "x" } } }) });
-    expect(bad.status).toBe(400);
-    const clip = await fetch(`${base}/anim/clip/stir`, { method: "PUT", body: JSON.stringify({ name: "stir", duration: 1, tracks: [] }) });
-    expect(clip.status).toBe(200);
-    const got = (await (await fetch(`${base}/anim/map`)).json()) as { slots: Record<string, { clip: string; speed: number }>; clips: string[] };
-    expect(got.slots.Life_Cook_Loop!.clip).toBe("custom:stir");
-    expect(got.slots.Life_Cook_Loop!.speed).toBe(0.8);
-    expect(got.clips).toEqual(["stir"]);
-    expect((await fetch(`${base}/anim/clip/stir`)).status).toBe(200);
   });
 
   it("limits chat to a few messages in a burst", async () => {

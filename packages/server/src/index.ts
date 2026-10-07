@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { LifeStore } from "./lives.js";
 import { Room, type Player } from "./world.js";
 import { Analytics } from "./analytics.js";
+import { Inbox, uidOf } from "./inbox.js";
 import { AnimStore, cleanMap, validName } from "./animstore.js";
 
 export interface GameServerOptions {
@@ -40,6 +41,7 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 export async function startGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const store = new LifeStore(options.dataDir ? join(options.dataDir, "lives.json") : null);
   const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
+  const inbox = new Inbox(options.dataDir ? join(options.dataDir, "inbox.json") : null);
   const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];
@@ -201,8 +203,11 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         me = joined.player;
         sockets.set(me.id, ws);
         analytics.visit(me.id, key, account ? "account" : "guest", me.where === "world" ? "world" : "home");
-        send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
+        inbox.touch(uidOf(me.key), me.name, now);
+        send(ws, { t: "welcome", id: me.id, uid: uidOf(me.key), room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
+        const mail = inbox.inbox(uidOf(me.key));
+        if (mail.length) send(ws, { t: "inbox", threads: mail });
         if (me.life) {
           sendLife(me);
           sendHome(me, me.where === "world");
@@ -276,13 +281,26 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         }
         case "dm": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
-          const other = room.players.get(message.to);
-          const target = other ? sockets.get(other.id) : undefined;
-          if (!other || !target || other.id === me.id) return send(ws, { t: "error", reason: "That player isn't here any more." });
-          const line: ServerMessage = { t: "chat", from: me.id, name: me.name, text: message.text, at: now, to: other.id };
+          const mine = uidOf(me.key);
+          const known = inbox.nameOf(message.to);
+          if (message.to === mine) return send(ws, { t: "error", reason: "That is your own ID." });
+          if (known === null) return send(ws, { t: "error", reason: "There is no player with that ID." });
+          inbox.send(mine, message.to, message.text, now);
+          const line: ServerMessage = { t: "chat", from: me.id, fromUid: mine, name: me.name, text: message.text, at: now, to: message.to };
           send(ws, line);
-          send(target, line);
+          for (const other of room.players.values()) {
+            if (uidOf(other.key) !== message.to) continue;
+            const target = sockets.get(other.id);
+            if (target) send(target, line);
+          }
           return;
+        }
+        case "find": {
+          if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "Slow down a little." });
+          const name = inbox.nameOf(message.uid);
+          if (name === null || message.uid === uidOf(me.key)) return send(ws, { t: "error", reason: message.uid === uidOf(me.key) ? "That is your own ID." : "There is no player with that ID." });
+          inbox.open(uidOf(me.key), message.uid);
+          return send(ws, { t: "person", uid: message.uid, name });
         }
         case "emote": {
           if (me.where !== "world" || !room.allow(me, "chat", now)) return;
@@ -369,6 +387,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         clearInterval(interval);
         clearInterval(lifeInterval);
         analytics.close();
+        inbox.close();
         const now = Date.now();
         for (const p of room.players.values()) room.saveLife(p, now);
         store.flush();

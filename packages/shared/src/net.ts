@@ -22,6 +22,8 @@ export interface PlayerView {
   level: number;
   /** How the character looks (a cleaned JSON string, see `cleanLook`). */
   look?: string;
+  /** The player's own ID: the same every time they play, and what people use to message or find them. */
+  uid?: string;
 }
 
 export type Where = "home" | "world";
@@ -54,8 +56,10 @@ export type ClientMessage =
   /** Arrives somewhere by a paid ride (taxi, keke, danfo): the server moves the player there if they just paid for a trip. */
   | { t: "arrive"; x: number; z: number }
   | { t: "chat"; text: string }
-  /** A private message to one player (wherever they are). */
+  /** A private message to one player by their ID (they get it when they next play if they are away). */
   | { t: "dm"; to: string; text: string }
+  /** Looks a player up by ID (to start a chat with them). */
+  | { t: "find"; uid: string }
   /** A gesture the other players nearby can see (wave, cheer, talk). */
   | { t: "emote"; emote: string }
   | { t: "pay"; to: string; amount: number }
@@ -64,11 +68,14 @@ export type ClientMessage =
   | { t: "rtc"; to: string; data: unknown };
 
 export type ServerMessage =
-  | { t: "welcome"; id: string; room: string; protocol: number; money: number; players: PlayerView[]; serverTime: number }
+  | { t: "welcome"; id: string; /** Your own player ID. */ uid?: string; room: string; protocol: number; money: number; players: PlayerView[]; serverTime: number }
+  /** Every private conversation this player has, sent once after they arrive. */
+  | { t: "inbox"; threads: { uid: string; name: string; msgs: { from: string; text: string; at: number }[] }[] }
+  | { t: "person"; uid: string; name: string }
   | { t: "join"; player: PlayerView }
   | { t: "leave"; id: string }
   | { t: "state"; tick: number; serverTime: number; players: Pick<PlayerView, "id" | "x" | "y" | "z" | "yaw" | "clip" | "level">[] }
-  | { t: "chat"; from: string; name: string; text: string; at: number; /** Set for a private message: who it was sent to. */ to?: string }
+  | { t: "chat"; from: string; name: string; text: string; at: number; /** Set for a private message: the ID of the player it was sent to. */ to?: string; /** The ID of the sender, for private messages. */ fromUid?: string }
   | { t: "emote"; from: string; emote: string }
   | { t: "money"; balance: number; note: string }
   /** The authoritative state of your life. `ack` is the last `do` id the server has handled; `active` is the action in progress. */
@@ -153,6 +160,8 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
       return text ? { t: "dm", to: m.to, text } : null;
     }
+    case "find":
+      return typeof m.uid === "string" && /^[a-f0-9]{6,16}$/.test(m.uid.trim().toLowerCase()) ? { t: "find", uid: m.uid.trim().toLowerCase() } : null;
     case "emote":
       return typeof m.emote === "string" && (EMOTES as readonly string[]).includes(m.emote) ? { t: "emote", emote: m.emote } : null;
     case "pay":

@@ -507,3 +507,13 @@ button.phone-btn-side { border: 0; padding: 0; cursor: pointer; }
 .soc-form input { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 11px 14px; background: #e1ebff; font: 600 .86rem system-ui; color: #12233f; outline: none; }
 .soc-form button { border: 0; border-radius: 999px; padding: 0 16px; background: #2f6bff; color: #fff; font: 800 .82rem system-ui; cursor: pointer; }
 .soc-form button:disabled { opacity: .4; }
+
+/* LifeChat with real players */
+.pa-compose-live { display: flex; gap: 8px; padding: 8px 12px 12px; }
+.pa-compose-live input { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 11px 14px; background: rgba(120, 150, 210, .18); color: inherit; font: 600 .88rem system-ui; outline: none; }
+.pa-compose-live button { width: 44px; border: 0; border-radius: 50%; background: #2f6bff; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.pa-compose-live button:disabled { opacity: .4; }
+.pa-find { display: flex; gap: 8px; padding: 10px; }
+.pa-find input { flex: 1; min-width: 0; border: 0; border-radius: 12px; padding: 11px 12px; background: rgba(120, 150, 210, .18); color: inherit; font: 700 .92rem ui-monospace, monospace; letter-spacing: .08em; outline: none; }
+.pa-find button { border: 0; border-radius: 12px; padding: 0 16px; background: #2f6bff; color: #fff; font: 800 .84rem system-ui; cursor: pointer; }
+.pa-find button:disabled { opacity: .4; }

@@ -4,6 +4,7 @@ import type { PlayerView, ServerMessage } from "@thelife/shared";
 import type { MapRuntime } from "../map/runtime";
 import type { NetStatus } from "./connection";
 import { world } from "./world";
+import { social } from "./social";
 import { useServerStats } from "./useServerStats";
 import "./online.css";
 
@@ -141,7 +142,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
     e.preventDefault();
     const text = draft.trim();
     if (!text) return;
-    world.send(dmTo ? { t: "dm", to: dmTo, text } : { t: "chat", text });
+    world.send(dmTo && players.find((p) => p.id === dmTo)?.uid ? { t: "dm", to: players.find((p) => p.id === dmTo)!.uid!, text } : { t: "chat", text });
     setDraft("");
   };
 
@@ -202,7 +203,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
                       </span>
                     ) : (
                       <span className="net-actions">
-                        <button onClick={() => setDmTo(p.id)}>Message</button>
+                        <button onClick={() => { if (p.uid) { social.startWith(p.uid, p.name); window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "chat" })); setOpen(false); } }}>Message</button>
                         <button onClick={() => setPaying(p.id)}>Pay</button>
                       </span>
                     )}
@@ -212,7 +213,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
               {!chatting && (
                 <div className="net-stats">
                   {server && <p className="net-note">{server.online} online · {server.guests} guest{server.guests === 1 ? "" : "s"} · {server.inWorld} out in Lagos · {server.viewsToday} views today</p>}
-                  <button className="net-open-chat" onClick={() => setChatting(true)}><GameIcon name="chat" size={14} /> Open chat</button>
+                  <button className="net-open-chat" onClick={() => { window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "chat" })); setOpen(false); }}><GameIcon name="chat" size={14} /> Open LifeChat</button>
                 </div>
               )}
               {chatting && <div className="net-log" ref={logRef} aria-live="polite">

@@ -268,3 +268,9 @@ Chronological record of decisions and changes. Newest first.
 - Phone: a Social app (nearby chat, private messages, people list) kept by `net/social.ts`.
 - Buy mode (`iso/BuyMode.tsx`), profile sheet (`ui/ProfileSheet.tsx`), bag redesign, arrow nudges that move the piece at once and rebuild the room a moment later.
 - The service worker no longer serves an old `manifest.json` (that is why returning players missed new animation packs and saw cooking as walking).
+
+## Bank branch, chat by player ID
+
+- Places with an inside: `place/PlaceInterior.tsx` + `place/bankScene.ts` (a lobby with a teller and cash machines). Walk to a bank door in the street and tap "Go into". The counter (office hours) and the cash machine (any time, ₦65) work the same savings and loan as the phone's LifePay, so they work on any phone, even the basic one without banking (`game-core/bank.ts`, RPCs `bankDeposit/Withdraw/Borrow/Repay`). The overlay lives inside the street page, so the position and connection are kept.
+- Chat: no separate Social app any more. LifeChat has a Players section: Nearby (90 m), private conversations, and Find people. Every player has an ID (`uidOf(key)`, shown in LifeChat); the server (`inbox.ts`, `inbox.json` in the data folder) keeps private messages so they wait for someone who is away, and finds people by ID. Update the VPS for this.
+- The fidget animation is gone.

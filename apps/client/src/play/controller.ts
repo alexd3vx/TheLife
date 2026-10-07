@@ -583,7 +583,6 @@ export class CharacterController {
     if (needs.energy < 45) options.push({ clip: "Life_Yawn", weight: 1 + (45 - needs.energy) / 10 });
     if (needs.energy < 65) options.push({ clip: "Life_Stretch", weight: 1 });
     if (needs.hunger < 40) options.push({ clip: "Life_BellyRub", weight: 1 + (40 - needs.hunger) / 10 });
-    if (needs.bladder < 35) options.push({ clip: "Life_Fidget", weight: 1 + (35 - needs.bladder) / 10 });
     if (options.length === 0) {
       this.nextGestureAt = this.clock + 10;
       return;

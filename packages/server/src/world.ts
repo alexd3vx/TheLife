@@ -1,3 +1,4 @@
+import { uidOf } from "./inbox.js";
 import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
@@ -316,6 +317,6 @@ export class Room {
   }
 
   view(p: Player): PlayerView {
-    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look };
+    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look, uid: uidOf(p.key) };
   }
 }

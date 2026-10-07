@@ -77,6 +77,8 @@ function parseClientMessage(raw) {
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
       return text ? { t: "dm", to: m.to, text } : null;
     }
+    case "find":
+      return typeof m.uid === "string" && /^[a-f0-9]{6,16}$/.test(m.uid.trim().toLowerCase()) ? { t: "find", uid: m.uid.trim().toLowerCase() } : null;
     case "emote":
       return typeof m.emote === "string" && EMOTES.includes(m.emote) ? { t: "emote", emote: m.emote } : null;
     case "pay":
@@ -978,14 +980,14 @@ function streamData(state, mb) {
   }
   return done();
 }
-function buyTicket(state, label, price, fun) {
+function buyTicket(state, label2, price, fun) {
   if (price > 0) {
-    const r = transfer(state.ledger, PLAYER, SINK, price, label, state.minute);
+    const r = transfer(state.ledger, PLAYER, SINK, price, label2, state.minute);
     if (!r.ok) return fail(`That costs \u20A6${price.toLocaleString()}. You don't have enough.`);
     state.stats.totalSpent += price;
   }
   addFun(state, fun);
-  return done(price > 0 ? `Ticket booked: ${label}.` : `You're going: ${label}.`);
+  return done(price > 0 ? `Ticket booked: ${label2}.` : `You're going: ${label2}.`);
 }
 function bookTicket(state, kind, title) {
   const day = dayOf(state);
@@ -1933,8 +1935,8 @@ var Sim = class {
   }
   start(requested, forced = false) {
     const actionId = this.resolve(requested);
-    const check = forced ? { ok: true } : this.canStart(actionId);
-    if (!check.ok) return check;
+    const check2 = forced ? { ok: true } : this.canStart(actionId);
+    if (!check2.ok) return check2;
     if (this.active) this.cancel();
     const def = ACTIONS[actionId];
     const recipeCook = (def.id === "cook" || def.id === "cookQuick") && !!this.state.kitchen.cooking;
@@ -3784,6 +3786,101 @@ function payRide(state, ride, meters) {
   return { ok: true, text: option.fare > 0 ? `${option.label}: \u20A6${option.fare.toLocaleString()}.` : `${option.label}.`, fare: option.fare };
 }
 
+// packages/game-core/src/places.ts
+var ALWAYS = { open: 0, close: 24 };
+var HOURS = {
+  airport: ALWAYS,
+  police: ALWAYS,
+  hospital: ALWAYS,
+  fire: ALWAYS,
+  hotel: ALWAYS,
+  school: { open: 7, close: 16, weekdaysOnly: true },
+  church: { open: 5, close: 21 },
+  mosque: { open: 4, close: 22 },
+  bank: { open: 8, close: 16, weekdaysOnly: true },
+  fuel: { open: 6, close: 22 },
+  market: { open: 7, close: 19 },
+  station: { open: 5, close: 22 },
+  museum: { open: 9, close: 17 },
+  government: { open: 8, close: 16, weekdaysOnly: true },
+  stadium: { open: 9, close: 22 },
+  park: { open: 6, close: 20 },
+  port: { open: 6, close: 18 }
+};
+var label = (h) => `${(Math.floor(h) + 11) % 12 + 1}${h % 24 >= 12 && h % 24 < 24 ? "PM" : "AM"}`;
+function openStatus(kind, hour, weekday) {
+  const h = HOURS[kind];
+  if (h.open === 0 && h.close === 24) return { open: true, text: "Open 24h" };
+  const weekend = weekday === 0 || weekday === 6;
+  if (h.weekdaysOnly && weekend) return { open: false, text: "closed today" };
+  if (hour >= h.open && hour < h.close) return { open: true, text: `Open \xB7 till ${label(h.close)}` };
+  return { open: false, text: hour < h.open ? `opens ${label(h.open)}` : `opens ${label(h.open)} tomorrow` };
+}
+
+// packages/game-core/src/bank.ts
+var ATM_FEE = 65;
+var MIN_AMOUNT = 100;
+var savingsBalance = (state) => balance(state.ledger, SAVINGS);
+function counterOpen(state) {
+  const clock = clockOf(state.minute);
+  const weekday = (clock.day + 3) % 7;
+  return openStatus("bank", clock.hourFloat, weekday);
+}
+function check(state, amount, atm) {
+  if (typeof amount !== "number" || !Number.isInteger(amount) || amount < MIN_AMOUNT) return `The smallest amount is \u20A6${MIN_AMOUNT}.`;
+  if (amount > 1e8) return "That is more than the bank handles at once.";
+  if (!atm) {
+    const c = counterOpen(state);
+    if (!c.open) return `The counter is closed (${c.text}). Use the cash machine, or come back.`;
+  }
+  return null;
+}
+function takeFee(state) {
+  if (balance(state.ledger, PLAYER) >= ATM_FEE) {
+    transfer(state.ledger, PLAYER, SINK, ATM_FEE, "Cash machine fee", state.minute);
+    state.stats.totalSpent += ATM_FEE;
+  }
+}
+function bankDeposit(state, amount, atm = false) {
+  const bad2 = check(state, amount, atm);
+  if (bad2) return { ok: false, reason: bad2 };
+  const fee = atm ? ATM_FEE : 0;
+  if (balance(state.ledger, PLAYER) < amount + fee) return { ok: false, reason: fee ? `You need \u20A6${(amount + fee).toLocaleString()} (the machine takes \u20A6${fee}).` : "You don't have that much." };
+  transfer(state.ledger, PLAYER, SAVINGS, amount, "Paid into savings", state.minute);
+  if (fee) takeFee(state);
+  return { ok: true, text: `Saved \u20A6${amount.toLocaleString()}. Savings: \u20A6${savingsBalance(state).toLocaleString()}.` };
+}
+function bankWithdraw(state, amount, atm = false) {
+  const bad2 = check(state, amount, atm);
+  if (bad2) return { ok: false, reason: bad2 };
+  if (savingsBalance(state) < amount) return { ok: false, reason: `You only have \u20A6${savingsBalance(state).toLocaleString()} saved.` };
+  transfer(state.ledger, SAVINGS, PLAYER, amount, "Taken out of savings", state.minute);
+  if (atm) takeFee(state);
+  return { ok: true, text: `Took out \u20A6${amount.toLocaleString()}. Savings: \u20A6${savingsBalance(state).toLocaleString()}.` };
+}
+function bankBorrow(state, amount) {
+  const bad2 = check(state, amount, false);
+  if (bad2) return { ok: false, reason: bad2 };
+  const p = state.phone;
+  if (p.loan) return { ok: false, reason: "Pay off your current loan first." };
+  if (amount > loanLimit(state.profile)) return { ok: false, reason: `The most they will lend you is \u20A6${loanLimit(state.profile).toLocaleString()}.` };
+  transfer(state.ledger, "mint", PLAYER, amount, "Loan from the bank", state.minute);
+  p.loan = { owed: Math.round(amount * 1.1), sinceDay: Math.floor(state.minute / 1440) + 1 };
+  return { ok: true, text: `\u20A6${amount.toLocaleString()} paid out. You owe \u20A6${p.loan.owed.toLocaleString()} (10% fee).` };
+}
+function bankRepay(state, amount) {
+  const bad2 = check(state, amount, false);
+  if (bad2) return { ok: false, reason: bad2 };
+  const p = state.phone;
+  if (!p.loan) return { ok: false, reason: "You have no loan." };
+  const pay = Math.min(amount, p.loan.owed, balance(state.ledger, PLAYER));
+  if (pay <= 0) return { ok: false, reason: "You don't have enough." };
+  transfer(state.ledger, PLAYER, SINK, pay, "Loan repayment", state.minute);
+  p.loan.owed -= pay;
+  if (p.loan.owed <= 0) p.loan = null;
+  return { ok: true, text: `Repaid \u20A6${pay.toLocaleString()}.${p.loan ? "" : " Loan cleared."}` };
+}
+
 // packages/game-core/src/onlineRules.ts
 var no = (reason) => ({ ok: false, reason });
 var yes = { ok: true };
@@ -3804,6 +3901,10 @@ var HANDLERS = {
   homeSell: (sim, [id, furniture]) => str(id, 40) ? homeSell(sim.state, id, typeof furniture === "string" ? furniture : void 0) : no(bad),
   homeBuy: (sim, [furniture, x, z, rot]) => str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture, x, z, rot) : no(bad),
   payRide: (sim, [id, meters]) => str(id, 12) && typeof meters === "number" ? payRide(sim.state, id, meters) : no(bad),
+  bankDeposit: (sim, [amount, atm]) => typeof amount === "number" ? bankDeposit(sim.state, amount, atm === true) : no(bad),
+  bankBorrow: (sim, [amount]) => typeof amount === "number" ? bankBorrow(sim.state, amount) : no(bad),
+  bankRepay: (sim, [amount]) => typeof amount === "number" ? bankRepay(sim.state, amount) : no(bad),
+  bankWithdraw: (sim, [amount, atm]) => typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),
@@ -3938,6 +4039,75 @@ var LifeStore = class {
       this.dirty = true;
       console.error("Could not save the lives:", e);
     }
+  }
+};
+
+// packages/server/src/inbox.ts
+import { createHash as createHash2 } from "node:crypto";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
+var uidOf = (key) => createHash2("sha1").update(`thelife:${key}`).digest("hex").slice(0, 10);
+var KEEP = 80;
+var Inbox = class {
+  constructor(file) {
+    this.file = file;
+    if (file && existsSync2(file)) {
+      try {
+        const parsed = JSON.parse(readFileSync2(file, "utf8"));
+        if (parsed && typeof parsed === "object") this.data = { users: parsed.users ?? {}, threads: parsed.threads ?? {} };
+      } catch {
+      }
+    }
+    if (file) this.timer = setInterval(() => this.save(), 3e4);
+  }
+  file;
+  data = { users: {}, threads: {} };
+  dirty = false;
+  timer = null;
+  touch(uid, name, now) {
+    const u = this.data.users[uid];
+    if (!u || u.name !== name || now - u.seen > 36e5) {
+      this.data.users[uid] = { name, seen: now };
+      this.dirty = true;
+    }
+  }
+  nameOf(uid) {
+    return this.data.users[uid]?.name ?? null;
+  }
+  /** Stores a message in both people's conversations. */
+  send(from, to, text, at) {
+    for (const [owner, peer] of [[from, to], [to, from]]) {
+      const t = (this.data.threads[owner] ??= {})[peer] ??= [];
+      t.push({ from, text, at });
+      if (t.length > KEEP) t.splice(0, t.length - KEEP);
+    }
+    this.dirty = true;
+  }
+  /** Makes sure a conversation exists (an empty one), so a player you looked up stays in your list. */
+  open(owner, peer) {
+    const t = this.data.threads[owner] ??= {};
+    if (!t[peer]) {
+      t[peer] = [];
+      this.dirty = true;
+    }
+  }
+  inbox(uid) {
+    return Object.entries(this.data.threads[uid] ?? {}).map(([peer, msgs]) => ({ uid: peer, name: this.nameOf(peer) ?? "Player", msgs })).sort((a, b) => (b.msgs.at(-1)?.at ?? 0) - (a.msgs.at(-1)?.at ?? 0));
+  }
+  save() {
+    if (!this.file || !this.dirty) return;
+    this.dirty = false;
+    try {
+      mkdirSync2(dirname2(this.file), { recursive: true });
+      writeFileSync2(`${this.file}.tmp`, JSON.stringify(this.data));
+      renameSync2(`${this.file}.tmp`, this.file);
+    } catch (e) {
+      console.error("inbox save failed", e);
+    }
+  }
+  close() {
+    if (this.timer) clearInterval(this.timer);
+    this.save();
   }
 };
 
@@ -4199,23 +4369,23 @@ var Room = class {
     return [...this.players.values()].filter((p) => p.where === "world");
   }
   view(p) {
-    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look };
+    return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look, uid: uidOf(p.key) };
   }
 };
 
 // packages/server/src/analytics.ts
-import { createHash as createHash2 } from "node:crypto";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname as dirname2 } from "node:path";
+import { createHash as createHash3 } from "node:crypto";
+import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname as dirname3 } from "node:path";
 var dayOf2 = (t) => new Date(t).toISOString().slice(0, 10);
 var hourOf = (t) => new Date(t).toISOString().slice(0, 13);
-var hash3 = (key) => createHash2("sha1").update(key).digest("hex").slice(0, 10);
+var hash3 = (key) => createHash3("sha1").update(key).digest("hex").slice(0, 10);
 var Analytics = class {
   constructor(file) {
     this.file = file;
-    if (file && existsSync2(file)) {
+    if (file && existsSync3(file)) {
       try {
-        this.data = { ...this.data, ...JSON.parse(readFileSync2(file, "utf8")) };
+        this.data = { ...this.data, ...JSON.parse(readFileSync3(file, "utf8")) };
       } catch {
       }
     }
@@ -4302,9 +4472,9 @@ var Analytics = class {
     const keepHours = Object.keys(this.data.hours).sort().slice(-72);
     this.data.hours = Object.fromEntries(keepHours.map((k) => [k, this.data.hours[k]]));
     try {
-      mkdirSync2(dirname2(this.file), { recursive: true });
-      writeFileSync2(`${this.file}.tmp`, JSON.stringify(this.data));
-      renameSync2(`${this.file}.tmp`, this.file);
+      mkdirSync3(dirname3(this.file), { recursive: true });
+      writeFileSync3(`${this.file}.tmp`, JSON.stringify(this.data));
+      renameSync3(`${this.file}.tmp`, this.file);
     } catch (e) {
       console.error("analytics save failed", e);
     }
@@ -4316,7 +4486,7 @@ var Analytics = class {
 };
 
 // packages/server/src/animstore.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3, readdirSync, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync4, readFileSync as readFileSync4, readdirSync, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "node:fs";
 import { join } from "node:path";
 var NAME = /^[A-Za-z0-9_-]{1,48}$/;
 var validName = (n) => NAME.test(n);
@@ -4343,10 +4513,10 @@ var AnimStore = class {
     this.dir = dir;
     if (!dir) return;
     try {
-      mkdirSync3(join(dir, "clips"), { recursive: true });
+      mkdirSync4(join(dir, "clips"), { recursive: true });
       const mapFile = join(dir, "map.json");
-      if (existsSync3(mapFile)) this.map = cleanMap(JSON.parse(readFileSync3(mapFile, "utf8"))) ?? {};
-      for (const f of readdirSync(join(dir, "clips"))) if (f.endsWith(".json")) this.clips.set(f.slice(0, -5), readFileSync3(join(dir, "clips", f), "utf8"));
+      if (existsSync4(mapFile)) this.map = cleanMap(JSON.parse(readFileSync4(mapFile, "utf8"))) ?? {};
+      for (const f of readdirSync(join(dir, "clips"))) if (f.endsWith(".json")) this.clips.set(f.slice(0, -5), readFileSync4(join(dir, "clips", f), "utf8"));
     } catch (e) {
       console.error("animation store failed to load", e);
     }
@@ -4387,8 +4557,8 @@ var AnimStore = class {
     if (!this.dir) return;
     try {
       const file = join(this.dir, rel);
-      writeFileSync3(`${file}.tmp`, text);
-      renameSync3(`${file}.tmp`, file);
+      writeFileSync4(`${file}.tmp`, text);
+      renameSync4(`${file}.tmp`, file);
     } catch (e) {
       console.error("animation store save failed", e);
     }
@@ -4402,6 +4572,7 @@ var send = (ws, message) => {
 async function startGameServer(options = {}) {
   const store = new LifeStore(options.dataDir ? join2(options.dataDir, "lives.json") : null);
   const analytics = new Analytics(options.dataDir ? join2(options.dataDir, "analytics.json") : null);
+  const inbox = new Inbox(options.dataDir ? join2(options.dataDir, "inbox.json") : null);
   const room = new Room(options.room ?? "lagos-test", void 0, store);
   const sockets = /* @__PURE__ */ new Map();
   const origins2 = options.origins ?? [];
@@ -4551,8 +4722,11 @@ async function startGameServer(options = {}) {
         me = joined.player;
         sockets.set(me.id, ws);
         analytics.visit(me.id, key, account ? "account" : "guest", me.where === "world" ? "world" : "home");
-        send(ws, { t: "welcome", id: me.id, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me.id).map((p) => room.view(p)), serverTime: now });
+        inbox.touch(uidOf(me.key), me.name, now);
+        send(ws, { t: "welcome", id: me.id, uid: uidOf(me.key), room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
+        const mail = inbox.inbox(uidOf(me.key));
+        if (mail.length) send(ws, { t: "inbox", threads: mail });
         if (me.life) {
           sendLife(me);
           sendHome(me, me.where === "world");
@@ -4624,13 +4798,26 @@ async function startGameServer(options = {}) {
         }
         case "dm": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
-          const other = room.players.get(message.to);
-          const target = other ? sockets.get(other.id) : void 0;
-          if (!other || !target || other.id === me.id) return send(ws, { t: "error", reason: "That player isn't here any more." });
-          const line = { t: "chat", from: me.id, name: me.name, text: message.text, at: now, to: other.id };
+          const mine = uidOf(me.key);
+          const known = inbox.nameOf(message.to);
+          if (message.to === mine) return send(ws, { t: "error", reason: "That is your own ID." });
+          if (known === null) return send(ws, { t: "error", reason: "There is no player with that ID." });
+          inbox.send(mine, message.to, message.text, now);
+          const line = { t: "chat", from: me.id, fromUid: mine, name: me.name, text: message.text, at: now, to: message.to };
           send(ws, line);
-          send(target, line);
+          for (const other of room.players.values()) {
+            if (uidOf(other.key) !== message.to) continue;
+            const target = sockets.get(other.id);
+            if (target) send(target, line);
+          }
           return;
+        }
+        case "find": {
+          if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "Slow down a little." });
+          const name = inbox.nameOf(message.uid);
+          if (name === null || message.uid === uidOf(me.key)) return send(ws, { t: "error", reason: message.uid === uidOf(me.key) ? "That is your own ID." : "There is no player with that ID." });
+          inbox.open(uidOf(me.key), message.uid);
+          return send(ws, { t: "person", uid: message.uid, name });
         }
         case "emote": {
           if (me.where !== "world" || !room.allow(me, "chat", now)) return;
@@ -4711,6 +4898,7 @@ async function startGameServer(options = {}) {
       clearInterval(interval);
       clearInterval(lifeInterval);
       analytics.close();
+      inbox.close();
       const now = Date.now();
       for (const p of room.players.values()) room.saveLife(p, now);
       store.flush();

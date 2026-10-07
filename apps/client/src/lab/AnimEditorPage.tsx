@@ -35,7 +35,6 @@ const SLOTS: { id: string; label: string; group: string }[] = [
   { id: "Life_Yawn", label: "Yawning (tired)", group: "Body language" },
   { id: "Life_Stretch", label: "Stretching", group: "Body language" },
   { id: "Life_BellyRub", label: "Rubbing the stomach (hungry)", group: "Body language" },
-  { id: "Life_Fidget", label: "Fidgeting (needs the toilet)", group: "Body language" },
   { id: "Life_Wave_Loop", label: "Waving at someone", group: "With others" },
   { id: "Life_Cheer_Loop", label: "Cheering", group: "With others" },
   { id: "Life_Talk_Loop", label: "Talking", group: "With others" },
@@ -278,7 +277,7 @@ export default function AnimEditorPage() {
                   <li key={s.id}>
                     <button className={slot === s.id && !clipName ? "is-on" : ""} onClick={() => { setClipName(null); setSlot(s.id); }}>
                       <b>{s.label}</b>
-                      <small>{slots[s.id] ? `${slots[s.id]!.clip}${slots[s.id]!.speed && slots[s.id]!.speed !== 1 ? ` ×${slots[s.id]!.speed}` : ""}` : `built-in (${defaultOf(s.id)})`}</small>
+                      <small>{slots[s.id] ? `${slots[s.id]!.clip}${slots[s.id]!.speed && slots[s.id]!.speed !== 1 ? ` ×${slots[s.id]!.speed}` : ""}` : defaultOf(s.id) === "built-in" ? "built-in" : `built-in (${defaultOf(s.id)})`}</small>
                       {slots[s.id] && <em>edited</em>}
                     </button>
                   </li>
