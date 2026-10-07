@@ -69,6 +69,7 @@ export default function CharacterStage({ look, walking, onBusy }: { look: Look; 
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("pointercancel", up);
 
+    let personHeight = 1.75;
     const fit = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
@@ -76,10 +77,11 @@ export default function CharacterStage({ look, walking, onBusy }: { look: Look; 
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       // the whole person fits whatever the shape of the box
-      const half = 1.32 / Math.min(1, camera.aspect * 1.25);
+      const k = personHeight / 1.75;
+      const half = (1.32 * k) / Math.min(1, camera.aspect * 1.25);
       const dist = half / Math.tan((camera.fov * Math.PI) / 360);
-      camera.position.set(0, 1.0, dist);
-      camera.lookAt(0, 0.88, 0);
+      camera.position.set(0, 1.0 * k, dist);
+      camera.lookAt(0, 0.88 * k, 0);
       camera.updateProjectionMatrix();
     };
     fit();
@@ -87,16 +89,30 @@ export default function CharacterStage({ look, walking, onBusy }: { look: Look; 
     ro.observe(canvas);
 
     let current: Look = lookRef.current;
+    let wanted: Look = lookRef.current;
     let applying: Promise<void> = Promise.resolve();
+    let running = false;
+    // Changing a body slider rebuilds the person, which takes a moment; while the slider is still moving, only the newest look matters.
     live.current.set = (next: Look) => {
-      applying = applying.then(async () => {
-        if (gone || !live.current.avatar) return;
-        const patch: Partial<Look> = {};
-        for (const k of Object.keys(next) as (keyof Look)[]) if (next[k] !== current[k]) (patch as Record<string, unknown>)[k] = next[k];
-        current = next;
-        if (Object.keys(patch).length) await live.current.avatar.setLook(patch);
-        busyRef.current?.(false);
-      });
+      wanted = next;
+      if (running) return applying;
+      running = true;
+      applying = (async () => {
+        try {
+          while (!gone && live.current.avatar && wanted !== current) {
+            const target = wanted;
+            const patch: Partial<Look> = {};
+            for (const k of Object.keys(target) as (keyof Look)[]) if (JSON.stringify(target[k]) !== JSON.stringify(current[k])) (patch as Record<string, unknown>)[k] = target[k];
+            current = target;
+            if (Object.keys(patch).length) await live.current.avatar.setLook(patch);
+            personHeight = live.current.avatar.headHeight() + 0.14;
+            fit();
+          }
+        } finally {
+          running = false;
+          busyRef.current?.(false);
+        }
+      })();
       return applying;
     };
 
@@ -105,6 +121,8 @@ export default function CharacterStage({ look, walking, onBusy }: { look: Look; 
       .then((avatar) => {
         if (gone) return avatar.dispose();
         live.current.avatar = avatar;
+        personHeight = avatar.headHeight() + 0.14;
+        fit();
         holder.add(avatar.root);
         avatar.root.traverse((o) => {
           const m = o as THREE.Mesh;

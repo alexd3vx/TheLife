@@ -21,7 +21,7 @@ function finish(el: HTMLCanvasElement, srgb: boolean) {
 function coils() {
   const size = 256;
   const { el, ctx } = canvas(size, size);
-  ctx.fillStyle = "#6c6c6c";
+  ctx.fillStyle = "#8a8a8a";
   ctx.fillRect(0, 0, size, size);
   let s = 3;
   const rand = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -35,6 +35,14 @@ function coils() {
     ctx.arc(x, y, r, rand() * 6, rand() * 6 + 4);
     ctx.stroke();
   }
+  // gaps between the coils, so layered shells read as fluffy volume (alpha-tested)
+  ctx.globalCompositeOperation = "destination-out";
+  for (let i = 0; i < 520; i++) {
+    ctx.beginPath();
+    ctx.arc(rand() * size, rand() * size, 1 + rand() * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
   return el;
 }
 

@@ -1,9 +1,22 @@
-import { useState } from "react";
-import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, bodyFor, sexOf, type Look } from "../lab/looks";
+import { useRef, useState } from "react";
+import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, bodyFor, lookShape, sexOf, type Look } from "../lab/looks";
+import type { BodyShape } from "../lab/bodyShape";
+import { BODY_SLIDERS } from "../lab/bodySliders";
 import { FABRICS } from "../lab/procedural/fabrics";
 import { ACCESSORY_OPTIONS, BOTTOMS, HAIR_STYLES, SHOES, TOPS } from "../iso/wardrobe";
 
-type Tab = "body" | "hair" | "clothes" | "extras";
+type Tab = "body" | "face" | "hair" | "clothes" | "extras";
+const FACE_GROUPS = ["Face", "Eyes", "Nose", "Mouth"] as const;
+const BODY_DETAILS = ["shoulders", "chest_width", "waist", "belly", "hip_width", "glutes", "arm_muscle", "thigh_fat"];
+
+function Slider({ label, value, min = -1, max = 1, step = 0.05, onChange }: { label: string; value: number; min?: number; max?: number; step?: number; onChange(v: number): void }) {
+  return (
+    <label className="studio-slider wide">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} />
+    </label>
+  );
+}
 
 function Swatches({ list, value, onPick, label, small }: { list: { id: string; label: string; color: string }[]; value: string | null; onPick(id: string): void; label: string; small?: boolean }) {
   return (
@@ -37,7 +50,21 @@ const pickOne = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.lengt
 /** Everything about how the person looks. Changes show on the stage straight away. */
 export default function StudioPanel({ look, update, walking, setWalking, onNext }: { look: Look; update(patch: Partial<Look>): void; walking: boolean; setWalking(on: boolean): void; onNext(): void }) {
   const [tab, setTab] = useState<Tab>("body");
+  const [faceGroup, setFaceGroup] = useState<(typeof FACE_GROUPS)[number]>("Face");
   const male = sexOf(look.body) === "male";
+  const shape = lookShape(look);
+  // two slider events can arrive before the screen redraws: build on the newest shape, not the one this render started with
+  const latest = useRef(shape);
+  latest.current = shape;
+  const setShape = (patch: Partial<BodyShape>) => {
+    latest.current = { ...latest.current, ...patch };
+    update({ shape: latest.current });
+  };
+  const setDetail = (id: string, v: number) => {
+    latest.current = { ...latest.current, detail: { ...latest.current.detail, [id]: v } };
+    update({ shape: latest.current });
+  };
+  const sliderLabel = (id: string) => BODY_SLIDERS.find((s) => s.id === id)?.label ?? id;
   const surprise = () =>
     update({
       skinTone: pickOne(SKIN_TONES).id,
@@ -52,13 +79,20 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
       shoes: pickOne(SHOES).id,
       shoesColor: pickOne(CLOTH_COLORS).id,
       accessory: Math.random() < 0.4 ? pickOne(ACCESSORY_OPTIONS).id : null,
-      height: 0.94 + Math.random() * 0.12,
-      build: 0.92 + Math.random() * 0.2,
+      shape: {
+        ...shape,
+        height: (Math.random() - 0.5) * 1.2,
+        weight: (Math.random() - 0.45) * 1.2,
+        muscle: (Math.random() - 0.4) * 1.2,
+        age: Math.round(18 + Math.random() * 30),
+        bust: male ? 0 : (Math.random() - 0.4) * 1.2,
+        detail: Object.fromEntries(BODY_SLIDERS.filter(() => Math.random() < 0.3).map((s) => [s.id, Math.round((s.oneWay ? Math.random() * 0.7 : (Math.random() - 0.5) * 1.2) * 20) / 20])),
+      },
     });
   return (
     <div className="creator-body studio">
       <nav className="studio-tabs" role="tablist">
-        {([["body", "Body"], ["hair", "Hair"], ["clothes", "Clothes"], ["extras", "Extras"]] as const).map(([id, label]) => (
+        {([["body", "Body"], ["face", "Face"], ["hair", "Hair"], ["clothes", "Clothes"], ["extras", "Extras"]] as const).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
             {label}
           </button>
@@ -71,7 +105,7 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
             <h2>Body</h2>
             <div className="creator-segment">
               {(["male", "female"] as const).map((sex) => (
-                <button key={sex} aria-pressed={sexOf(look.body) === sex} onClick={() => update({ body: bodyFor(sex, true), beard: sex === "male" ? look.beard : false, hair: look.hair })}>
+                <button key={sex} aria-pressed={sexOf(look.body) === sex} onClick={() => update({ body: bodyFor(sex, true), beard: sex === "male" ? look.beard : false, hair: look.hair, shape: { ...shape, sex: sex === "male" ? 1 : 0 } })}>
                   {sex === "male" ? "Male" : "Female"}
                 </button>
               ))}
@@ -82,18 +116,17 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
           </section>
           <section>
             <h2>Shape</h2>
-            <label className="studio-slider">
-              Height
-              <input type="range" min={0.92} max={1.08} step={0.01} value={look.height} onChange={(e) => update({ height: Number(e.target.value) })} />
-            </label>
-            <label className="studio-slider">
-              Build
-              <input type="range" min={0.88} max={1.2} step={0.01} value={look.build} onChange={(e) => update({ build: Number(e.target.value) })} />
-            </label>
+            <Slider label="Looks about" value={shape.age} min={18} max={70} step={1} onChange={(v) => setShape({ age: v })} />
+            <Slider label="Height" value={shape.height} min={-0.8} max={0.8} onChange={(v) => setShape({ height: v })} />
+            <Slider label="Build" value={shape.weight} onChange={(v) => setShape({ weight: v })} />
+            <Slider label="Muscle" value={shape.muscle} onChange={(v) => setShape({ muscle: v })} />
+            {!male && <Slider label="Bust" value={shape.bust} onChange={(v) => setShape({ bust: v })} />}
+            {BODY_DETAILS.map((id) => (
+              <Slider key={id} label={sliderLabel(id)} value={shape.detail[id] ?? 0} onChange={(v) => setDetail(id, v)} />
+            ))}
           </section>
           <section>
-            <h2>Face</h2>
-            <h3>Eyes</h3>
+            <h2>Eyes and beard</h2>
             <Swatches list={EYE_COLORS.map((c) => ({ ...c, color: c.id === "brown" ? "#5a3a22" : c.color }))} value={look.eyeColor} onPick={(id) => update({ eyeColor: id })} label="Eye colour" />
             {male && (
               <label className="creator-check">
@@ -102,6 +135,25 @@ export default function StudioPanel({ look, update, walking, setWalking, onNext 
             )}
           </section>
         </>
+      )}
+
+      {tab === "face" && (
+        <section>
+          <h2>Face</h2>
+          <div className="creator-chips">
+            {FACE_GROUPS.map((g) => (
+              <button key={g} aria-pressed={faceGroup === g} onClick={() => setFaceGroup(g)}>
+                {g}
+              </button>
+            ))}
+          </div>
+          {BODY_SLIDERS.filter((s) => s.group === faceGroup).map((s) => (
+            <Slider key={s.id} label={s.label} value={shape.detail[s.id] ?? 0} min={s.oneWay ? 0 : -1} onChange={(v) => setDetail(s.id, v)} />
+          ))}
+          <button className="studio-reset" onClick={() => update({ shape: { ...shape, detail: Object.fromEntries(Object.entries(shape.detail).filter(([id]) => !BODY_SLIDERS.some((s) => s.id === id && s.group === faceGroup))) } })}>
+            Reset these
+          </button>
+        </section>
       )}
 
       {tab === "hair" && (

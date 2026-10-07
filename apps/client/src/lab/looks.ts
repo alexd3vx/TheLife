@@ -1,4 +1,5 @@
 // Character customisation choices. Colours are tints multiplied onto the model's textures.
+import { DEFAULT_SHAPE, type BodyShape } from "./bodyShape";
 
 export interface SkinTone {
   id: string;
@@ -113,6 +114,8 @@ export interface Look {
   /** Body shape: 0.92 to 1.08 for height, 0.88 to 1.2 for build (width). 1 is average. */
   height: number;
   build: number;
+  /** The realistic bodies' shape (sex, age, build and face sliders). Missing in older looks: it is then worked out from body, height and build. */
+  shape?: BodyShape;
 }
 
 export const DEFAULT_LOOK: Look = {
@@ -174,4 +177,11 @@ export function parseLook(json: string | undefined | null): Look {
   } catch {
     return { ...DEFAULT_LOOK };
   }
+}
+
+/** The body shape a look asks for: its own, or one worked out from the older body, height and build fields. */
+export function lookShape(look: Look): BodyShape {
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  if (look.shape) return { ...DEFAULT_SHAPE, ...look.shape, detail: { ...(look.shape.detail ?? {}) } };
+  return { ...DEFAULT_SHAPE, sex: sexOf(look.body) === "male" ? 1 : 0, height: clamp(((look.height ?? 1) - 1) / 0.08, -1, 1), weight: clamp(((look.build ?? 1) - 1) / 0.2, -1, 1) * 0.9 };
 }

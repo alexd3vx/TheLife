@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadGLTF } from "./loaders";
 import { assetUrl } from "./manifest";
@@ -25,65 +26,8 @@ export interface MorphMeta {
   meshes: Record<string, { space: string; vertices: number; triangles: number }>;
 }
 
-/** A person's body, as a handful of numbers. */
-export interface BodyShape {
-  /** 0 feminine, 0.5 neutral, 1 masculine */
-  sex: number;
-  /** years, 18 to 70 */
-  age: number;
-  /** each -1 to 1 (negative: soft / slim / short / uncommon, positive: muscular / heavy / tall / ideal) */
-  muscle: number;
-  weight: number;
-  height: number;
-  proportions: number;
-  /** 0 to 1: how far the face and body lean towards these features */
-  european: number;
-  eastAsian: number;
-  /** -1 small, 1 full (feminine bodies) */
-  bust: number;
-  /** slider id -> -1 to 1 */
-  detail: Record<string, number>;
-}
-
-export const DEFAULT_SHAPE: BodyShape = { sex: 0.5, age: 25, muscle: 0, weight: 0, height: 0, proportions: 0, european: 0, eastAsian: 0, bust: 0, detail: {} };
-
-const pos = (v: number) => Math.max(0, v);
-const neg = (v: number) => Math.max(0, -v);
-
-/** Which morphs a shape switches on, and how far (a plain weighted sum; measured against the exact MakeHuman result to within a few mm). */
-export function shapeWeights(s: BodyShape): Record<string, number> {
-  const w: Record<string, number> = {};
-  const put = (k: string, v: number) => {
-    if (Math.abs(v) > 1e-4) w[k] = (w[k] ?? 0) + v;
-  };
-  const m = Math.min(1, Math.max(0, s.sex)), f = 1 - m;
-  put("masculine", pos(2 * m - 1));
-  put("feminine", pos(1 - 2 * m));
-  const both = (name: string, v: number) => {
-    put(`${name}@m`, v * m);
-    put(`${name}@f`, v * f);
-  };
-  const age = Math.min(70, Math.max(18, s.age));
-  both("older", age > 25 ? (age - 25) / 45 : 0);
-  both("younger", age < 25 ? (25 - age) / 7 : 0);
-  both("muscular", pos(s.muscle));
-  both("soft", neg(s.muscle));
-  both("heavy", pos(s.weight));
-  both("slim", neg(s.weight));
-  both("tall", pos(s.height));
-  both("short", neg(s.height));
-  both("proportions_ideal", pos(s.proportions));
-  both("proportions_uncommon", neg(s.proportions));
-  both("features_european", s.european);
-  both("features_east_asian", s.eastAsian);
-  // the bust only exists for feminine bodies
-  put("bust_full", pos(s.bust) * f);
-  put("bust_small", neg(s.bust) * f);
-  for (const [id, v] of Object.entries(s.detail)) {
-    put(v >= 0 ? `${id}+` : `${id}-`, Math.abs(v));
-  }
-  return w;
-}
+export { DEFAULT_SHAPE, shapeWeights, type BodyShape } from "./bodyShape";
+import { shapeWeights, type BodyShape } from "./bodyShape";
 
 interface Part {
   mesh: THREE.SkinnedMesh;
@@ -109,26 +53,65 @@ interface Block {
   z: Int16Array;
 }
 
+/** Everything every person shares: the downloaded files and the decoded morph blocks. Loaded once. */
+interface Shared {
+  gltf: GLTF;
+  meta: MorphMeta;
+  bin: ArrayBuffer;
+  blocks: Map<string, Block>;
+  byId: Map<string, MorphMeta["targets"][number]>;
+  femaleSkin: THREE.Texture | null;
+}
+const sharedByFile = new Map<string, Promise<Shared>>();
+
+function loadShared(file: string): Promise<Shared> {
+  let p = sharedByFile.get(file);
+  if (!p) {
+    p = (async () => {
+      const [gltf, meta, bin] = await Promise.all([
+        loadGLTF(assetUrl(`${file}.glb`)),
+        fetch(assetUrl(`${file}.morphs.json`)).then((r) => r.json() as Promise<MorphMeta>),
+        gunzip(assetUrl(`${file}.morphs.pack`)),
+      ]);
+      let femaleSkin: THREE.Texture | null = null;
+      const skin = (gltf.scene.getObjectByName("Body") as THREE.Mesh | undefined)?.material as THREE.Material | undefined;
+      const idx = skin?.userData?.skinDetailFemale as number | undefined;
+      if (idx !== undefined) {
+        femaleSkin = (await gltf.parser.getDependency("texture", idx)) as THREE.Texture;
+        femaleSkin.colorSpace = THREE.SRGBColorSpace;
+        femaleSkin.flipY = false;
+      }
+      return { gltf, meta, bin, blocks: new Map(), byId: new Map(meta.targets.map((t) => [t.id, t])), femaleSkin };
+    })();
+    p.catch(() => sharedByFile.delete(file));
+    sharedByFile.set(file, p);
+  }
+  return p;
+}
+
 export class MorphBody {
   readonly scene: THREE.Object3D;
   readonly meta: MorphMeta;
   readonly bones = new Map<string, THREE.Bone>();
   readonly parts = new Map<string, Part>();
   private bin: ArrayBuffer;
-  private blocks = new Map<string, Block>();
+  private blocks: Map<string, Block>;
   private femaleSkin: THREE.Texture | null = null;
   private maleSkin: THREE.Texture | null = null;
   private current: Record<string, number> = {};
   private restWorld = new Map<string, THREE.Vector3>();
-  private byId = new Map<string, MorphMeta["targets"][number]>();
+  private byId: Map<string, MorphMeta["targets"][number]>;
   /** Where the hips and the head are now, for placing cameras and retargeting. */
   height = 1.74;
 
-  private constructor(scene: THREE.Object3D, meta: MorphMeta, bin: ArrayBuffer) {
+  private constructor(scene: THREE.Object3D, shared: Shared) {
+    const meta = shared.meta;
     this.scene = scene;
     this.meta = meta;
-    this.bin = bin;
-    for (const t of meta.targets) this.byId.set(t.id, t);
+    this.bin = shared.bin;
+    this.blocks = shared.blocks;
+    this.byId = shared.byId;
+    this.femaleSkin = shared.femaleSkin;
     scene.traverse((o) => {
       if ((o as THREE.Bone).isBone) this.bones.set(o.name, o as THREE.Bone);
       const m = o as THREE.SkinnedMesh;
@@ -147,22 +130,17 @@ export class MorphBody {
     for (const [name, p] of Object.entries(meta.restBones)) this.restWorld.set(name, new THREE.Vector3(p[0], p[1], p[2]));
   }
 
-  static async load(file = "characters/body_mpfb"): Promise<MorphBody> {
-    const [gltf, meta, bin] = await Promise.all([
-      loadGLTF(assetUrl(`${file}.glb`)),
-      fetch(assetUrl(`${file}.morphs.json`)).then((r) => r.json() as Promise<MorphMeta>),
-      gunzip(assetUrl(`${file}.morphs.pack`)),
-    ]);
-    // each person gets their own copy of the skeleton, geometry and materials (the file is cached and shared)
-    const scene = SkeletonUtils.clone(gltf.scene);
+  /** A new person: their own skeleton, geometry and materials, shaped by `shape` (the rest body if none). */
+  static async load(shape?: BodyShape, file = "characters/body_mpfb"): Promise<MorphBody> {
+    const shared = await loadShared(file);
+    const scene = SkeletonUtils.clone(shared.gltf.scene);
     scene.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (!m.isSkinnedMesh) return;
       m.geometry = m.geometry.clone();
       m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
     });
-    const body = new MorphBody(scene, meta, bin);
-    // the two skin detail pictures (feminine bodies use the second)
+    const body = new MorphBody(scene, shared);
     const skinMat = body.parts.get("Body")?.mesh.material as THREE.MeshStandardMaterial | undefined;
     if (skinMat) {
       // the base layer sits a few millimetres above the skin; keep the skin a hair behind it so the two never flicker
@@ -170,14 +148,8 @@ export class MorphBody {
       skinMat.polygonOffsetFactor = 1;
       skinMat.polygonOffsetUnits = 1;
       body.maleSkin = skinMat.map;
-      const idx = skinMat.userData?.skinDetailFemale as number | undefined;
-      if (idx !== undefined) {
-        body.femaleSkin = (await gltf.parser.getDependency("texture", idx)) as THREE.Texture;
-        body.femaleSkin.colorSpace = THREE.SRGBColorSpace;
-        body.femaleSkin.flipY = false;
-      }
     }
-    body.apply({});
+    body.apply(shape ? shapeWeights(shape) : {});
     return body;
   }
 
@@ -323,6 +295,17 @@ export class MorphBody {
     }
   }
 
+  /** Iris colour: the brown eye picture with the iris pixels (the saturated ones) turned to this colour. Null keeps the brown. */
+  setEyeColour(colour: string | null): void {
+    for (const n of ["Eye_L", "Eye_R"]) {
+      const mat = this.parts.get(n)?.mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (!mat) continue;
+      const base = (mat.userData.baseMap ??= mat.map) as THREE.Texture;
+      mat.map = colour ? eyeTexture(base, colour) : base;
+      mat.needsUpdate = true;
+    }
+  }
+
   setLayersVisible(opts: { shorts: boolean; top: boolean }): void {
     const sh = this.parts.get("Shorts"), tp = this.parts.get("Top");
     if (sh) sh.mesh.visible = opts.shorts;
@@ -343,4 +326,46 @@ export class MorphBody {
       for (const m of mats) m.dispose();
     }
   }
+}
+
+const eyeTextures = new Map<string, THREE.Texture>();
+
+/** The iris of the brown eye picture recoloured: iris pixels (saturated, not bright) take the hue of `colour` and scale to its depth. */
+function eyeTexture(base: THREE.Texture, colour: string): THREE.Texture {
+  const key = colour.toLowerCase();
+  const have = eyeTextures.get(key);
+  if (have) return have;
+  const img = base.image as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const target = { h: 0, s: 0, l: 0 };
+  new THREE.Color(colour).getHSL(target);
+  const px = data.data;
+  const c = new THREE.Color();
+  const hsl = { h: 0, s: 0, l: 0 };
+  for (let i = 0; i < px.length; i += 4) {
+    c.setRGB(px[i]! / 255, px[i + 1]! / 255, px[i + 2]! / 255, THREE.SRGBColorSpace);
+    c.getHSL(hsl, THREE.SRGBColorSpace);
+    if (hsl.s < 0.3 || hsl.l > 0.68) continue;
+    // how strongly this pixel is iris (the edge of the iris blends away)
+    const k = Math.min(1, (hsl.s - 0.3) / 0.15);
+    const h = hsl.h + (target.h - hsl.h) * k;
+    const s = Math.min(1, hsl.s * (target.s / 0.7)) * k + hsl.s * (1 - k);
+    const l = Math.min(0.75, hsl.l * (target.l / 0.28)) * k + hsl.l * (1 - k);
+    c.setHSL(h, s, l, THREE.SRGBColorSpace);
+    px[i] = Math.round(c.r * 255);
+    px[i + 1] = Math.round(c.g * 255);
+    px[i + 2] = Math.round(c.b * 255);
+  }
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  tex.anisotropy = 4;
+  eyeTextures.set(key, tex);
+  return tex;
 }

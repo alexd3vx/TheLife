@@ -183,7 +183,7 @@ const LOOK_NUMBERS = ["height", "build"];
 
 /** A character's look from a client: only the known fields, only short ids, booleans or null. Anything else is dropped. */
 export function cleanLook(raw: string): string | undefined {
-  if (raw.length > 1_500) return undefined;
+  if (raw.length > 4_000) return undefined;
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -201,7 +201,31 @@ export function cleanLook(raw: string): string | undefined {
     const v = (value as Record<string, unknown>)[key];
     if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.round(Math.max(0.8, Math.min(1.25, v)) * 100) / 100;
   }
-  return Object.keys(out).length ? JSON.stringify(out) : undefined;
+  const shape = cleanShape((value as Record<string, unknown>).shape);
+  const result: Record<string, unknown> = { ...out };
+  if (shape) result.shape = shape;
+  return Object.keys(result).length ? JSON.stringify(result) : undefined;
+}
+
+const SHAPE_RANGES: Record<string, [number, number]> = { sex: [0, 1], age: [18, 70], muscle: [-1, 1], weight: [-1, 1], height: [-1, 1], proportions: [-1, 1], european: [0, 1], eastAsian: [0, 1], bust: [-1, 1] };
+
+/** A body shape: the known numbers inside their ranges, and up to 100 face and body sliders (short ids, -1 to 1). */
+function cleanShape(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const src = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, [lo, hi]] of Object.entries(SHAPE_RANGES)) {
+    const v = src[key];
+    if (typeof v === "number" && Number.isFinite(v)) out[key] = Math.round(Math.max(lo, Math.min(hi, v)) * 100) / 100;
+  }
+  const detail: Record<string, number> = {};
+  if (src.detail && typeof src.detail === "object") {
+    for (const [id, v] of Object.entries(src.detail as Record<string, unknown>).slice(0, 100)) {
+      if (/^[a-z][a-z0-9_]{0,23}$/.test(id) && typeof v === "number" && Number.isFinite(v)) detail[id] = Math.round(Math.max(-1, Math.min(1, v)) * 100) / 100;
+    }
+  }
+  out.detail = detail;
+  return out;
 }
 
 /** A display name: letters, digits, spaces and a few marks, 1 to 20 characters. */

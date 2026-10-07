@@ -2,7 +2,8 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
-import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, sexOf, type Look } from "./looks";
+import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, lookShape, sexOf, type Look } from "./looks";
+import { MorphBody } from "./bodyMorph";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
 import { fabricTexture, type FabricId } from "./procedural/fabrics";
 import { buildGarment, isProceduralGarment, tieTriangles } from "./procedural/garments";
@@ -77,6 +78,9 @@ export const REAL_FOR_LIFE: Record<string, string> = {
   Life_Read_Loop: "KK_Holding_B",
 };
 
+/** Iris colours for the morphable body's eye picture (brown is the picture itself). */
+const IRIS_COLOURS: Record<string, string | null> = { brown: null, hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
+
 export class Avatar {
   readonly root = new THREE.Group();
   private bodyScene: THREE.Object3D | null = null;
@@ -85,6 +89,8 @@ export class Avatar {
   private originalIndex: ArrayLike<number> | null = null;
   private vertexBone: Uint16Array | null = null;
   private bodyRest: BodyRest | null = null;
+  /** The realistic bodies are the morphable body (bodyMorph.ts); the stylised pair are plain glTF bodies. */
+  private morph: MorphBody | null = null;
   private partRoots = new Map<string, THREE.Object3D>();
   private mixer: THREE.AnimationMixer | null = null;
   private currentAction: THREE.AnimationAction | null = null;
@@ -123,22 +129,28 @@ export class Avatar {
   /** Rebuilds the whole figure, e.g. when the body changes. */
   private async rebuild(): Promise<void> {
     const token = ++this.loadToken;
-    const gltf = await loadGLTF(assetUrl(this.asset(`body_${this.look.body}`).file));
-    if (token !== this.loadToken) return;
+    const morph = isRealistic(this.look.body) ? await MorphBody.load(lookShape(this.look)) : null;
+    const gltf = morph ? null : await loadGLTF(assetUrl(this.asset(`body_${this.look.body}`).file));
+    if (token !== this.loadToken) {
+      morph?.dispose();
+      return;
+    }
+    this.morph?.dispose();
+    this.morph = morph;
 
     const wasPlaying = this.currentAction?.getClip().name;
     this.clearParts();
     if (this.bodyScene) this.root.remove(this.bodyScene);
     this.mixer?.stopAllAction();
 
-    this.bodyScene = SkeletonUtils.clone(gltf.scene);
+    this.bodyScene = morph ? morph.scene : SkeletonUtils.clone(gltf!.scene);
     this.root.add(this.bodyScene);
 
     const meshes = skinnedMeshesOf(this.bodyScene);
     // The skin is the biggest skinned mesh (the rest are eyes and brows).
     this.bodyMesh = meshes.reduce<THREE.SkinnedMesh | null>((best, m) => (!best || m.geometry.getAttribute("position").count > best.geometry.getAttribute("position").count ? m : best), null);
     this.skeleton = this.bodyMesh?.skeleton ?? null;
-    this.builtInBrows = meshes.filter((m) => materialsOf(m).some((mat) => /hair/i.test(mat.name)));
+    this.builtInBrows = morph ? meshes.filter((m) => m.name === "Brows") : meshes.filter((m) => materialsOf(m).some((mat) => /hair/i.test(mat.name)));
     for (const mesh of meshes) {
       mesh.frustumCulled = false;
       mesh.castShadow = true;
@@ -337,7 +349,7 @@ export class Avatar {
     const previous = this.look;
     this.look = { ...previous, ...patch };
 
-    if (patch.body && patch.body !== previous.body) {
+    if ((patch.body && patch.body !== previous.body) || (patch.shape !== undefined && JSON.stringify(patch.shape) !== JSON.stringify(previous.shape)) || (this.morph && (patch.height !== undefined || patch.build !== undefined) && !this.look.shape)) {
       await this.rebuild();
       return;
     }
@@ -360,6 +372,10 @@ export class Avatar {
   private async applySkin(): Promise<void> {
     if (!this.bodyScene) return;
     const tone = SKIN_TONES.find((t) => t.id === this.look.skinTone) ?? SKIN_TONES[0]!;
+    if (this.morph) {
+      this.morph.setSkin(tone.base, this.look.shape ? this.look.shape.sex < 0.5 : sexOf(this.look.body) === "female");
+      return;
+    }
     if (isRealistic(this.look.body)) {
       // No photo texture: the skin tone is the colour, with a fine procedural surface on top.
       const detail = skinTextures();
@@ -390,6 +406,10 @@ export class Avatar {
   private applyEyes(): void {
     if (!this.bodyScene) return;
     const swatch = EYE_COLORS.find((s) => s.id === this.look.eyeColor) ?? EYE_COLORS[0]!;
+    if (this.morph) {
+      this.morph.setEyeColour(IRIS_COLOURS[swatch.id] ?? null);
+      return;
+    }
     eachMaterial(this.bodyScene, (material) => {
       if (/eye/i.test(material.name)) material.color.set(isRealistic(this.look.body) ? "#ffffff" : swatch.color);
     });
@@ -439,6 +459,7 @@ export class Avatar {
     const swatch = HAIR_COLORS.find((s) => s.id === this.look.hairColor) ?? HAIR_COLORS[0]!;
     const tint = new THREE.Color(swatch.color);
     for (const brow of this.builtInBrows) eachMaterial(brow, (m) => m.color.copy(tint));
+    this.morph?.setHairColour(tint);
     for (const part of this.partRoots.values()) {
       if (part.userData.kind === "hair" || part.userData.kind === "proc-hair") eachMaterial(part, (m) => m.color.copy(tint));
     }
@@ -452,8 +473,8 @@ export class Avatar {
     this.bodyRest = null;
     const mesh = this.bodyMesh;
     if (!mesh || !mesh.geometry.index) return;
-    // The geometry is shared with the loader cache, so edit our own copy.
-    mesh.geometry = mesh.geometry.clone();
+    // The geometry is shared with the loader cache, so edit our own copy (a morphable body already owns its own).
+    if (!this.morph) mesh.geometry = mesh.geometry.clone();
     const index = mesh.geometry.index!;
     this.originalIndex = index.array.slice();
 
@@ -563,6 +584,14 @@ export class Avatar {
     await this.applyOutfitTextures();
     this.applyProceduralMaterials();
     this.updateBodyMask();
+    this.updateBaseLayer();
+  }
+
+  /** The morphable body wears a modest base layer; it goes away under a garment of its own. */
+  private updateBaseLayer(): void {
+    if (!this.morph) return;
+    const feminine = (this.look.shape ? this.look.shape.sex : sexOf(this.look.body) === "female" ? 0 : 1) < 0.7;
+    this.morph.setLayersVisible({ shorts: !this.partRoots.has("bottom"), top: feminine && !this.partRoots.has("top") });
   }
 
   private async buildPart(id: string, kind: PartKind): Promise<THREE.Object3D | null> {
@@ -638,10 +667,17 @@ export class Avatar {
     if (!rest || !headBone) return null;
     const result = buildHair(rest, id);
     if (!result) return null;
-    const material = new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshPhysicalMaterial({
       map: hairTexture(result.texture, result.repeat),
+      sheen: 0.9,
+      sheenRoughness: 0.5,
+      sheenColor: new THREE.Color("#7d6a5a"),
       roughness: result.texture === "wrap" ? 0.7 : 0.95,
       side: THREE.DoubleSide,
+      // the scalp caps carry shading and a soft hairline in their colour attribute; the coil texture has gaps
+      vertexColors: result.geometry.hasAttribute("color"),
+      alphaTest: 0.5,
+      alphaToCoverage: true,
     });
     material.bumpMap = material.map;
     material.bumpScale = result.texture === "wrap" ? 0.6 : 2.5;
@@ -710,6 +746,11 @@ export class Avatar {
 
   /** Height and build: a plain scale of the whole body (the animations still fit). */
   private applyShape(): void {
+    if (this.morph) {
+      // the morphable body already has its height and build in its shape
+      this.root.scale.set(1, 1, 1);
+      return;
+    }
     const h = Math.max(0.85, Math.min(1.12, this.look.height ?? 1));
     const b = Math.max(0.85, Math.min(1.25, this.look.build ?? 1));
     this.root.scale.set(b, h, b);
@@ -859,6 +900,14 @@ export class Avatar {
         m.needsUpdate = true;
       });
     }
+  }
+
+  /** The height of the head bone above the character's feet (for cameras). */
+  headHeight(): number {
+    const head = this.skeleton?.bones.find((b) => b.name === "Head");
+    if (!head) return 1.65;
+    this.root.updateMatrixWorld(true);
+    return head.getWorldPosition(new THREE.Vector3()).y - this.root.position.y;
   }
 
   /** Length of a clip in seconds (0 if there is none). */
@@ -1102,6 +1151,8 @@ export class Avatar {
 
   dispose(): void {
     this.loadToken++;
+    this.morph?.dispose();
+    this.morph = null;
     this.mixer?.stopAllAction();
     this.root.clear();
   }

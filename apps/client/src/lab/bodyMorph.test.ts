@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
+import { BODY_SLIDERS } from "./bodySliders";
 import { DEFAULT_SHAPE, shapeWeights, type BodyShape, type MorphMeta } from "./bodyMorph";
 
 const dir = new URL("../../public/assets/characters/", import.meta.url);
@@ -55,6 +56,10 @@ describe("the body pack", () => {
       expect(ids.has(s.inc), s.id).toBe(true);
       if (s.dec) expect(ids.has(s.dec), s.id).toBe(true);
     }
+  });
+
+  it("lists the same sliders as the creator draws", () => {
+    expect(BODY_SLIDERS.map((s) => [s.id, s.group, !s.oneWay])).toEqual(meta.sliders.map((s) => [s.id, s.group, !!s.dec]));
   });
 
   it("keeps every block inside the file, with indices inside its mesh space", () => {

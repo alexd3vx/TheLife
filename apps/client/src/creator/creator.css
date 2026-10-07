@@ -98,6 +98,9 @@
 .studio-note { margin: 8px 0 0; font-size: .82rem; color: var(--text-muted); line-height: 1.4; }
 .studio-slider { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 10px; font-size: .9rem; margin: 6px 0; }
 .studio-slider input { accent-color: var(--accent); width: 100%; }
+.studio-slider.wide { grid-template-columns: 112px 1fr; }
+.studio-slider.wide span { font-size: .84rem; line-height: 1.15; }
+.studio-reset { margin-top: 10px; min-height: 40px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
 .studio-actions { display: flex; gap: 8px; }
 .studio-actions button { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
 .studio-actions button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }

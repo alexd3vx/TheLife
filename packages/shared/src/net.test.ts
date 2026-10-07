@@ -9,8 +9,13 @@ describe("net messages", () => {
 
   it("drops a look that is too big or not JSON", () => {
     expect(cleanLook("{")).toBeUndefined();
-    expect(cleanLook(JSON.stringify({ body: "x".repeat(2000) }))).toBeUndefined();
+    expect(cleanLook(JSON.stringify({ body: "x".repeat(5000) }))).toBeUndefined();
     expect(cleanLook("[]")).toBeUndefined();
+  });
+
+  it("keeps a body shape inside its ranges and drops junk sliders", () => {
+    const out = JSON.parse(cleanLook(JSON.stringify({ body: "realfemale", shape: { sex: 3, age: 5, weight: -0.123, junk: 9, detail: { nose_width: 0.5, "bad id": 1, big: 7, text: "x" } } }))!);
+    expect(out.shape).toEqual({ sex: 1, age: 18, weight: -0.12, detail: { nose_width: 0.5, big: 1 } });
   });
 
   it("cleans a hello and the name in it", () => {

@@ -20,6 +20,7 @@ const NetTestPage = lazy(() => import("./net/NetTestPage"));
 const StatsPage = lazy(() => import("./net/StatsPage"));
 const AnimEditorPage = lazy(() => import("./lab/AnimEditorPage"));
 const BodyLabPage = lazy(() => import("./lab/BodyLabPage"));
+const HairLabPage = lazy(() => import("./lab/HairLabPage"));
 const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
@@ -93,6 +94,13 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <BodyLabPage />
+      </Suspense>
+    );
+  }
+  if ((import.meta.env.DEV || admin) && hash.startsWith("#/hair")) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <HairLabPage />
       </Suspense>
     );
   }

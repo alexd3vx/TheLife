@@ -24,6 +24,7 @@ export const HAIR_STYLES: Option[] = [
   { id: "p_long", label: "Long straight" },
   { id: "p_wrap", label: "Head wrap" },
   { id: "p_durag", label: "Durag" },
+  { id: "p_hijab", label: "Hijab" },
 ];
 
 export const TOPS: Option[] = [
