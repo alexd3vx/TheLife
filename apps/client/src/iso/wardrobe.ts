@@ -38,6 +38,9 @@ export const TOPS: Option[] = [
   { id: "p_jersey", label: "Jersey" },
   { id: "p_dress", label: "Dress" },
   { id: "p_kaftan", label: "Kaftan" },
+  { id: "p_buba", label: "Buba" },
+  { id: "p_senator", label: "Senator" },
+  { id: "p_gown", label: "Gown" },
   { id: "p_agbada", label: "Agbada" },
   { id: "p_shirt", label: "Shirt" },
   { id: "p_blazer", label: "Blazer" },
@@ -51,6 +54,9 @@ export const BOTTOMS: Option[] = [
   { id: "p_jeans", label: "Jeans" },
   { id: "p_slacks", label: "Suit trousers" },
   { id: "p_palazzo", label: "Wide trousers" },
+  { id: "p_skirt", label: "Skirt" },
+  { id: "p_longskirt", label: "Long skirt" },
+  { id: "p_wrapper", label: "Wrapper (iro)" },
 ];
 
 export const SHOES: Option[] = [
@@ -72,3 +78,7 @@ export const ACCESSORY_OPTIONS: Option[] = [
   { id: "a_chain", label: "Chain" },
   { id: "a_tie", label: "Tie" },
 ];
+
+/** Clothes the game puts on a person (a towel after the shower, pyjamas in bed); they are not offered in the wardrobe. */
+export const STATE_TOPS = ["p_towel", "p_pyjama_top", "p_nightgown"];
+export const STATE_BOTTOMS = ["p_pyjama_bottom"];

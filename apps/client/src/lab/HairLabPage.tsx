@@ -9,7 +9,7 @@ import "./bodylab.css";
 /** A developer page for hair: one person, a close camera (front, side, back, top), every style and colour. Open it at #/hair. */
 export default function HairLabPage() {
   const ref = useRef<HTMLCanvasElement>(null);
-  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void } | null>(null);
+  const live = useRef<{ set(p: Partial<Look>): Promise<void>; view(v: string): void; state(s: "none" | "underwear" | "towel" | "night"): Promise<void> } | null>(null);
   const [look, setLook] = useState<Look>({ ...DEFAULT_LOOK, top: null, bottom: null, shoes: null, hair: "p_afro" });
   const [view, setView] = useState("front");
   const [ready, setReady] = useState(false);
@@ -43,12 +43,13 @@ export default function HairLabPage() {
       cam.aspect = w / h;
       cam.updateProjectionMatrix();
       const head = avatar?.headHeight() ?? 1.65;
-      const full = v === "full";
-      const d = full ? 5.2 : 1.25;
+      const full = v === "full" || v === "upper" || v === "lower" || v === "feet";
+      const d = v === "full" ? 5.2 : v === "upper" ? 2.9 : v === "lower" ? 3.2 : v === "feet" ? 1.8 : 1.25;
+      const aim = v === "upper" ? 1.2 : v === "lower" ? 0.55 : v === "feet" ? 0.15 : 0.9;
       const angle = v === "front" ? 0 : v === "side" ? Math.PI / 2 : v === "back" ? Math.PI : v === "three" ? Math.PI / 4 : 0;
       const up = v === "top" ? 0.9 : 0;
-      cam.position.set(Math.sin(angle) * d * Math.cos(up), full ? 1.0 : head + 0.04 + Math.sin(up) * d, Math.cos(angle) * d * Math.cos(up));
-      cam.lookAt(0, full ? 0.9 : head + 0.02, 0);
+      cam.position.set(Math.sin(angle) * d * Math.cos(up), full ? aim + 0.1 : head + 0.04 + Math.sin(up) * d, Math.cos(angle) * d * Math.cos(up));
+      cam.lookAt(0, full ? aim : head + 0.02, 0);
     };
     new ResizeObserver(frame).observe(canvas);
     createCharacter(look).then((a) => {
@@ -60,6 +61,7 @@ export default function HairLabPage() {
       live.current = {
         set: (p) => (chain = chain.then(async () => { await a.setLook(p); frame(); })),
         view: (nv) => { v = nv; frame(); },
+        state: (st) => (chain = chain.then(async () => { await a.setOutfitState(st); })),
       };
       (window as unknown as { __hair?: unknown }).__hair = live.current;
       frame();
@@ -84,7 +86,7 @@ export default function HairLabPage() {
         <canvas ref={ref} />
         {!ready && <div className="bl-wait">Loading…</div>}
         <div className="bl-views">
-          {["front", "three", "side", "back", "top", "full"].map((x) => <button key={x} className={view === x ? "is-on" : ""} onClick={() => { setView(x); live.current?.view(x); }}>{x}</button>)}
+          {["front", "three", "side", "back", "top", "full", "upper", "lower", "feet"].map((x) => <button key={x} className={view === x ? "is-on" : ""} onClick={() => { setView(x); live.current?.view(x); }}>{x}</button>)}
         </div>
       </div>
       <div className="bl-panel">

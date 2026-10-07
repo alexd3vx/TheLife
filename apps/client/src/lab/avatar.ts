@@ -5,8 +5,9 @@ import { loadGLTF, loadGltfTexture } from "./loaders";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, lookShape, sexOf, type Look } from "./looks";
 import { MorphBody } from "./bodyMorph";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
-import { fabricTexture, type FabricId } from "./procedural/fabrics";
-import { buildGarment, isProceduralGarment, tieTriangles } from "./procedural/garments";
+import type { FabricId } from "./procedural/fabrics";
+import { clothFor } from "./procedural/cloth";
+import { buildGarment, coversLegs, isProceduralGarment, tieTriangles } from "./procedural/garments";
 import { buildGeometry } from "./procedural/geometryClip";
 import { buildHair } from "./procedural/hair";
 import { buildAccessory } from "./procedural/accessories";
@@ -361,9 +362,9 @@ export class Avatar {
     if (patch.brows !== undefined) this.applyBuiltInBrows();
     if (patch.outfitVariant !== undefined || patch.topColor !== undefined || patch.bottomColor !== undefined || patch.shoesColor !== undefined) {
       await this.applyOutfitTextures();
-      this.applyProceduralMaterials();
+      await this.applyProceduralMaterials();
     }
-    if (patch.topFabric !== undefined || patch.bottomFabric !== undefined) this.applyProceduralMaterials();
+    if (patch.topFabric !== undefined || patch.bottomFabric !== undefined) await this.applyProceduralMaterials();
     await this.syncParts();
   }
 
@@ -539,8 +540,24 @@ export class Avatar {
     this.partRoots.clear();
   }
 
+  private outfitState: "none" | "underwear" | "towel" | "night" = "none";
+
+  /**
+   * What the person wears is sometimes decided by what they are doing, not by their look: in the shower only the base layer, after it a
+   * towel, in bed pyjamas. The look itself is not changed.
+   */
+  async setOutfitState(state: "none" | "underwear" | "towel" | "night"): Promise<void> {
+    if (state === this.outfitState) return;
+    this.outfitState = state;
+    await this.syncParts();
+  }
+
   private wantedParts(): Record<string, { id: string; kind: PartKind } | null> {
-    const { body, top, bottom, shoes, hood, pauldrons } = this.look;
+    const s = this.outfitState;
+    const { body, hood, pauldrons } = this.look;
+    const top = s === "none" ? this.look.top : s === "towel" ? "p_towel" : s === "night" ? "p_pyjama_top" : null;
+    const bottom = s === "none" ? this.look.bottom : s === "night" ? "p_pyjama_bottom" : null;
+    const shoes = s === "none" ? this.look.shoes : null;
     const clothing = (outfit: string | null, slot: string) => {
       if (!outfit) return null;
       if (isProceduralGarment(outfit)) return slot === "top" || slot === "bottom" || slot === "shoes" ? { id: outfit, kind: "proc-garment" as const } : null;
@@ -554,7 +571,7 @@ export class Avatar {
       brows: hair(this.look.brows),
       top: clothing(top, "top"),
       sleeves: isProceduralGarment(top) ? null : clothing(top, "sleeves"),
-      bottom: clothing(bottom, "bottom"),
+      bottom: coversLegs(top) ? null : clothing(bottom, "bottom"),
       shoes: clothing(shoes, "shoes"),
       hood: hood ? clothing("ranger", "hood") : null,
       acc: pauldrons ? clothing("ranger", "acc") : null,
@@ -582,7 +599,7 @@ export class Avatar {
     this.applyAccessoryColor();
     this.applyShape();
     await this.applyOutfitTextures();
-    this.applyProceduralMaterials();
+    await this.applyProceduralMaterials();
     this.updateBodyMask();
     this.updateBaseLayer();
   }
@@ -761,9 +778,8 @@ export class Avatar {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
     const result = buildGarment(this.bodyRest, id);
     if (!result) return null;
-    const material = result.layers.length > 1
-      ? result.layers.map(() => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide }))
-      : new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+    const make = () => new THREE.MeshPhysicalMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide });
+    const material = result.layers.length > 1 ? result.layers.map(() => make()) : make();
     const skinned = new THREE.SkinnedMesh(result.geometry, material);
     skinned.frustumCulled = false;
     skinned.castShadow = true;
@@ -781,31 +797,54 @@ export class Avatar {
     return group;
   }
 
-  /** Fabric pattern and colour for procedural garments. */
-  private applyProceduralMaterials(): void {
-    for (const part of this.partRoots.values()) {
+  /** Fabric and colour for procedural garments: real cloth pictures (weave, threads, how dull or shiny), in the wearer's colour. */
+  private async applyProceduralMaterials(): Promise<void> {
+    const token = this.loadToken;
+    for (const part of [...this.partRoots.values()]) {
       if (part.userData.kind !== "proc-garment") continue;
       const slot = part.userData.slot as string;
-      const fabric = (slot === "bottom" ? this.look.bottomFabric : slot === "top" ? this.look.topFabric : "plain") as FabricId;
+      const garment = part.userData.assetId as string;
+      const fabric = (this.outfitState !== "none" ? "plain" : slot === "bottom" ? this.look.bottomFabric : slot === "top" ? this.look.topFabric : "plain") as FabricId;
       const colour = CLOTH_COLORS.find((c) => c.id === this.colourFor(slot));
-      const texture = fabricTexture(fabric);
       const layers = (part.userData.layers as (string | null)[] | undefined) ?? [null];
+      const meshes: THREE.Mesh[] = [];
       part.traverse((child) => {
-        const mesh = child as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        materialsOf(mesh).forEach((material, i) => {
-          const m = material as THREE.MeshStandardMaterial;
-          const fixed = layers[i] ?? null;
-          m.map = fixed ? null : texture;
-          m.color.set(fixed ?? colour?.color ?? "#ffffff");
-          m.needsUpdate = true;
-        });
+        if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
       });
+      for (const mesh of meshes) {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (let i = 0; i < mats.length; i++) {
+          const m = mats[i] as THREE.MeshPhysicalMaterial;
+          const fixed = layers[i] ?? null;
+          const cloth = await clothFor(fabric, garment, fixed ?? colour?.color ?? "#ffffff");
+          if (token !== this.loadToken) return;
+          const tile = (t: THREE.Texture) => {
+            const c = t.clone();
+            c.repeat.set(cloth.repeat, cloth.repeat);
+            c.needsUpdate = true;
+            return c;
+          };
+          m.map = tile(cloth.map);
+          m.normalMap = tile(cloth.normalMap);
+          m.normalScale.set(cloth.normalScale, cloth.normalScale);
+          m.roughnessMap = tile(cloth.roughnessMap);
+          m.roughness = cloth.roughness;
+          m.color.set(cloth.tint ?? "#ffffff");
+          if ("sheen" in m) {
+            m.sheen = cloth.sheen;
+            m.sheenRoughness = 0.5;
+            m.sheenColor.set("#ffffff");
+          }
+          m.needsUpdate = true;
+        }
+      }
     }
   }
 
   /** Which colour setting a garment slot follows. Sleeves, hood and shoulder guards match the top. */
   private colourFor(slot: string | undefined): string | null {
+    if (this.outfitState === "towel") return "white";
+    if (this.outfitState === "night") return slot === "bottom" ? "grey" : "sky";
     const { topColor, bottomColor, shoesColor } = this.look;
     if (slot === "bottom") return bottomColor;
     if (slot === "shoes") return shoesColor;

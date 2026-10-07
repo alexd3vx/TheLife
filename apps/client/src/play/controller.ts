@@ -76,7 +76,15 @@ export class CharacterController {
   private heading = { x: 0, z: 1 };
   private pending: Interaction | null = null;
   private interaction: Interaction | null = null;
-  private actionId: string | null = null;
+  private _actionId: string | null = null;
+  /** What the person is doing: it also decides what they wear (the shower is taken in underwear, sleep in pyjamas). */
+  private get actionId(): string | null {
+    return this._actionId;
+  }
+  private set actionId(id: string | null) {
+    this._actionId = id;
+    this.avatar.setOutfitState(id === "shower" ? "underwear" : id === "sleep" ? "night" : "none");
+  }
   /** True once the action has ended but the character is still sitting (e.g. after a meal). */
   private resting = false;
   /** Collapsed on the spot (not at a bed). */

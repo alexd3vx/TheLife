@@ -47,6 +47,17 @@ export function jointPos(rest: BodyRest, name: string): THREE.Vector3 {
   return v;
 }
 
+/**
+ * Where the neck meets the shoulders: the neck bone's place, brought down to the collarbones. (The morphable body's neck joint sits mid
+ * neck, which would put every neckline up under the chin.)
+ */
+export function neckBase(rest: BodyRest): THREE.Vector3 {
+  const neck = jointPos(rest, "neck_01").clone();
+  const l = rest.joint.get("clavicle_l"), r = rest.joint.get("clavicle_r");
+  if (l && r) neck.y = Math.min(neck.y, (l.y + r.y) / 2 + 0.03);
+  return neck;
+}
+
 /** The box around the skin the Head bone moves (the skull, face and jaw), in the mesh's local space. */
 export function headBox(rest: BodyRest): THREE.Box3 | null {
   const head = rest.boneIndex.get("Head");

@@ -344,3 +344,10 @@ Chronological record of decisions and changes. Newest first.
 - Hair (`lab/procedural/hair.ts`): head surface measured by casting rays from the cranium centre (96 by 34 grid); `cap` clips the body's head triangles by a hairline field; shells, soft hairline through vertex alpha, round blend for afro; `strands` rooted on the surface with shoulder clearance and tapered tips; `fuzz`, `bundle`, `drape`, `lobe`; hijab added. `HairLabPage` at `#/hair` (dev builds and admins) with every view, style, colour and skin tone.
 - Found on the way: dots in node names (`Eye.L`) are stripped by three.js (already fixed in Phase 1); the stylised hair box-fit is unused on the new body; the street view shows the new body fine.
 - Not done: replacing the procedural garments (Phase 3), the face rig (Phase 4), a `#/hair`-style check of every hair style on every body shape (spot-checked wide and narrow heads, male and female).
+
+## Phase 3: clothes made of real cloth
+
+- Owner feedback mid-phase: the flat coloured cloth looked bad, "make real texture". Downloaded 13 Poly Haven fabrics (CC0), made them small and colour-neutral (`tools/fabrics/build_fabrics.py`, user agent header needed or the host answers 403), `lab/procedural/cloth.ts` picks fabric by garment and by the wearer's choice, draws ankara, adire and stripes, and clones the textures per garment for their own tiling. Garment materials are `MeshPhysicalMaterial` (sheen for satin and brocade).
+- `lab/procedural/loft.ts` (silhouette from the body's vertices, lofted hanging cloth with row-to-row smoothing so skirts do not copy the legs), `hanging(...)` and `legCut(...)` in `garments.ts`; new garments: gown, buba, senator, skirt, long skirt, wrapper; nightwear, towel and pyjamas as game states. `neckBase` fixes necklines. Tops that cover the legs hide the bottom (`coversLegs`).
+- `Avatar.setOutfitState`; the controller's `actionId` setter switches it for `shower` and `sleep`.
+- Tests: wardrobe lists, state garments hidden from the wardrobe, long garments (`garments.test.ts`). Whole repo typechecks; client tests 58.

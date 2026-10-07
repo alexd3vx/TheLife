@@ -3,13 +3,22 @@ import * as THREE from "three";
 // Greyscale, tileable fabric patterns. The game tints them with the chosen garment colour,
 // so a single "ankara" pattern becomes indigo, orange, green and so on.
 
-export type FabricId = "plain" | "stripes" | "ankara" | "denim";
+export type FabricId = "plain" | "stripes" | "ankara" | "denim" | "adire" | "cotton" | "poplin" | "linen" | "knit" | "fleece" | "wool" | "satin" | "suiting" | "towel" | "pique" | "brocade" | "check";
 
+/** What the wearer can choose. "Natural" is whatever the garment is normally made of; the real fabric pictures are in cloth.ts. */
 export const FABRICS: { id: FabricId; label: string }[] = [
-  { id: "plain", label: "Plain" },
+  { id: "plain", label: "Natural" },
+  { id: "linen", label: "Linen" },
+  { id: "denim", label: "Denim" },
+  { id: "knit", label: "Knit" },
+  { id: "wool", label: "Tweed" },
+  { id: "satin", label: "Satin" },
+  { id: "suiting", label: "Suiting" },
+  { id: "brocade", label: "Brocade" },
+  { id: "check", label: "Check" },
   { id: "stripes", label: "Stripes" },
   { id: "ankara", label: "Ankara print" },
-  { id: "denim", label: "Denim" },
+  { id: "adire", label: "Adire" },
 ];
 
 function canvas(size: number) {
