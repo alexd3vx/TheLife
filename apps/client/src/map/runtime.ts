@@ -17,7 +17,7 @@ import { AdaptiveQuality } from "../graphics";
 import { getSettings, shadowMapSize, subscribeSettings, type Settings } from "../settings/settings";
 import { setFacadeEnvironment } from "./facade";
 import { PostFX } from "../settings/postfx";
-import { bodyFor, sexOf } from "../lab/looks";
+import { bodyFor, sexOf, type Look } from "../lab/looks";
 import { ChunkStreamer, type StreamStats } from "./streamer";
 import { EMOTE_CLIP, RemotePlayers, bubbleSprite } from "./remotePlayers";
 import type { PlayerView } from "@thelife/shared";
@@ -60,6 +60,8 @@ export interface MapRuntime {
   setInputBlocked(on: boolean): void;
   /** The 2D city map is covering the street: stop drawing the 3D world until it is gone. */
   setCovered(on: boolean): void;
+  /** Dress the street character like the life (the look kept with the life, not the one saved on this device). */
+  setLook(look: Look): void;
   zoomOut(): void;
   /** Walk or run to the front door of a named place. */
   goTo(id: string, pace: "walk" | "run" | "auto"): boolean;
@@ -887,6 +889,9 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     },
     setCovered(on: boolean) {
       covered = on;
+    },
+    setLook(look) {
+      void avatar.setLook(look);
     },
     goTo,
     placeAt(x, z) {

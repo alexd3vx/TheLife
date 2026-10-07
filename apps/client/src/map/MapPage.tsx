@@ -1,3 +1,4 @@
+import { parseLook } from "../lab/looks";
 import { isAdmin } from "../ui/admin";
 import GameHud from "../play/GameHud";
 import { GameIcon } from "../ui/icons";
@@ -136,6 +137,11 @@ export default function MapPage() {
   const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlayer ? nearPlayer.name : null;
   const nearRef = useRef({ atHome, nearPlayer });
   nearRef.current = { atHome, nearPlayer };
+  // the street character is the life's own look (the same one at home and inside), not whatever this device last saved
+  const lifeLook = life.session?.sim.state.look;
+  useEffect(() => {
+    if (lifeLook && !loading) runtimeRef.current?.setLook(parseLook(lifeLook));
+  }, [lifeLook, loading]);
   const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip || !!inside;
   useEffect(() => {
     if (!stats || mode !== "street") return;
