@@ -12,6 +12,8 @@ export interface PanelProps {
   /** Runs a rule, shows the result, makes the staff reply and refreshes the sheet. */
   run(fn: () => Outcome): void;
   note: { ok: boolean; text: string } | null;
+  /** The buyer's price trait for groceries (1 = normal). */
+  scale: number;
 }
 
 /** Every place with a socket lets you charge your phone. */

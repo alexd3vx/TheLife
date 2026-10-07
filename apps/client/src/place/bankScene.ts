@@ -128,7 +128,7 @@ export function buildBankRoom(name: string): PlaceRoom {
 
   // light fittings
   const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#e8f1ff", emissiveIntensity: 1.4 });
-  for (const x of [-3, 0, 3]) for (const z of [-1, 2]) {
+  for (const x of [-3, 0, 3]) for (const z of [2]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
     lamp.position.set(x, H - 0.1, z);
     g.add(lamp);

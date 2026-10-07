@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useEffect, useRef, useState } from "react";
-import { counterOpen, type Landmark } from "@thelife/game-core";
+import { counterOpen, shopOpen, type Landmark } from "@thelife/game-core";
 import { Avatar } from "../lab/avatar";
 import { loadSavedLook, parseLook } from "../lab/looks";
 import { loadManifest } from "../lab/manifest";
@@ -11,8 +11,10 @@ import type { GameSession } from "../play/gameSession";
 import { GameIcon } from "../ui/icons";
 import BankPanel from "./BankPanel";
 import HospitalPanel from "./HospitalPanel";
+import ShopPanel from "./ShopPanel";
 import { buildBankRoom } from "./bankScene";
 import { buildHospitalRoom } from "./hospitalScene";
+import { buildShopRoom } from "./shopScene";
 import type { Outcome } from "./panel";
 import "./place.css";
 
@@ -29,7 +31,9 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [, bump] = useState(0);
   const state = session.sim.state;
+  const scale = session.sim.traits.groceries ?? 1;
   const hospitalKind = place.kind === "hospital";
+  const shopKind = place.kind === "market" || place.kind === "fuel" ? place.kind : null;
   const counter = counterOpen(state);
 
   useEffect(() => {
@@ -51,8 +55,8 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         renderer.domElement.remove();
       });
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(hospitalKind ? "#d6eef0" : "#cfe0fa");
-      const room = hospitalKind ? buildHospitalRoom(place.name) : buildBankRoom(place.name);
+      scene.background = new THREE.Color(hospitalKind ? "#d6eef0" : shopKind === "market" ? "#f1e3c6" : "#cfe0fa");
+      const room = hospitalKind ? buildHospitalRoom(place.name) : shopKind ? buildShopRoom(place.name, shopKind) : buildBankRoom(place.name);
       scene.add(room.group);
       scene.add(new THREE.HemisphereLight("#eaf2ff", "#8fa6d0", 1.1));
       const sun = new THREE.DirectionalLight("#ffffff", 2.2);
@@ -98,7 +102,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       staff.root.position.copy(room.staffAt);
       scene.add(me.root, staff.root);
       me.play("Idle_Loop", 0);
-      staff.play(hospitalKind ? "Idle_Loop" : "Life_Type_Loop", 0);
+      staff.play(hospitalKind || shopKind ? "Idle_Loop" : "Life_Type_Loop", 0);
       let bubble: { sprite: THREE.Sprite; until: number } | null = null;
       staffRef.current = {
         say(text) {
@@ -113,7 +117,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           bubble = { sprite, until: performance.now() / 1000 + 4 + Math.min(5, text.length * 0.05) };
         },
       };
-      staffRef.current.say(hospitalKind ? `Welcome to ${place.name}. What is the matter?` : `Welcome to ${place.name}. How can I help?`);
+      staffRef.current.say(hospitalKind ? `Welcome to ${place.name}. What is the matter?` : shopKind ? "Welcome, welcome! What will you buy?" : `Welcome to ${place.name}. How can I help?`);
       const clock = new THREE.Clock();
       const loop = () => {
         raf = requestAnimationFrame(loop);
@@ -147,7 +151,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
     const r = fn();
     const text = r.ok ? (r.text ?? "Done.") : (r.reason ?? "That didn't work.");
     setNote({ ok: r.ok, text });
-    staffRef.current?.say(r.ok ? (hospitalKind ? "There you go. Take care." : "Done. Anything else?") : text.length < 70 ? text : "Sorry, I can't do that.");
+    staffRef.current?.say(r.ok ? (hospitalKind ? "There you go. Take care." : shopKind ? "Thank you! Anything else?" : "Done. Anything else?") : text.length < 70 ? text : "Sorry, I can't do that.");
     session.notice(text);
     bump((n) => n + 1);
   };
@@ -161,12 +165,16 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           <b>{place.name}</b>
           {hospitalKind
             ? <small className="is-open">Open all day and night</small>
+            : shopKind
+            ? <small className={shopOpen(state, shopKind).open ? "is-open" : ""}>{shopOpen(state, shopKind).open ? "Open now" : `Closed · ${shopOpen(state, shopKind).text}`}</small>
             : <small className={counter.open ? "is-open" : ""}>{counter.open ? "Counter open" : `Counter closed · ${counter.text}`}</small>}
         </div>
       </div>
 
       <section className={`place-sheet${hospitalKind ? " is-hospital" : ""}`}>
-        {hospitalKind ? <HospitalPanel state={state} run={run} note={note} /> : <BankPanel state={state} run={run} note={note} />}
+        {hospitalKind ? <HospitalPanel state={state} run={run} note={note} scale={scale} />
+          : shopKind ? <ShopPanel kind={shopKind} state={state} run={run} note={note} scale={scale} />
+          : <BankPanel state={state} run={run} note={note} scale={scale} />}
       </section>
     </div>
   );

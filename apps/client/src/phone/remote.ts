@@ -128,3 +128,6 @@ export const bankRepay = remote("bankRepay", core.bankRepay as (s: GameState, am
 type HoR = core.HospitalResult;
 export const hospital = remote("hospital", core.hospitalService as (s: GameState, id: string) => HoR);
 export const hospitalFirstAid = remote("hospitalFirstAid", core.hospitalFirstAid as (s: GameState) => HoR);
+
+// ---- the shops (in person)
+export const shopSnack = remote("shopSnack", core.shopSnack as (s: GameState, kind: core.ShopPlace, id: string, scale?: number) => core.ShopResult, (a) => [a[1], a[2]]); // the price scale is the server's own

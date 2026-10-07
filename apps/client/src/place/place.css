@@ -51,3 +51,9 @@
 .place-service strong { flex: none; padding: 8px 12px; border-radius: 999px; background: #12233f; color: #fff; font: 800 .84rem system-ui; font-variant-numeric: tabular-nums; }
 .place-service:disabled { opacity: .45; cursor: default; }
 .place-sheet.is-hospital .place-tabs button.is-on { background: #1f9d97; }
+.place-service.is-row { cursor: default; }
+.place-service .place-ico { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #e1ebff; color: #2f55d8; }
+.place-service .place-qty { flex: none; display: flex; gap: 6px; margin-left: auto; }
+.place-qty button { border: 0; border-radius: 999px; padding: 9px 13px; background: #2f6bff; color: #fff; font: 800 .84rem system-ui; cursor: pointer; }
+.place-qty button:disabled { opacity: .35; cursor: default; }
+.place-sheet .place-money .is-owe b { color: #b3322a; }

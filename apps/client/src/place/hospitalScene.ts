@@ -136,7 +136,7 @@ export function buildHospitalRoom(name: string): PlaceRoom {
   box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 2.4, false); // the charging socket
 
   const lampMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#f2fbff", emissiveIntensity: 1.5 });
-  for (const x of [-3, 0, 3]) for (const z of [-1, 2]) {
+  for (const x of [-3, 0, 3]) for (const z of [2]) {
     const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.4), lampMat);
     lamp.position.set(x, H - 0.1, z);
     g.add(lamp);

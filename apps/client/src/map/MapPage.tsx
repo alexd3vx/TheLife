@@ -31,7 +31,7 @@ import "./map.css";
 
 /** The neighbourhood, streamed in chunks. A test bench for the map engine: walk around, zoom out, and run the performance tour. */
 /** Kinds of place that have an inside you can walk into. */
-const INSIDE = new Set<string>(["bank", "hospital"]);
+const INSIDE = new Set<string>(["bank", "hospital", "market", "fuel"]);
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -272,7 +272,7 @@ export default function MapPage() {
 
       {nearPlace && !atHome && !inside && intro === "off" && mode === "street" && !trip && (
         <button className="map-enter" onClick={() => setInside(nearPlace)}>
-          <GameIcon name={nearPlace.kind === "hospital" ? "hospital" : "bank"} /> Go into {nearPlace.name}
+          <GameIcon name={nearPlace.kind === "hospital" ? "hospital" : nearPlace.kind === "bank" ? "bank" : nearPlace.kind === "fuel" ? "fuel" : "market"} /> Go into {nearPlace.name}
         </button>
       )}
       {inside && life.session && <PlaceInterior place={inside} session={life.session} onClose={() => setInside(null)} />}

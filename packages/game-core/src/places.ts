@@ -51,12 +51,12 @@ const GROUP: Record<LandmarkKind, PlaceGroup> = {
   station: "civic",
   airport: "civic",
   port: "civic",
-  fuel: "civic",
+  fuel: "food",
 };
 
 export const placeGroup = (kind: LandmarkKind): PlaceGroup => GROUP[kind];
 
-export const GROUP_LABEL: Record<PlaceGroup, string> = { food: "Food", fun: "Fun & culture", night: "Nightlife", work: "Work & skills", care: "Care & faith", civic: "Civic" };
+export const GROUP_LABEL: Record<PlaceGroup, string> = { food: "Food & shops", fun: "Fun & culture", night: "Nightlife", work: "Work & skills", care: "Care & faith", civic: "Civic" };
 
 const label = (h: number) => `${((Math.floor(h) + 11) % 12) + 1}${h % 24 >= 12 && h % 24 < 24 ? "PM" : "AM"}`;
 

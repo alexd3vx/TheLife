@@ -29,3 +29,4 @@ export * from "./travel.js";
 export * from "./places.js";
 export * from "./bank.js";
 export * from "./hospital.js";
+export * from "./shop.js";

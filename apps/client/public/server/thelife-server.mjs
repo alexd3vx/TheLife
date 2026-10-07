@@ -3870,6 +3870,42 @@ function openStatus(kind, hour, weekday) {
   return { open: false, text: hour < h.open ? `opens ${label(h.open)}` : `opens ${label(h.open)} tomorrow` };
 }
 
+// packages/game-core/src/shop.ts
+var SNACKS = [
+  { id: "water", name: "Sachet water", blurb: "Cold pure water.", price: 100, effect: { energy: 2, hunger: 1 } },
+  { id: "zobo", name: "Zobo", blurb: "Chilled hibiscus drink in a bottle.", price: 300, effect: { hunger: 4, fun: 4 } },
+  { id: "cola", name: "Cold soft drink", blurb: "Fizzy and sweet. A quick lift.", price: 450, effect: { energy: 8, fun: 5 } },
+  { id: "chinchin", name: "Chin chin", blurb: "A crunchy bag to nibble on.", price: 300, effect: { hunger: 10, fun: 3 } },
+  { id: "pie", name: "Meat pie", blurb: "Warm from the glass case.", price: 700, effect: { hunger: 22 } },
+  { id: "puff", name: "Puff-puff", blurb: "Hot, sugary, by the dozen.", price: 500, effect: { hunger: 14, fun: 5 } },
+  { id: "suya", name: "Suya with onions", blurb: "Spiced beef on a stick, wrapped in paper.", price: 1500, effect: { hunger: 34, fun: 6 } },
+  { id: "jollof", name: "Plate of jollof and chicken", blurb: "A full plate from the food stall.", price: 2500, effect: { hunger: 55, fun: 4 } }
+];
+var snackById = (id) => SNACKS.find((s) => s.id === id);
+function shopOpen(state, kind) {
+  const clock = clockOf(state.minute);
+  const weekday = (clock.day + 3) % 7;
+  return openStatus(kind, clock.hourFloat, weekday);
+}
+function shopSnack(state, kind, id, scale = 1) {
+  if (kind !== "market" && kind !== "fuel") return { ok: false, reason: "That is not a shop." };
+  const s = snackById(id);
+  if (!s) return { ok: false, reason: "They don't sell that." };
+  const hours = shopOpen(state, kind);
+  if (!hours.open) return { ok: false, reason: `Closed (${hours.text}).` };
+  const price = Math.max(1, Math.round(s.price * scale));
+  const before = { ...state.needs };
+  const r = transfer(state.ledger, PLAYER, SINK, price, s.name, state.minute);
+  if (!r.ok) return { ok: false, reason: `${s.name} costs \u20A6${price.toLocaleString()}. You don't have enough.` };
+  state.stats.totalSpent += price;
+  for (const n of NEED_IDS) {
+    const add = s.effect[n];
+    if (add) state.needs[n] = clampNeed(state.needs[n] + add);
+  }
+  const gained = NEED_IDS.filter((n) => Math.round(state.needs[n]) > Math.round(before[n]));
+  return { ok: true, text: `${s.name} (\u20A6${price.toLocaleString()}): ${gained.length ? `${gained.join(", ")} up.` : "you were not hungry."}` };
+}
+
 // packages/game-core/src/bank.ts
 var ATM_FEE = 65;
 var MIN_AMOUNT = 100;
@@ -3960,6 +3996,7 @@ var HANDLERS = {
   bankWithdraw: (sim, [amount, atm]) => typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad),
   hospital: (sim, [id]) => str(id, 20) ? hospitalService(sim.state, id) : no(bad),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
+  shopSnack: (sim, [kind, id]) => str(kind, 10) && str(id, 20) ? shopSnack(sim.state, kind, id, sim.traits.groceries) : no(bad),
   chooseRecipe: (sim, [id]) => str(id, 30) ? chooseRecipe(sim.state, id) : no(bad),
   cancelRecipe: (sim) => cancelRecipe(sim.state),
   chooseDish: (sim, [id]) => str(id, 30) ? chooseDish(sim.state, id) : no(bad),
