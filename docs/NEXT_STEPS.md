@@ -148,3 +148,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Camera (Q34):** selfie and scene photos, poses and emotes, weekly photo contests (group photos with friends not chosen for now). (7 Oct)
 - **Admin tools first (Q35):** reports and bans queue, ad manager, economy dials, live events. (7 Oct)
 - **Sign-up (Q36):** username and password, email optional, with an 18+ confirmation. (7 Oct)
+- **Careers at launch (Q37):** all four groups wanted (office and tech, street and trade, public service, creative and media), **built one group at a time**. (7 Oct)
+- **AI NPCs (Q38):** scripted dialogue with Pidgin variety now; AI chat for a few key NPCs later, capped and cheap. (7 Oct)
+- **Install (Q39):** PWA now, Play Store app (TWA wrapper) later. (7 Oct)
+- **Analytics (Q40):** anonymous usage counts only (online now, visits, sessions, which places and apps are used, crashes). (7 Oct)
+
+*Questions asked so far: 40 of the owner's 100 (plus 16 earlier in the master plan).*
