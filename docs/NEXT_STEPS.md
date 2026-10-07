@@ -25,6 +25,32 @@ Public pages, plus a throw-away account (name, username, password; email was opt
 - Things they do that we do not: ad billboards, city tabs, gov events, family and staff, companies, betting and investing, group chats.
 - Things we do that they do not: realistic characters, real-clock Lagos, a server-run economy with a ledger, real OSM streets, walkable interiors with people.
 
+
+### 2b. Deep dive: the reference game's phone apps (7 Oct 2026, read-only)
+
+| App | What it does there | Notes for us |
+|---|---|---|
+| Bank (Naija Reserve Bank) | Wallet balance, net worth, top-up; savings 0.5% a week; bonds 2% in 7 days; interest builds by the minute and is paid daily; weekly income tax (first ₦1m a week free, then 20%) | Their bank is a single app. We make the bank a place with accounts, cards, PINs and forms, and make LifePay the weaker phone wallet |
+| Contacts | Mummy (always picks up), "find a player: meet people around town to save their numbers" | Numbers are collected by meeting people: good rule, we keep it |
+| Messages | Chats, Updates, Groups; chat actions: invite over, visit them, send money, request money, buy food, companies, block, report | Our player-ID chat already exists; add the actions |
+| Ride | "Where to?" list of every place with a short funny description | We have ride options by background; add descriptions |
+| Houses | Homes / Invest / Rent tabs; homes by size and weekly rent (6x6 face-me-I-face-you ₦2,400/week to 14x14 Banana Island mansion ₦1.5m/week); move in costs 3x rent; furniture moves with you; other cities add-on | Matches the master plan's "choose area by budget"; rent is paid every Saturday |
+| Cars | "No cars yet": a physical showroom (Polanco Motors, Victoria Island), test drive, haggle | Vehicles tie to a real place we can walk into |
+| Health | Healthy / sick states; order drugs ₦1,500 for mild illness; hospital injection ₦8,000; untreated sickness gets serious after a day | Fits our hospital; add illness over time (Phase 6) |
+| Invest | Buy land by area with weekly growth and "omo-onile risk"; plots, trailers, businesses | Good Lagos-flavoured idea to adopt |
+| Family | Up to 4 "baes", add relatives with consent | Social Phase |
+| Staff | Hire house help ₦15k/week, private chef ₦60k/week, driver ₦40k/week; wages come off with rent on Saturday | Easy to add later |
+| Hustle | Player-to-player job board with escrow ("the fee is held safe until the job is done") | Strong social/economy feature; needs moderation (the board there already has inappropriate posts) |
+| Shops | Player shops by city, type and area | We can start with place-based shops |
+| Lagos Gov | Weekly elections for Governor/Senator/President, cabinet, polling unit you visit in person, live count | Master plan mentions status and politics |
+| Others | Jobs, Boutique, Chowdeck (food), Invite, Police, Company, Settings, Help and guide | Compare later |
+
+Things they do for retention: daily gem hunt with a prize, "steady light" news banners, online and visit counters on the home screen, weekly rent day, weekly election.
+
+### 2c. What the auto-mode safety check did (why I was "restricted")
+
+Reading the site and creating a throw-away account went through. When I tried to **send a chat message to another real person** (@mikeee_092008) from that account, Claude Code's safety check refused it as a real-world action I had not been given explicit permission to take through that tool, and it also blocked a plain grep right after. I stopped, as required, and did not try to get round it. Reading pages, taking screenshots and writing code are fine; sending messages, spending or sending money, or posting as an account are the kinds of actions that get stopped.
+
 ## 3. Known problems (from the owner's list) and what to do
 
 | # | Problem | Cause (found or suspected) | Plan |
@@ -62,10 +88,13 @@ Public pages, plus a throw-away account (name, username, password; email was opt
 
 ## 5. Question backlog (asked four at a time)
 
-Batch 1 (asked 7 Oct): visual rule, first slice, social priority, survival depth.
+Batch 1 (asked 7 Oct): map look, first wave, voice calls, survival depth.
 
 Drafted for later batches (not asked yet): camera (first/third person/isometric) per place; device targets and minimum phone; offline or always-online; one city or several; how many players per room; voice call quality and cost; moderation and reporting; age rating; whether real brands appear (GTBank, Total) or invented ones; ads and monetisation; accounts and ID verification; death and permadeath; time speed; crime; jobs list and promotions; companies owned by players; property ownership and rent between players; land and building by players; weather and seasons; religion events (Sunday service, Friday prayers, Ramadan); holidays; languages (Pidgin, Yoruba, Igbo, Hausa); music and radio; phone apps that should be real vs decorative; photography; sports; betting; education path; health and illness; pets; relationships, marriage and kids; ageing; inheritance; achievements; leaderboard; owner tools and live events; anti-cheat; save portability; data and privacy.
 
 ## 6. Decisions recorded
 
-(Fill in as the owner answers.)
+- **Map and building look: colourful game-style 3D** (saturated colours, chunky buildings with real height, water with depth, labels and icons like the reference), realistic people on top. (7 Oct)
+- **First wave:** bugs and basics, bank rework, social, map overhaul. The owner wants **all features planned first, then built one at a time** (so no more building until the plan is agreed). (7 Oct)
+- **Voice calls:** phone calls between players only (ring, answer or decline, speaker; WebRTC with the server doing signalling). Nearby voice is not wanted for now. (7 Oct)
+- **Survival depth: medium** (moodles, injuries and treatment, weather and clothes, power cuts and generators; no zombies). (7 Oct)
