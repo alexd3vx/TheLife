@@ -160,5 +160,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Accessibility (Q46):** all four: text size and contrast, colour-blind safe cues (shapes and labels besides colour), reduced motion and low-data mode, subtitles for calls and key sounds. (7 Oct)
 - **Push notifications (Q47):** messages and calls, rent, bills and events, needs and health; the owner also wants "more to get them addicted". Plan: opt-in, per-type switches, quiet hours and a daily cap, rewards that bring people back (events, streak-free daily reasons to return) rather than manipulative nags; no loot-box or gambling-style loops. (7 Oct)
 - **First playtest (Q48):** later, after the first wave of the plan. (7 Oct)
+- **Return reasons (Q49):** weekly events, daily surprises, social pull and streak rewards all wanted (streaks to be built with grace days so one missed day does not wipe progress). Also **level names with different badges that show everywhere (chat, profile, map, LifeGram) and lock some features behind milestones.** (7 Oct)
+- **Government effects (Q50):** small real effects for everyone (NEPA cuts, fares, market tax), announced with a **news screen/cutscene** when a new term starts or the vote result lands. (7 Oct)
+- **Crime (Q51):** light and avoidable: fake alert texts, pickpockets in crowds, checkpoints; reports at the police station. (7 Oct)
+- **Skills with real depth (Q52):** cooking, fitness, music and creative, tech: all wanted, **built one at a time**. (7 Oct)
 
-*Questions asked so far: 48 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 52 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
