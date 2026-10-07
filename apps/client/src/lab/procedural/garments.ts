@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { BOTTOMS, SHOES, TOPS } from "../../iso/wardrobe";
 import { jointPos, neckBase, type BodyRest } from "./bodyRest";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { loft, silhouette, type Silhouette } from "./loft";
+import { loftGeometry, loftGrid, silhouette, type LoftGrid, type Silhouette } from "./loft";
 import { buildGeometry, clipField, clipPlane, extractTriangles, type Triangle } from "./geometryClip";
 
 export interface GarmentChoice {
@@ -23,6 +23,8 @@ export interface GarmentResult {
   slot: "top" | "bottom" | "shoes";
   /** One entry per layer of the geometry: a fixed colour (a white shirt under a jacket), or null to follow the garment's colour. */
   layers: (string | null)[];
+  /** Hanging parts (not in `geometry` when simulating): the cloth simulation moves these. */
+  lofts: LoftGrid[];
 }
 
 /** A part added onto a garment: a collar, lapels, the shirt showing under an open jacket. */
@@ -49,7 +51,7 @@ interface Spec {
   /** Rounds of smoothing so the cloth hangs rather than copying the muscles under it (default 6 for tops, 4 for trousers). */
   smooth?: number;
   /** The part that hangs below the body-hugging part (a skirt, the body of a kaftan): lofted round the body instead of cut from it. */
-  lower?(rest: BodyRest, sil: Silhouette): THREE.BufferGeometry[];
+  lower?(rest: BodyRest, sil: Silhouette): LoftGrid[];
   /** Shapes the legs of trousers (flare, room above the knee): returns a function that moves a vertex. */
   legs?(rest: BodyRest): (p: THREE.Vector3, n: THREE.Vector3) => void;
   /** Covers the legs (a long garment): a bottom worn with it would only be inside it. */
@@ -190,13 +192,14 @@ const floorY = (r: BodyRest) => jointPos(r, "foot_l").y;
  * A garment that hugs the body down to `from` and hangs below it: a lofted sleeve of cloth from there to the hem. `slack` is the ease
  * round the body at the top; `hang` makes it hang from the widest point above (kaftans and agbada skip the waist).
  */
-function hanging(o: { from(r: BodyRest): number; hem(r: BodyRest): number; offset: number; top?: number; flare(t: number): number; hang?: boolean; fold?: number; folds?: number; back?: number; follow?: number }): NonNullable<Spec["lower"]> {
+function hanging(o: { from(r: BodyRest): number; hem(r: BodyRest): number; offset: number; top?: number; flare(t: number): number; hang?: boolean; fold?: number; folds?: number; back?: number; follow?: number; easeLen?: number; up?: number }): NonNullable<Spec["lower"]> {
   return (rest, sil) => [
-    loft(rest, sil, {
-      yTop: o.from(rest) + 0.03,
+    loftGrid(rest, sil, {
+      yTop: o.from(rest) + (o.up ?? 0.03),
       yBottom: o.hem(rest),
       offset: o.offset,
       offsetTop: o.top ?? 0.03,
+      ...(o.easeLen !== undefined ? { easeLen: o.easeLen } : {}),
       flare: o.flare,
       ...(o.hang !== undefined ? { hang: o.hang } : {}),
       ...(o.fold !== undefined ? { fold: o.fold } : {}),
@@ -213,7 +216,34 @@ const bodiceCut = (from: (r: BodyRest) => number, neck: [number, number], sleeve
   return sleeves ? cutSleeves(out, rest, sleeves[0], sleeves[1], sleeves[2]) : withoutArms(out, rest);
 };
 
+
+/**
+ * A top that hangs: the shoulders, chest and sleeves follow the body, and below the chest the cloth hangs from there (a lofted sleeve that
+ * the cloth simulation moves). `hem` is the hem height above the hips, `slack` the ease round the body.
+ */
+function looseTop(o: { offset: number; neck: [number, number]; sleeves: [string, string, number]; hem: number; slack: number; flare?: number; smooth?: number; extras?: Extra[] }): Spec {
+  return {
+    slot: "top",
+    offset: o.offset,
+    smooth: o.smooth ?? 7,
+    covers: [],
+    cut: bodiceCut(chestY, o.neck, o.sleeves),
+    lower: hanging({ from: chestY, hem: (r) => jointPos(r, "pelvis").y + o.hem, offset: o.slack, top: o.offset - 0.002, easeLen: 0.55, up: 0.1, flare: (t) => (o.flare ?? 0.01) * t, hang: true, fold: 0.004, folds: 9 }),
+    ...(o.extras ? { extras: o.extras } : {}),
+  };
+}
+const collar = (reach: number, lift: number, flare: number, off: number): Extra => ({ select: (main, _b, rest) => collarOf(main, rest, reach), offset: off, adjust: (r) => standUp(lift, flare, neckBase(r).y) });
+
 const LONG_SPECS: Record<string, Spec> = {
+  p_tee: looseTop({ offset: 0.02, neck: [0.085, 0.03], sleeves: ["upperarm", "lowerarm", 0.5], hem: 0.08, slack: 0.04 }),
+  p_tank: looseTop({ offset: 0.018, neck: [0.12, 0.09], sleeves: ["upperarm", "lowerarm", -0.1], hem: 0.08, slack: 0.034 }),
+  p_vest: looseTop({ offset: 0.016, neck: [0.13, 0.13], sleeves: ["upperarm", "lowerarm", -0.2], hem: 0.08, slack: 0.03 }),
+  p_polo: looseTop({ offset: 0.021, neck: [0.075, 0.015], sleeves: ["upperarm", "lowerarm", 0.42], hem: 0.05, slack: 0.042 }),
+  p_long: looseTop({ offset: 0.02, neck: [0.085, 0.03], sleeves: ["lowerarm", "hand", 0.7], hem: 0.08, slack: 0.04 }),
+  p_hoodie: looseTop({ offset: 0.036, neck: [0.095, 0.015], sleeves: ["lowerarm", "hand", 0.85], hem: 0.0, slack: 0.07, flare: 0.02, smooth: 9 }),
+  p_jersey: looseTop({ offset: 0.028, neck: [0.1, 0.05], sleeves: ["upperarm", "lowerarm", 0.25], hem: 0.0, slack: 0.055 }),
+  p_shirt: looseTop({ offset: 0.022, neck: [0.075, 0.012], sleeves: ["lowerarm", "hand", 0.8], hem: 0.0, slack: 0.045, extras: [collar(0.14, 0.022, 0.05, 0.014)] }),
+  p_sweater: looseTop({ offset: 0.04, neck: [0.082, 0.02], sleeves: ["lowerarm", "hand", 0.92], hem: -0.02, slack: 0.065, smooth: 9, extras: [collar(0.13, 0.014, 0.04, 0.056)] }),
   p_dress: {
     slot: "top",
     long: true,
@@ -353,17 +383,6 @@ function legCut(flare: (t: number) => number, thigh = 0) {
 }
 
 const SPECS: Record<string, Spec> = {
-  p_vest: {
-    slot: "top",
-    offset: 0.016,
-    covers: ["spine_01", "spine_02", "spine_03"],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.08;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.13, 0.13);
-      return cutSleeves(out, rest, "upperarm", "lowerarm", -0.2);
-    },
-  },
   p_crop: {
     slot: "top",
     offset: 0.018,
@@ -373,39 +392,6 @@ const SPECS: Record<string, Spec> = {
       let out = clipPlane(tris, [0, 1, 0], -hem);
       out = cutNeckline(out, rest, 0.085, 0.03);
       return cutSleeves(out, rest, "upperarm", "lowerarm", 0.35);
-    },
-  },
-  p_polo: {
-    slot: "top",
-    offset: 0.021,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.05;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.075, 0.015);
-      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.42);
-    },
-  },
-  p_hoodie: {
-    slot: "top",
-    offset: 0.036,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.02;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.095, 0.015);
-      return cutSleeves(out, rest, "lowerarm", "hand", 0.85);
-    },
-  },
-  p_jersey: {
-    slot: "top",
-    offset: 0.028,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.0;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.1, 0.05);
-      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.25);
     },
   },
   p_jeans: {
@@ -487,19 +473,6 @@ const SPECS: Record<string, Spec> = {
       return clipPlane(withoutArms(tris, rest), [0, -1, 0], top);
     },
   },
-  p_shirt: {
-    slot: "top",
-    offset: 0.022,
-    smooth: 7,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.03;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.075, 0.012);
-      return cutSleeves(out, rest, "lowerarm", "hand", 0.8);
-    },
-    extras: [{ select: (main, _b, rest) => collarOf(main, rest, 0.14), offset: 0.014, adjust: (r) => standUp(0.022, 0.05, neckBase(r).y) }],
-  },
   p_blazer: {
     slot: "top",
     offset: 0.04,
@@ -514,19 +487,6 @@ const SPECS: Record<string, Spec> = {
       { select: (main, _b, rest) => collarOf(main, rest, 0.15), offset: 0.05, adjust: (r) => standUp(0.02, 0.05, neckBase(r).y) },
     ],
   },
-  p_sweater: {
-    slot: "top",
-    offset: 0.04,
-    smooth: 9,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.0;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.082, 0.02);
-      return cutSleeves(out, rest, "lowerarm", "hand", 0.92);
-    },
-    extras: [{ select: (main, _b, rest) => collarOf(main, rest, 0.13), offset: 0.056, adjust: (r) => standUp(0.014, 0.04, neckBase(r).y) }],
-  },
   p_slacks: {
     slot: "bottom",
     offset: 0.026,
@@ -538,39 +498,6 @@ const SPECS: Record<string, Spec> = {
       return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
     },
     legs: legCut((t) => 0.006 * t, 0.012),
-  },
-  p_tee: {
-    slot: "top",
-    offset: 0.02,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.1;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.085, 0.03);
-      return cutSleeves(out, rest, "upperarm", "lowerarm", 0.5);
-    },
-  },
-  p_tank: {
-    slot: "top",
-    offset: 0.018,
-    covers: ["spine_01", "spine_02", "spine_03"],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.1;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.12, 0.09);
-      return cutSleeves(out, rest, "upperarm", "lowerarm", -0.1);
-    },
-  },
-  p_long: {
-    slot: "top",
-    offset: 0.02,
-    covers: ["spine_01", "spine_02", "spine_03", ...both("clavicle")],
-    cut(tris, rest) {
-      const hem = jointPos(rest, "pelvis").y + 0.1;
-      let out = clipPlane(tris, [0, 1, 0], -hem);
-      out = cutNeckline(out, rest, 0.085, 0.03);
-      return cutSleeves(out, rest, "lowerarm", "hand", 0.7);
-    },
   },
   p_shorts: {
     slot: "bottom",
@@ -624,7 +551,7 @@ export function isProceduralGarment(id: string | null): id is string {
   return !!id && id in SPECS;
 }
 
-export function buildGarment(rest: BodyRest, id: string): GarmentResult | null {
+export function buildGarment(rest: BodyRest, id: string, simulate = false): GarmentResult | null {
   const spec = SPECS[id];
   if (!spec) return null;
   // The cut planes alone define each garment's area (bone boundaries are ragged, planes are clean).
@@ -642,11 +569,15 @@ export function buildGarment(rest: BodyRest, id: string): GarmentResult | null {
   const smooth = spec.smooth ?? (spec.slot === "top" ? 6 : spec.slot === "bottom" ? 4 : 0);
   const parts: THREE.BufferGeometry[] = [buildGeometry(triangles, { offset: spec.offset, uvScale: 3.2, smooth, ...(spec.adjust ? { adjust: spec.adjust } : spec.legs ? { adjust: spec.legs(rest) } : {}) })];
   const layers: (string | null)[] = [null];
+  const lofts: LoftGrid[] = [];
   if (spec.lower) {
     const reachTop = Math.max(jointPos(rest, "spine_03").y + 0.1, 1.3);
-    for (const g of spec.lower(rest, silhouette(rest, 0.02, reachTop))) {
-      parts.push(g);
-      layers.push(null);
+    for (const grid of spec.lower(rest, silhouette(rest, 0.02, reachTop))) {
+      if (simulate) lofts.push(grid);
+      else {
+        parts.push(loftGeometry(grid, false));
+        layers.push(null);
+      }
     }
   }
   for (const extra of spec.extras ?? []) {
@@ -657,5 +588,5 @@ export function buildGarment(rest: BodyRest, id: string): GarmentResult | null {
   }
   // each part becomes its own group, so it can have its own material (a white shirt under a coloured jacket)
   const geometry = parts.length === 1 ? parts[0]! : mergeGeometries(parts, true)!;
-  return { geometry, covers: [], coveredTriangles, slot: spec.slot, layers };
+  return { geometry, covers: [], coveredTriangles, slot: spec.slot, layers, lofts };
 }

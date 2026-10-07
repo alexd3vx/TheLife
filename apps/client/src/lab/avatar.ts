@@ -9,6 +9,7 @@ import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./proce
 import type { FabricId } from "./procedural/fabrics";
 import { clothFor } from "./procedural/cloth";
 import { Sway, applySway } from "./procedural/clothSway";
+import { ClothSim, bodyColliders } from "./procedural/clothSim";
 import { buildGarment, coversLegs, isProceduralGarment, tieTriangles } from "./procedural/garments";
 import { buildGeometry } from "./procedural/geometryClip";
 import { buildHair } from "./procedural/hair";
@@ -145,6 +146,7 @@ export class Avatar {
     this.morph?.dispose();
     this.morph = morph;
     this.pelvisBone = null;
+    this.colliders = null;
 
     const wasPlaying = this.currentAction?.getClip().name;
     this.clearParts();
@@ -550,6 +552,7 @@ export class Avatar {
   }
 
   private sway = new Sway();
+  private colliders: ReturnType<typeof bodyColliders> | null = null;
   private pelvisBone: THREE.Bone | null = null;
   private outfitState: "none" | "underwear" | "towel" | "night" = "none";
 
@@ -598,6 +601,7 @@ export class Avatar {
       const current = this.partRoots.get(slot);
       if (current && current.userData.assetId === want?.id) continue;
       if (current) {
+        for (const sim of (current.userData.sims as ClothSim[] | undefined) ?? []) sim.dispose();
         current.parent?.remove(current);
         this.partRoots.delete(slot);
       }
@@ -787,7 +791,9 @@ export class Avatar {
   /** A garment cut from the body mesh, so it shares the body's skeleton and deforms with it. */
   private buildProceduralGarment(id: string): THREE.Object3D | null {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
-    const result = buildGarment(this.bodyRest, id);
+    // the people looked at close up get real cloth (a simulation of the hanging part); a crowd gets the cheap sway in the shader
+    const simulate = !!this.face;
+    const result = buildGarment(this.bodyRest, id, simulate);
     if (!result) return null;
     const make = () => {
       const m = new THREE.MeshPhysicalMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide, vertexColors: true });
@@ -810,6 +816,12 @@ export class Avatar {
     group.userData.coveredTriangles = result.coveredTriangles;
     group.add(skinned);
     this.bodyScene.add(group);
+    if (simulate && result.lofts.length) {
+      this.colliders ??= bodyColliders(this.bodyRest, this.skeleton.bones);
+      const sims = result.lofts.map((grid) => new ClothSim(grid, this.skeleton!, this.colliders!, this.bodyScene!, new THREE.MeshPhysicalMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide, vertexColors: true })));
+      for (const s of sims) group.add(s.mesh);
+      group.userData.sims = sims;
+    }
     return group;
   }
 
@@ -1087,6 +1099,7 @@ export class Avatar {
     this.lookMarks.clear();
     this.mixer?.update(delta);
     this.updateSway(delta);
+    for (const part of this.partRoots.values()) for (const sim of (part.userData.sims as ClothSim[] | undefined) ?? []) sim.update(delta);
     this.applyLook(delta);
     this.face?.update(delta);
     this.updateEyes(delta);

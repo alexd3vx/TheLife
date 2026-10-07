@@ -83,6 +83,8 @@ export interface LoftOptions {
   /** Distance outside the body's reach (the cloth's thickness plus ease), and how close it starts at the top (to meet the part that hugs the body). */
   offset: number;
   offsetTop?: number;
+  /** How far down (0 to 1 of the length) the cloth takes to grow from the top offset to its full ease. */
+  easeLen?: number;
   /** Extra reach by how far down the cloth is, from 0 at the top to 1 at the hem. Metres. */
   flare(t: number): number;
   /** The cloth hangs from where it starts: it never comes in closer than the widest point above it (so a kaftan skips the waist). */
@@ -97,8 +99,39 @@ export interface LoftOptions {
   uvScale?: number;
 }
 
+/** The raw grid of a lofted sleeve: `nu` particles round, `rows + 1` down; rows run from the top (row 0) to the hem. */
+export interface LoftGrid {
+  nu: number;
+  rows: number;
+  position: Float32Array;
+  uv: Float32Array;
+  skinIndex: Uint16Array;
+  skinWeight: Float32Array;
+  sway: Float32Array;
+  color: Float32Array;
+  indices: Uint32Array;
+}
+
 /** A closed sleeve of cloth lofted round the body, ready to skin (position, normal, uv, skinIndex, skinWeight; not indexed). */
 export function loft(rest: BodyRest, sil: Silhouette, o: LoftOptions): THREE.BufferGeometry {
+  return loftGeometry(loftGrid(rest, sil, o), false);
+}
+
+/** The geometry of a loft grid: indexed (to simulate) or not (to skin). */
+export function loftGeometry(grid: LoftGrid, indexed: boolean): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(grid.position.slice(), 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(grid.uv, 2));
+  g.setAttribute("skinIndex", new THREE.BufferAttribute(grid.skinIndex, 4));
+  g.setAttribute("skinWeight", new THREE.BufferAttribute(grid.skinWeight, 4));
+  g.setAttribute("sway", new THREE.BufferAttribute(grid.sway, 1));
+  g.setAttribute("color", new THREE.BufferAttribute(grid.color, 3));
+  g.setIndex(new THREE.BufferAttribute(grid.indices, 1));
+  g.computeVertexNormals();
+  return indexed ? g : g.toNonIndexed();
+}
+
+export function loftGrid(rest: BodyRest, sil: Silhouette, o: LoftOptions): LoftGrid {
   const nu = sil.nu;
   const rows = o.rows ?? 22;
   const pelvisY = jointPos(rest, "pelvis").y;
@@ -144,7 +177,7 @@ export function loft(rest: BodyRest, sil: Silhouette, o: LoftOptions): THREE.Buf
     for (let i = 0; i < nu; i++) {
       const u = (i / nu) * Math.PI * 2;
       const fold = (o.fold ?? 0) * Math.sin(u * (o.folds ?? 9) + t * 4) * Math.min(1, t * 2);
-      const ease = o.offsetTop === undefined ? 1 : Math.min(1, t / 0.15);
+      const ease = o.offsetTop === undefined ? 1 : Math.min(1, t / (o.easeLen ?? 0.15));
       const off = o.offsetTop === undefined ? o.offset : o.offsetTop + (o.offset - o.offsetTop) * ease * ease * (3 - 2 * ease);
       const radius = reach[j]![i]! + off + o.flare(t) + (o.extra ? o.extra(u, t) : 0) + fold;
       position.push(sil.cx + Math.sin(u) * radius, y, sil.cz + Math.cos(u) * radius);
@@ -183,12 +216,7 @@ export function loft(rest: BodyRest, sil: Silhouette, o: LoftOptions): THREE.Buf
       indices.push(a, c, b, b, c, d);
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
-  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute("skinIndex", new THREE.BufferAttribute(new Uint16Array(sIdx), 4));
-  g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(sW, 4));
-  // how freely this vertex moves when the person does (nothing at the top, most at the hem), and baked shading: a darker stitched hem
+  // how freely each vertex moves with the person (nothing at the top, most at the hem), and baked shading: a darker stitched hem and folds
   const sway: number[] = [], shade: number[] = [];
   for (let j = 0; j <= rows; j++) for (let i = 0; i < nu; i++) {
     const t = j / rows;
@@ -198,9 +226,15 @@ export function loft(rest: BodyRest, sil: Silhouette, o: LoftOptions): THREE.Buf
     const fold = 0.93 + 0.07 * Math.sin((i / nu) * Math.PI * 2 * (o.folds ?? 9) + t * 4);
     shade.push(hem * top * fold, hem * top * fold, hem * top * fold);
   }
-  g.setAttribute("sway", new THREE.Float32BufferAttribute(sway, 1));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(shade, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g.toNonIndexed();
+  return {
+    nu,
+    rows,
+    position: new Float32Array(position),
+    uv: new Float32Array(uv),
+    skinIndex: new Uint16Array(sIdx),
+    skinWeight: new Float32Array(sW),
+    sway: new Float32Array(sway),
+    color: new Float32Array(shade),
+    indices: new Uint32Array(indices),
+  };
 }

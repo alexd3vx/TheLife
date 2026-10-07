@@ -366,3 +366,11 @@ Chronological record of decisions and changes. Newest first.
 - The home controller sets the mood from the needs (`updateFace`).
 - `#/hair` has mood, speak, wink and look buttons for checking faces (`__hair.mood`, `.speak`, `.wink`, `.look`).
 - Test: every unit a mood or mouth shape uses exists in the pack; teeth and tongue exist.
+
+## Cloth physics (owner: "use physics so it looks real")
+
+- `lab/procedural/clothSim.ts`: a position-based simulation of the hanging part of a garment (about 1,600 particles): inertia and gravity, a soft spring to where the animated body would carry each particle (firm at the waistband, loose at the hem), neighbour distances kept (no stretch or tear), and collision with capsules that stand in for the thighs, calves, feet and hips (radii measured from the body's skin). Two substeps a frame. The result is a plain mesh in the person's space; the upper part of a garment stays skinned. `loft.ts` now has `loftGrid` (the raw particle grid) next to `loft`.
+- Only the people looked at close up (those with a face rig) get the simulation; a crowd keeps the cheap shader sway. `Avatar.update` steps the sims after the animation.
+- Tops are no longer tight shells: tee, tank, vest, polo, long sleeve, hoodie, jersey, shirt and sweater are a fitted bodice (shoulders, chest, sleeves) plus a hanging, simulated body (`looseTop`), blended in over half its length so there is no shelf at the chest.
+- Gowns, dresses, kaftans, agbada and skirts trail behind when walking and swing when stopping (checked in `#/hair` with the walk button).
+- Not simulated: sleeves and the fitted bodice (they are skinned), trousers (they follow the legs).
