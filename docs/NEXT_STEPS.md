@@ -47,6 +47,12 @@ Public pages, plus a throw-away account (name, username, password; email was opt
 
 Things they do for retention: daily gem hunt with a prize, "steady light" news banners, online and visit counters on the home screen, weekly rent day, weekly election.
 
+### 2b-2. Rides, places and ads in the reference game (7 Oct)
+
+- **Ride cutscene (danfo):** choose a destination, pick Trek / Keke ₦150 / Danfo ₦150 / Okada ₦250 / Cab ₦500, tap Go. A real 3D driven scene plays: chase camera behind a painted danfo ("EKO O NI BAJE"), dense traffic (cabs, buses, jeeps), market canopies, power lines, pedestrians, haze; buttons for three camera modes (chase, look around, seat), Map, and Skip; the fare is taken and the clock moves. Flights and the airport use the same idea with runway boards.
+- **Arrival at a place:** a compact stage of the place with the players who are there (name tags), a place chat ("Say something to the 6 players here"), activity chips (Amphitheatre, Art gallery, Under the trees, Drinks kiosk), and a place sheet with ten or so activities (watch a stage play, buy a small painting, spray graffiti, play Ayo). Everything in a place is a one-tap activity.
+- **Ads (`lagoslife.app/advertise`):** advertisers need no game account: upload a logo, pay, live at once. 38 digital billboards (8 giant ones at junctions and bridges), ads rotate 15 s each; ₦250,000 per billboard per 7 days; sea plots (6x6) ₦18,000 per 7 days; a stats-page ad ₦150,000; airport boards ₦500,000 per 7 days at Lagos, Abuja and Port Harcourt; tapping an ad opens the advertiser's link. 250 ads on 38 boards at the time.
+
 ### 2c. What the auto-mode safety check did (why I was "restricted")
 
 Reading the site and creating a throw-away account went through. When I tried to **send a chat message to another real person** (@mikeee_092008) from that account, Claude Code's safety check refused it as a real-world action I had not been given explicit permission to take through that tool, and it also blocked a plain grep right after. I stopped, as required, and did not try to get round it. Reading pages, taking screenshots and writing code are fine; sending messages, spending or sending money, or posting as an account are the kinds of actions that get stopped.
@@ -102,3 +108,7 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Bank account opening: realistic form** (name, date of birth, phone, ID type and number, address, photo placeholder, then a wait, then a card and a PIN you choose; needs the ID card item and a utility bill). (7 Oct)
 - **LifePay keeps** small transfers, bills and airtime, savings and loans, so the nerf is by limits, fees and rates (daily transfer limit, per-transfer fee, low savings rate, small high-interest loans), while the bank has big transfers, cards, higher savings rates, big loans, statements and business accounts. (7 Oct)
 - **Phone numbers:** every player gets an automatic Nigerian-style number on an invented network; you save someone's number by meeting them or by them sharing it; numbers are searchable in chat and the bank. (7 Oct)
+- **LifeGram first version:** photos from the in-game camera, likes, comments, follow; report and word filter from day one. (7 Oct)
+- **Visiting homes:** live together in the home in real time (host accepts, guest walks in, host can ask guests to leave). (7 Oct)
+- **Map first pass:** 3D buildings with height and colour, water with depth, real bridges, labels and landmarks, **and digital billboards that promoters pay real money for, for a number of days** (like the reference's ad page). (7 Oct)
+- **New-player film:** plane lands and a taxi ride to the chosen home, plus an interactive first day, and the vehicle and airplane cutscenes should be studied from the reference (done above: chase camera, camera modes, skip). (7 Oct)
