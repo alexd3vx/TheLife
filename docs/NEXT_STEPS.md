@@ -164,5 +164,9 @@ Drafted for later batches (not asked yet): camera (first/third person/isometric)
 - **Government effects (Q50):** small real effects for everyone (NEPA cuts, fares, market tax), announced with a **news screen/cutscene** when a new term starts or the vote result lands. (7 Oct)
 - **Crime (Q51):** light and avoidable: fake alert texts, pickpockets in crowds, checkpoints; reports at the police station. (7 Oct)
 - **Skills with real depth (Q52):** cooking, fitness, music and creative, tech: all wanted, **built one at a time**. (7 Oct)
+- **Betting (Q53):** a LagosBet-style sports betting phone app on real football fixtures with play money only; no casino. (7 Oct)
+- **Leaderboards (Q54):** richest, level and milestones, hustle rating, photo contest winners, "and others as well" (more boards can be added later, e.g. best business, most visited home). (7 Oct)
+- **Identity (Q55):** username fixed; display name and look changeable (look changes cost money at the barber or boutique). (7 Oct)
+- **Mini-games (Q56):** short tap and timing tasks (10 to 30 s: tap to cook, rhythm for music, typing for office) **and** big mini-games for some jobs, both "but better" than a basic version. (7 Oct)
 
-*Questions asked so far: 52 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
+*Questions asked so far: 56 of the owner's 100 (plus the 40 in `MASTER_PLAN.md`).*
