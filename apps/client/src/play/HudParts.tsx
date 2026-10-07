@@ -115,3 +115,14 @@ export function BottomNav({ active, unread = 0, onBuy, onMap, onBag }: { active:
     </nav>
   );
 }
+
+/** Top left: your own face; tap it for your profile. */
+export function ProfileButton({ hud }: { hud: HudSnapshot }) {
+  const p = hud.profile;
+  const initials = p ? `${p.firstName[0] ?? ""}${p.surname[0] ?? ""}`.toUpperCase() : "?";
+  return (
+    <button className={`hud-avatar tier-${p?.tier ?? "middle"}`} onClick={() => window.dispatchEvent(new CustomEvent("thelife-open-profile"))} aria-label="Your profile">
+      {initials}
+    </button>
+  );
+}

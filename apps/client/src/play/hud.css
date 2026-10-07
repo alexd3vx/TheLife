@@ -50,3 +50,8 @@
 .hud-on .net-chip { left: 12px; right: auto; top: calc(max(12px, env(safe-area-inset-top)) + 112px); background: var(--hud-bg); color: var(--hud-ink); border: 0; box-shadow: var(--hud-shadow); }
 .hud-on .net-chip b { color: var(--hud-blue); }
 @media (max-width: 380px) { .hud-pill { gap: 7px; padding-left: 12px; font-size: .8rem; } .hud-money { padding-left: 6px; } }
+
+.hud-avatar { position: absolute; z-index: 4; left: 12px; top: max(12px, env(safe-area-inset-top)); width: 42px; height: 42px; border-radius: 50%; border: 3px solid #fff; display: grid; place-items: center; font: 800 .85rem system-ui; color: #fff; background: linear-gradient(145deg, #5b9bff, #2f55d8); box-shadow: var(--hud-shadow); cursor: pointer; padding: 0; }
+.hud-avatar.tier-lapo { border-color: #9fd0ff; } .hud-avatar.tier-nepo { border-color: #d3b8ff; }
+.hud-on .play-top { display: none; }
+.is-buying .hud-avatar { display: none; }

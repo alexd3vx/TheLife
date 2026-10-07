@@ -14,15 +14,15 @@ import type { Status } from "./controller";
 import type { HudSnapshot } from "./gameSession";
 import PhoneUI from "../phone/PhoneUI";
 import SettingsPanel from "../settings/SettingsPanel";
-import HomeShop from "../iso/HomeShop";
-import EditPad from "../iso/EditPad";
+import BuyMode from "../iso/BuyMode";
 import "../iso/iso.css";
 import { useSettings } from "../settings/settings";
 import { startPlay, type PlayRuntime, type TapMenu } from "./runtime";
 import "./play.css";
 import OnlineCount from "../net/OnlineCount";
 import "../net/stats.css";
-import { BottomNav, Chips, MoreMenu, NeedsRow, TopPill } from "./HudParts";
+import ProfileSheet from "../ui/ProfileSheet";
+import { BottomNav, Chips, MoreMenu, NeedsRow, ProfileButton, TopPill } from "./HudParts";
 
 interface Toast {
   id: number;
@@ -75,6 +75,12 @@ export default function PlayPage() {
   const lastNote = useRef<number | null>(null);
   const recentNotes = useRef(new Map<string, number>());
   const [bagOpen, setBagOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    const on = () => setProfileOpen(true);
+    window.addEventListener("thelife-open-profile", on);
+    return () => window.removeEventListener("thelife-open-profile", on);
+  }, []);
   const [kitchen, setKitchen] = useState<"fridge" | "cook" | "eat" | null>(null);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -166,7 +172,7 @@ export default function PlayPage() {
   const banner = status.label ?? hover;
 
   return (
-    <div className="play hud-on">
+    <div className={`play hud-on${editing ? " is-buying" : ""}`}>
       <div className="play-stage" ref={containerRef} />
 
       <div className="play-top">
@@ -183,6 +189,7 @@ export default function PlayPage() {
 
       {hud && !editing && (
         <>
+          <ProfileButton hud={hud} />
           <TopPill hud={hud} />
           <Chips hud={hud} />
           <NeedsRow hud={hud} />
@@ -220,29 +227,19 @@ export default function PlayPage() {
         </div>
       )}
 
-      {editing && (
-        <>
-          <div className="home-hint" style={{ top: "calc(max(12px, env(safe-area-inset-top)) + 182px)" }}>{sel ? "Tap the floor, or use the arrows." : "Tap a piece of furniture to pick it up."}</div>
-          <EditPad active={!!sel && !shopOpen} onMove={(sx, sy) => runtimeRef.current?.edit.nudge(sx, sy)} onTurn={() => runtimeRef.current?.edit.rotate()} />
-          <div className="home-bar">
-            <button disabled={!sel} onClick={() => runtimeRef.current?.edit.rotate()}>Turn</button>
-            <button className="danger" disabled={!sel} onClick={() => runtimeRef.current?.edit.sell()}>
-              {sel ? `Sell ₦${Math.floor(sel.price * (sel.bought ? 0.6 : 0.25)).toLocaleString()}` : "Sell"}
-            </button>
-            <button onClick={() => setShopOpen(true)}>Shop</button>
-            <button className="primary" onClick={() => { runtimeRef.current?.edit.stop(); setEditing(false); setShopOpen(false); }}>Done</button>
-          </div>
-        </>
-      )}
-      {editing && shopOpen && runtimeRef.current?.session && (
-        <HomeShop
+      {editing && runtimeRef.current?.session && (
+        <BuyMode
           session={runtimeRef.current.session}
-          onClose={() => setShopOpen(false)}
-          onBuy={(f) => void runtimeRef.current?.edit.buy(f).then((err) => (err ? runtimeRef.current?.session?.notice(err) : setShopOpen(false)))}
+          sel={sel}
+          onBuy={(f) => void runtimeRef.current?.edit.buy(f).then((err) => err && runtimeRef.current?.session?.notice(err))}
+          onTurn={() => runtimeRef.current?.edit.rotate()}
+          onSell={() => runtimeRef.current?.edit.sell()}
+          onNudge={(sx, sy) => runtimeRef.current?.edit.nudge(sx, sy)}
+          onDone={() => { runtimeRef.current?.edit.stop(); setEditing(false); setShopOpen(false); }}
         />
       )}
       {!editing && !phoneOpen && !bagOpen && !kitchen && (
-        <BottomNav active="home" unread={hud?.phone.unread ?? 0} onBag={() => setBagOpen(true)} onBuy={() => { runtimeRef.current?.edit.start(); setEditing(true); setShopOpen(true); }} />
+        <BottomNav active="home" unread={hud?.phone.unread ?? 0} onBag={() => setBagOpen(true)} onBuy={() => { runtimeRef.current?.edit.start(); setEditing(true); }} />
       )}
       {!editing && !phoneOpen && !bagOpen && (
         <MoreMenu
@@ -251,6 +248,7 @@ export default function PlayPage() {
             { label: "Reset view", icon: "map", run: () => runtimeRef.current?.resetView() },
             { label: "Edit home", icon: "home", run: () => { runtimeRef.current?.edit.start(); setEditing(true); } },
             { label: "Settings", icon: "settings", run: () => setShowSettings(true) },
+            { label: "Main menu", icon: "home", run: () => { window.location.hash = "#/"; } },
             { label: "New game", icon: "close", danger: true, run: () => { if (window.confirm("Start a brand new game? Your current progress will be erased.")) runtimeRef.current?.newGame(); } },
           ]}
         />
@@ -306,6 +304,7 @@ export default function PlayPage() {
       {kitchen && runtimeRef.current?.session && (
         <KitchenPanel session={runtimeRef.current.session} initialTab={kitchen} onClose={() => setKitchen(null)} runUse={(a) => runtimeRef.current?.useAction(a) ?? false} />
       )}
+      {profileOpen && hud && runtimeRef.current?.session && <ProfileSheet session={runtimeRef.current.session} hud={hud} onClose={() => setProfileOpen(false)} />}
       {bagOpen && runtimeRef.current?.session && (
         <InventoryPanel session={runtimeRef.current.session} onClose={() => setBagOpen(false)} onPhone={() => { setPhoneApp(null); setPhoneOpen(true); }} />
       )}

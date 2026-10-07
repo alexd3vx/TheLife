@@ -17,8 +17,7 @@ import { parseLook } from "../lab/looks";
 import "../play/play.css";
 import "./iso.css";
 import SettingsPanel from "../settings/SettingsPanel";
-import EditPad from "./EditPad";
-import HomeShop from "./HomeShop";
+import BuyMode from "./BuyMode";
 import { homeBuy, homeMove, homeSell } from "../phone/remote";
 import { layoutForTier, layoutWithHome } from "../play/layouts";
 
@@ -136,7 +135,6 @@ export default function IsoPage() {
     session.notice(r.text);
     appliedHome.current = JSON.stringify(st.home ?? null);
     const id = st.home!.added[st.home!.added.length - 1]!.id;
-    setShopOpen(false);
     void room.setLayout(layoutWithHome(layoutForTier(tier), st.home)).then(() => room.selectId(id));
   };
   const toggleEdit = () => {
@@ -173,7 +171,7 @@ export default function IsoPage() {
   }, [ready, filmShowing, welcome.showing, life.justArrived]);
 
   return (
-    <div className="play hud-on">
+    <div className={`play hud-on${editing ? " is-buying" : ""}`}>
       <canvas ref={canvasRef} className="play-stage" style={{ width: "100%", height: "100%", display: "block", touchAction: "none" }} />
       <div className="play-top">
         <a className="play-chip" href="#/" aria-label="Back to the menu">←<span className="play-chip-label"> Back</span></a>
@@ -183,28 +181,25 @@ export default function IsoPage() {
           items={[
             ...(session && ready && !introOn ? [{ label: "Edit home", icon: "home" as const, run: toggleEdit }] : []),
             { label: "Settings", icon: "settings" as const, run: () => setShowSettings(true) },
+            { label: "Main menu", icon: "home" as const, run: () => { window.location.hash = "#/"; } },
           ]}
         />
       )}
       {!editing && session && ready && !introOn && <OnlineCount />}
       {!editing && session && ready && !introOn && (
-        <BottomNav active="home" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onBuy={() => { toggleEdit(); setShopOpen(true); }} />
+        <BottomNav active="home" onBag={() => window.dispatchEvent(new CustomEvent("thelife-toggle-bag"))} onBuy={toggleEdit} />
       )}
-      {editing && (
-        <>
-          <div className="home-hint">{sel ? "Drag it, tap the floor, or use the arrows." : "Tap a piece of furniture to pick it up."}</div>
-          <EditPad active={!!sel} onMove={(sx, sy) => roomRef.current?.nudgeSelected(sx, sy)} onTurn={() => roomRef.current?.rotateSelected()} />
-          <div className="home-bar">
-            <button disabled={!sel} onClick={() => roomRef.current?.rotateSelected()}>Turn</button>
-            <button className="danger" disabled={!sel} onClick={() => roomRef.current?.sellSelected()}>
-              {sel ? `Sell ${sel.bought ? "₦" + Math.floor(sel.price * 0.6).toLocaleString() : "₦" + Math.floor(sel.price * 0.25).toLocaleString()}` : "Sell"}
-            </button>
-            <button onClick={() => setShopOpen(true)}>Shop</button>
-            <button className="primary" onClick={toggleEdit}>Done</button>
-          </div>
-        </>
+      {editing && session && (
+        <BuyMode
+          session={session}
+          sel={sel}
+          onBuy={buy}
+          onTurn={() => roomRef.current?.rotateSelected()}
+          onSell={() => roomRef.current?.sellSelected()}
+          onNudge={(sx, sy) => roomRef.current?.nudgeSelected(sx, sy)}
+          onDone={toggleEdit}
+        />
       )}
-      {editing && shopOpen && session && <HomeShop session={session} onBuy={buy} onClose={() => setShopOpen(false)} />}
       {showSettings && (
         <div style={{ position: "absolute", inset: 0, zIndex: 80 }}>
           <SettingsPanel onClose={() => setShowSettings(false)} />

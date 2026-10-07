@@ -18,6 +18,8 @@ interface ChatLine {
 /** The "Go online" controls on the map page: connect, see who is here, chat, pay. The world itself is drawn by the map runtime. */
 export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime | null> }) {
   const [open, setOpen] = useState(false);
+  /** The people list is what the chip shows; typing a message is its own step (so a tap on the chip never pops up a text box). */
+  const [chatting, setChatting] = useState(false);
   const [status, setStatus] = useState<NetStatus>(world.status);
   const [detail, setDetail] = useState(world.detail);
   const [players, setPlayers] = useState<PlayerView[]>([]);
@@ -154,6 +156,7 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
     const on = (e: Event) => {
       const d = (e as CustomEvent<string | { id: string; mode: "pay" | "dm" }>).detail;
       setOpen(true);
+      setChatting(!!d && typeof d === "object" && d.mode === "dm");
       if (d && typeof d === "object" && d.mode === "dm") {
         setDmTo(d.id);
         setPaying(null);
@@ -167,9 +170,10 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
   const server = useServerStats();
   return (
     <>
-      <button className={`net-chip is-${status}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Online play">
+      <button className={`net-chip is-${status}`} onClick={() => { setOpen((o) => !o); setChatting(false); }} aria-expanded={open} aria-label={online ? `${server?.online ?? players.length + 1} online. Open the list of people` : "Online play"}>
+        <GameIcon name="people" size={15} />
         <span className="net-dot" />
-        {online ? (server ? `${server.online} online${server.guests ? ` · ${server.guests} guest${server.guests === 1 ? "" : "s"}` : ""}` : `Online · ${players.length + 1}`) : status === "connecting" ? "Connecting…" : "Offline"}
+        <b>{online ? (server?.online ?? players.length + 1) : status === "connecting" ? "…" : "Off"}</b>
       </button>
       {open && (
         <div className="net-panel" role="dialog" aria-label="Online play">
@@ -205,24 +209,30 @@ export default function OnlinePanel({ runtime }: { runtime: RefObject<MapRuntime
                   </li>
                 ))}
               </ul>
-              <div className="net-log" ref={logRef} aria-live="polite">
+              {!chatting && (
+                <div className="net-stats">
+                  {server && <p className="net-note">{server.online} online · {server.guests} guest{server.guests === 1 ? "" : "s"} · {server.inWorld} out in Lagos · {server.viewsToday} views today</p>}
+                  <button className="net-open-chat" onClick={() => setChatting(true)}><GameIcon name="chat" size={14} /> Open chat</button>
+                </div>
+              )}
+              {chatting && <div className="net-log" ref={logRef} aria-live="polite">
                 {lines.map((l) => (
                   <p key={l.id} className={l.system ? "is-system" : l.mine ? "is-mine" : ""}>
                     {!l.system && <b>{l.name}: </b>}
                     {l.text}
                   </p>
                 ))}
-              </div>
-              {dmTo && (
+              </div>}
+              {chatting && dmTo && (
                 <p className="net-note">
                   Private message to <b>{players.find((p) => p.id === dmTo)?.name ?? "player"}</b>{" "}
                   <button className="is-ghost" onClick={() => setDmTo(null)}>Say it out loud instead</button>
                 </p>
               )}
-              <form className="net-chat" onSubmit={sendChat}>
+              {chatting && <form className="net-chat" onSubmit={sendChat}>
                 <input value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} placeholder={dmTo ? "Private message…" : "Say something (people nearby hear you)…"} aria-label="Chat message" />
                 <button type="submit" disabled={!online}>Send</button>
-              </form>
+              </form>}
             </>
           )}
         </div>

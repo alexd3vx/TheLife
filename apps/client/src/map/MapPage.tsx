@@ -371,6 +371,7 @@ export default function MapPage() {
           items={[
             { label: "Reset view", icon: "walk", run: () => runtimeRef.current?.resetView() },
             { label: "Settings", icon: "settings", run: () => setShowSettings(true) },
+            { label: "Main menu", icon: "home", run: () => { window.location.hash = "#/"; } },
             ...(admin
               ? [
                   { label: "Zoom out (test)", icon: "map" as const, run: () => runtimeRef.current?.zoomOut() },

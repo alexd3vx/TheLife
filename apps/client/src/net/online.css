@@ -56,3 +56,9 @@
 .net-log .is-system { opacity: 0.65; font-style: italic; }
 .net-log .is-mine b { color: #a8c8ff; }
 .net-chat { display: flex; gap: 6px; }
+
+.net-chip { padding: 8px 12px; min-width: 0; }
+.net-chip b { color: inherit; font-variant-numeric: tabular-nums; }
+.net-chip .net-dot { width: 7px; height: 7px; }
+.net-stats { display: grid; gap: 8px; padding: 4px 2px; }
+.net-open-chat { justify-self: start; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 9px 14px; background: #2f6bff; color: #fff; font: 700 .82rem system-ui; cursor: pointer; }

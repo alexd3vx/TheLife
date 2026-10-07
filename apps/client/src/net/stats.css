@@ -18,8 +18,9 @@
 .stats-card { padding-bottom: 28px; }
 .stats-note { color: var(--text-muted); font-size: .82rem; }
 
-.online-count { position: absolute; z-index: 3; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 112px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: rgba(244, 248, 255, .94); color: #12233f; font: 700 .76rem system-ui; text-decoration: none; box-shadow: 0 6px 22px rgba(8, 20, 50, .28); }
-.online-count i { width: 9px; height: 9px; border-radius: 50%; background: #2f6bff; box-shadow: 0 0 0 3px rgba(47, 107, 255, .25); }
+.online-count { position: absolute; z-index: 3; right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 64px); display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: rgba(244, 248, 255, .94); color: #12233f; font: 700 .76rem system-ui; text-decoration: none; box-shadow: 0 6px 22px rgba(8, 20, 50, .28); }
+.online-count small { color: #5c6f92; font-weight: 600; }
+.online-count b { font-variant-numeric: tabular-nums; }
 .online-count.is-low { left: 12px; right: auto; top: calc(max(12px, env(safe-area-inset-top)) + 152px); }
 
 .player-card { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); width: min(380px, calc(100% - 24px)); padding: 12px; border-radius: 22px; background: rgba(244, 248, 255, .96); color: #12233f; box-shadow: 0 10px 34px rgba(8, 20, 50, .38); display: grid; gap: 10px; }

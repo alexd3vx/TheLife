@@ -64,6 +64,9 @@ export class FilmRenderer {
   private cw = 1;
   private ch = 1;
   private scale = 1;
+  /** A lighter picture for a scene that only has to look nice for a few seconds (the welcome back): fewer pixels, no paper grain. */
+  lite = false;
+  private frame = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -194,7 +197,7 @@ export class FilmRenderer {
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const cw = Math.max(1, Math.round(this.canvas.clientWidth * dpr)), ch = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
     // Never more than about 1.2 million pixels: a big phone screen is drawn a little smaller and stretched by the browser.
-    const k = Math.min(1, Math.sqrt(1_200_000 / (cw * ch)));
+    const k = Math.min(1, Math.sqrt((this.lite ? 480_000 : 1_200_000) / (cw * ch)));
     const w = Math.round(cw * k), h = Math.round(ch * k);
     if (this.canvas.width !== w || this.canvas.height !== h) {
       this.canvas.width = w;
@@ -207,7 +210,7 @@ export class FilmRenderer {
   }
 
   draw(dt: number): void {
-    this.resize();
+    if (!this.lite || this.frame++ % 30 === 0) this.resize();
     this.t += dt;
     const c = this.ctx;
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0);
@@ -220,6 +223,7 @@ export class FilmRenderer {
     else this.home(c, dt);
     c.fillStyle = TINT[this.tier];
     c.fillRect(0, 0, this.w, H);
+    if (this.lite) return;
     // hand-painted paper grain
     c.save();
     c.globalCompositeOperation = "overlay";

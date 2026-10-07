@@ -5,7 +5,8 @@ import PhoneUI from "../phone/PhoneUI";
 import { GameIcon, type FaName } from "../ui/icons";
 import { GameSession, type HudSnapshot } from "./gameSession";
 import "./play.css";
-import { NeedsRow, TopPill } from "./HudParts";
+import ProfileSheet from "../ui/ProfileSheet";
+import { NeedsRow, ProfileButton, TopPill } from "./HudParts";
 
 const NEED_META: { id: NeedId; icon: FaName; label: string }[] = [
   { id: "hunger", icon: "hunger", label: "Hunger" },
@@ -36,6 +37,12 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phoneApp, setPhoneApp] = useState<string | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    const on = () => setProfileOpen(true);
+    window.addEventListener("thelife-open-profile", on);
+    return () => window.removeEventListener("thelife-open-profile", on);
+  }, []);
   useEffect(() => {
     const open = (e: Event) => {
       setPhoneApp((e as CustomEvent<string>).detail ?? null);
@@ -121,6 +128,7 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
 
   return (
     <>
+      <ProfileButton hud={hud} />
       <TopPill hud={hud} />
       <NeedsRow hud={hud} />
 
@@ -148,6 +156,7 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
           <GameIcon name="bag" size={22} />
         </button>
       )}
+      {profileOpen && <ProfileSheet session={session} hud={hud} onClose={() => setProfileOpen(false)} />}
       {bagOpen && <InventoryPanel session={session} onClose={() => setBagOpen(false)} onPhone={() => { setPhoneApp(null); setPhoneOpen(true); }} />}
       {phoneOpen && <PhoneUI session={session} initialApp={phoneApp as never} onClose={() => setPhoneOpen(false)} />}
 

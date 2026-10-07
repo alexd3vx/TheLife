@@ -24,13 +24,16 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, r
     const canvas = canvasRef.current;
     if (!canvas) return;
     const r = new FilmRenderer(canvas, tier);
+    r.lite = true;
     r.setHour(hour);
     r.setBeat("welcome");
     let raf = 0;
     let last = performance.now();
+    // drawn at about 30 frames a second: it is a slow scene, and the phone keeps its power for loading the game behind it
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      if (now - last < 32) return;
+      const dt = Math.min(0.08, (now - last) / 1000);
       last = now;
       r.draw(dt);
     };
