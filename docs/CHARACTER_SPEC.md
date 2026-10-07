@@ -136,3 +136,11 @@ I searched on 7 Oct for a free, CC0, realistic, African-featured base with morph
 3. **Body range:** allow a wide body range (slim to heavy, muscular to soft) from day one, or ship a narrower range first? (Recommendation: wide, since sliders cost little once the morphs exist.)
 4. **Underwear and nudity:** keep it modest (plain shorts and vest or bra for the states, no nudity), as written above?
 5. **Order after Phase 0:** hair first (the weakest part, the biggest visible win) or the morphable body first? (Recommendation: Phase 1 first, because hair and clothes must be fitted to the final body.)
+
+## 9. Owner's answers (7 Oct)
+
+1. **Base:** MPFB2 first, fall back to extending the current Human Base Meshes if the shape-key export fails.
+2. **Realism:** semi-realistic with better skin and hair (30 FPS on a mid-range 2020 Android).
+3. **Body range:** wide from day one (slim to heavy, soft to muscular, age 18 to 70, all garments fitting).
+4. **Order after Phase 0:** the morphable body first; hair and clothes after, fitted to the final body.
+5. **Still open:** underwear and nudity wording (section 8, item 4); assumed modest unless the owner says otherwise.
