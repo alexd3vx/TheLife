@@ -186,7 +186,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(streamer.root);
   const remotes = new RemotePlayers(manifest);
   scene.add(remotes.root);
-  const peds = new Pedestrians(district.terrain!, small ? 40 : 70);
+  const peds = new Pedestrians(district.terrain!, small ? 40 : 70, manifest, small ? 5 : 9);
   scene.add(peds.root);
   const traffic = new Traffic(small ? 22 : 36);
   scene.add(traffic.root);
