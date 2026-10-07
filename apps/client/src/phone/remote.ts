@@ -116,3 +116,10 @@ export const homeBuy = remote("homeBuy", core.homeBuy as (s: GameState, furnitur
 
 // ---- getting around
 export const payRide = remote("payRide", core.payRide as (s: GameState, id: string, meters: number) => core.RideResult);
+
+// ---- the bank branch (in person: works on any phone)
+type BR = core.BankResult;
+export const bankDeposit = remote("bankDeposit", core.bankDeposit as (s: GameState, amount: number, atm?: boolean) => BR, (a) => [a[1], a[2] === true]);
+export const bankWithdraw = remote("bankWithdraw", core.bankWithdraw as (s: GameState, amount: number, atm?: boolean) => BR, (a) => [a[1], a[2] === true]);
+export const bankBorrow = remote("bankBorrow", core.bankBorrow as (s: GameState, amount: number) => BR);
+export const bankRepay = remote("bankRepay", core.bankRepay as (s: GameState, amount: number) => BR);

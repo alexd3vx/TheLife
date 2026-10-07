@@ -27,3 +27,4 @@ export * from "./kitchen.js";
 export * from "./home.js";
 export * from "./travel.js";
 export * from "./places.js";
+export * from "./bank.js";

@@ -14,10 +14,12 @@ import OnlinePanel from "../net/OnlinePanel";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import { payRide, setChargeChecker } from "../phone/remote";
+import PlaceInterior from "../place/PlaceInterior";
 import OnlineCount from "../net/OnlineCount";
 import PlayerCard from "../net/PlayerCard";
 import "../net/stats.css";
 import { BottomNav, MoreMenu } from "../play/HudParts";
+import type { Landmark } from "@thelife/game-core";
 import TravelFilm from "../arrival/TravelFilm";
 import { chargingSpotNear, rideOptions } from "@thelife/game-core";
 import TouchControls, { useTouchControlsVisible } from "../controls/TouchControls";
@@ -28,6 +30,9 @@ import "../play/play.css";
 import "./map.css";
 
 /** The neighbourhood, streamed in chunks. A test bench for the map engine: walk around, zoom out, and run the performance tour. */
+/** Kinds of place that have an inside you can walk into. */
+const INSIDE = new Set<string>(["bank"]);
+
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<MapRuntime | null>(null);
@@ -98,7 +103,7 @@ export default function MapPage() {
   useEffect(() => {
     runtimeRef.current?.setHome(home ? { door: home.door, spawn: home.spawn, tier: home.tier } : null);
   }, [home, loading]);
-  if (import.meta.env.DEV) (window as unknown as { __mapUi: unknown }).__mapUi = { pick: setPicked, open: () => setBigMap(true) };
+  if (import.meta.env.DEV) (window as unknown as { __mapUi: unknown }).__mapUi = { pick: setPicked, open: () => setBigMap(true), enter: (id: string) => setInside(district.landmarks.find((l) => l.id === id) ?? null) };
   const atHome = !!(home && stats && Math.hypot(stats.position.x - home.spawn.x, stats.position.z - home.spawn.z) < 7);
 
   // Keyboard and on-screen controls: what the interact button does depends on what is close.
@@ -122,17 +127,20 @@ export default function MapPage() {
     }
     return best;
   })();
-  const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlayer ? nearPlayer.name : null;
-  const nearRef = useRef({ atHome, nearPlayer });
-  nearRef.current = { atHome, nearPlayer };
-  const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip;
+  // a place with an inside (for now: the bank) when you stand at its door
+  const nearPlace = stats && intro === "off" ? district.landmarks.find((l) => INSIDE.has(l.kind) && Math.hypot(l.entrance.x - stats.position.x, l.entrance.z - stats.position.z) < 9) ?? null : null;
+  const [inside, setInside] = useState<Landmark | null>(null);
+  const nearLabel = intro !== "off" ? null : atHome ? "Enter home" : nearPlace ? `Go into ${nearPlace.name}` : nearPlayer ? nearPlayer.name : null;
+  const nearRef = useRef({ atHome, nearPlayer, nearPlace });
+  nearRef.current = { atHome, nearPlayer, nearPlace };
+  const blocked = phoneOpen || showSettings || bigMap || intro !== "off" || !!trip || !!inside;
   useEffect(() => {
     runtimeRef.current?.setInputBlocked(blocked);
   }, [blocked, loading]);
   // under the big map nobody sees the street: don't draw it
   useEffect(() => {
-    runtimeRef.current?.setCovered(bigMap && !trip);
-  }, [bigMap, trip, loading]);
+    runtimeRef.current?.setCovered((bigMap || !!inside) && !trip);
+  }, [bigMap, trip, inside, loading]);
   useEffect(() => {
     const detach = input.attach();
     const off = input.onPress((a) => {
@@ -142,6 +150,7 @@ export default function MapPage() {
       if (a === "interact") {
         const n = nearRef.current;
         if (n.atHome) window.location.hash = "#/play";
+        else if (n.nearPlace) setInside(n.nearPlace);
         else if (n.nearPlayer) window.dispatchEvent(new CustomEvent("thelife-open-online", { detail: n.nearPlayer.id }));
       } else if (a === "resetCamera") runtimeRef.current?.resetView();
       else if (a === "map") window.dispatchEvent(new CustomEvent("thelife-open-phone", { detail: "maps" }));
@@ -261,6 +270,12 @@ export default function MapPage() {
         </div>
       )}
 
+      {nearPlace && !atHome && !inside && intro === "off" && mode === "street" && !trip && (
+        <button className="map-enter" onClick={() => setInside(nearPlace)}>
+          <GameIcon name="bank" /> Go into {nearPlace.name}
+        </button>
+      )}
+      {inside && life.session && <PlaceInterior place={inside} session={life.session} onClose={() => setInside(null)} />}
       {atHome && intro === "off" && mode === "street" && (
         <a className="map-enter" href="#/play">
           <GameIcon name="home" /> Enter home
