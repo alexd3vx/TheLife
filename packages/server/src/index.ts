@@ -6,6 +6,7 @@ import { LifeStore } from "./lives.js";
 import { Room, placeView, type Player } from "./world.js";
 import { Analytics } from "./analytics.js";
 import { Inbox, uidOf } from "./inbox.js";
+import { Payments } from "./payments.js";
 import { supabaseInbox } from "./supabaseInbox.js";
 import { AnimStore, cleanMap, validName } from "./animstore.js";
 
@@ -46,6 +47,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
   const analytics = new Analytics(options.dataDir ? join(options.dataDir, "analytics.json") : null);
   const inbox = new Inbox(options.dataDir ? join(options.dataDir, "inbox.json") : null, supabaseInbox(options.inboxDb?.url, options.inboxDb?.serviceKey));
   await inbox.ready;
+  const payments = new Payments(options.dataDir ? join(options.dataDir, "payments.json") : null);
   const room = new Room(options.room ?? "lagos-test", undefined, store);
   const sockets = new Map<string, WebSocket>();
   const origins = options.origins ?? [];
@@ -171,6 +173,86 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
   };
 
   /** Sends a player their life as the server has it (and, once, what happened while they were away). */
+  // ---- voice calls: the server only introduces the two phones (WebRTC carries the voice between them) and bills the caller's airtime
+  interface Call {
+    id: string;
+    caller: Player;
+    callee: Player;
+    active: boolean;
+    timer: ReturnType<typeof setInterval> | null;
+  }
+  const calls = new Map<string, Call>();
+  const callOf = (p: Player): Call | undefined => [...calls.values()].find((c) => c.caller.id === p.id || c.callee.id === p.id);
+  const relay = (to: Player, from: Player, data: unknown, intro = false) => {
+    const target = sockets.get(to.id);
+    if (target) send(target, { t: "rtc", from: from.id, ...(intro ? { fromUid: uidOf(from.key), name: from.name } : {}), data });
+  };
+  const endCall = (c: Call, why: string, by?: Player) => {
+    if (!calls.delete(c.id)) return;
+    if (c.timer) clearInterval(c.timer);
+    for (const p of [c.caller, c.callee]) if (p.id !== by?.id) relay(p, by ?? c.caller, { k: "end", call: c.id, why });
+  };
+  const handleCall = (me: Player, ws: WebSocket, toRaw: string, data: unknown, now: number) => {
+    const d = (data && typeof data === "object" ? data : {}) as { k?: unknown; call?: unknown };
+    const kind = typeof d.k === "string" ? d.k : "";
+    const callId = typeof d.call === "string" && /^[A-Za-z0-9]{6,32}$/.test(d.call) ? d.call : "";
+    if (!callId) return;
+    if (kind === "invite") {
+      const rejected = (why: string) => send(ws, { t: "rtc", from: "server", data: { k: "end", call: callId, why } });
+      const blocker = room.callBlocker(me);
+      if (blocker) return rejected(blocker);
+      if (callOf(me)) return rejected("You are already on a call.");
+      const callee = [...room.players.values()].find((p) => p.id === toRaw || uidOf(p.key) === toRaw);
+      if (!callee || !callee.life || !sockets.has(callee.id)) return rejected("They can't be reached right now. Try again later.");
+      if (callee.id === me.id) return rejected("You can't call yourself.");
+      if (callOf(callee)) return rejected("Their line is busy.");
+      calls.set(callId, { id: callId, caller: me, callee, active: false, timer: null });
+      // an unanswered call stops ringing after 40 seconds
+      setTimeout(() => {
+        const c = calls.get(callId);
+        if (c && !c.active) endCall(c, "No answer.");
+      }, 40_000).unref?.();
+      relay(callee, me, { k: "invite", call: callId }, true);
+      return;
+    }
+    const c = calls.get(callId);
+    if (!c || (c.caller.id !== me.id && c.callee.id !== me.id)) return;
+    const other = c.caller.id === me.id ? c.callee : c.caller;
+    switch (kind) {
+      case "accept": {
+        if (me.id !== c.callee.id || c.active) return;
+        if (!room.chargeCallMinute(c.caller, now)) return endCall(c, "They ran out of airtime.");
+        c.active = true;
+        // the caller pays by the minute (every minute started), from their airtime
+        c.timer = setInterval(() => {
+          if (!room.chargeCallMinute(c.caller, Date.now())) endCall(c, c.caller.id === me.id ? "You ran out of airtime." : "They ran out of airtime.");
+          else {
+            const caller = sockets.get(c.caller.id);
+            if (caller) sendLife(c.caller);
+          }
+        }, 60_000);
+        c.timer.unref?.();
+        sendLife(c.caller);
+        relay(other, me, { k: "accept", call: callId });
+        return;
+      }
+      case "decline":
+      case "cancel":
+      case "end":
+        return endCall(c, kind === "decline" ? "They declined." : kind === "cancel" ? "Missed call." : "The call ended.", me);
+      case "offer":
+      case "answer":
+      case "ice": {
+        const payload = (data as Record<string, unknown>).sdp ?? (data as Record<string, unknown>).candidate;
+        if (payload === undefined) return;
+        relay(other, me, { k: kind, call: callId, ...(kind === "ice" ? { candidate: payload } : { sdp: payload }) });
+        return;
+      }
+      default:
+        return;
+    }
+  };
+
   const sendLife = (p: Player) => {
     const ws = sockets.get(p.id);
     const snap = room.snapshot(p);
@@ -227,13 +309,20 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         sockets.set(me.id, ws);
         analytics.visit(me.id, key, account ? "account" : "guest", me.where === "world" ? "world" : "home");
         inbox.touch(uidOf(me.key), me.name, now);
-        send(ws, { t: "welcome", id: me.id, uid: uidOf(me.key), room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
+        // money that was sent to this player while they were away
+        const waiting = me.life ? payments.take(uidOf(me.key)) : [];
+        for (const p of waiting) room.credit(me, p.amount, `From ${p.from}`, now);
+        send(ws, { t: "welcome", id: me.id, uid: uidOf(me.key), phone: inbox.phoneOf(uidOf(me.key)) ?? undefined, room: room.name, protocol: PROTOCOL_VERSION, money: room.money(me), players: room.inWorld().filter((p) => p.id !== me!.id).map((p) => room.view(p)), serverTime: now });
         if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id);
         const mail = inbox.inbox(uidOf(me.key));
         if (mail.length) send(ws, { t: "inbox", threads: mail });
         if (me.life) {
           sendLife(me);
           sendHome(me, me.where === "world");
+          if (waiting.length) {
+            const total = waiting.reduce((a, p) => a + p.amount, 0);
+            send(ws, { t: "money", balance: room.money(me), note: waiting.length === 1 ? `${waiting[0]!.from} sent you ₦${total.toLocaleString()} while you were away.` : `You received ₦${total.toLocaleString()} from ${waiting.length} people while you were away.` });
+          }
         } else send(ws, { t: "needsLife" });
         return;
       }
@@ -242,6 +331,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           const made = room.createLife(me, message.profile, now, message.replace === true, message.look);
           if (!made.ok) return send(ws, { t: "error", reason: made.reason });
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // their name changed
+          inbox.touch(uidOf(me.key), me.name, now); // people find them by the character's name
           send(ws, { t: "money", balance: room.money(me), note: "Your life begins." });
           sendLife(me);
           sendHome(me, me.where === "world");
@@ -353,10 +443,12 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         }
         case "find": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "Slow down a little." });
-          const name = inbox.nameOf(message.uid);
-          if (name === null || message.uid === uidOf(me.key)) return send(ws, { t: "error", reason: message.uid === uidOf(me.key) ? "That is your own ID." : "There is no player with that ID." });
-          inbox.open(uidOf(me.key), message.uid);
-          return send(ws, { t: "person", uid: message.uid, name });
+          const mine = uidOf(me.key);
+          const uid = message.phone ? inbox.uidOfPhone(message.phone) : (message.uid ?? null);
+          const name = uid ? inbox.nameOf(uid) : null;
+          if (!uid || name === null || uid === mine) return send(ws, { t: "error", reason: uid === mine ? "That is your own number." : message.phone ? "There is no player with that phone number." : "There is no player with that ID." });
+          inbox.open(mine, uid);
+          return send(ws, { t: "person", uid, name, phone: inbox.phoneOf(uid) ?? undefined });
         }
         case "emote": {
           if (me.where !== "world" || !room.allow(me, "chat", now)) return;
@@ -381,13 +473,48 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           }
           return;
         }
+        case "payto": {
+          if (!room.allow(me, "pay", now)) return send(ws, { t: "error", reason: "Slow down: too many payments." });
+          const mine = uidOf(me.key);
+          const name = inbox.nameOf(message.uid);
+          if (message.uid === mine) return send(ws, { t: "error", reason: "You can't pay yourself." });
+          if (name === null) return send(ws, { t: "error", reason: "There is no player with that ID." });
+          const bad = room.checkAmount(message.amount);
+          if (bad) return send(ws, { t: "error", reason: bad });
+          const other = [...room.players.values()].find((p) => p.life && uidOf(p.key) === message.uid);
+          if (other) {
+            const result = room.payPlayer(me, other, message.amount, now);
+            if (!result.ok) return send(ws, { t: "error", reason: result.reason });
+          } else {
+            const out = room.debit(me, message.amount, `Sent to ${name}`, now);
+            if (!out.ok) return send(ws, { t: "error", reason: out.reason });
+            payments.queue(message.uid, { from: me.name, amount: message.amount, at: now });
+          }
+          send(ws, { t: "money", balance: room.money(me), note: `You sent ₦${message.amount.toLocaleString()} to ${name}.` });
+          sendLife(me);
+          if (other) {
+            const target = sockets.get(other.id);
+            if (target) {
+              send(target, { t: "money", balance: room.money(other), note: `${me.name} sent you ₦${message.amount.toLocaleString()}.` });
+              sendLife(other);
+            }
+          }
+          // it shows in the conversation, for both of them, and stays there
+          const text = `₦${message.amount.toLocaleString()} sent`;
+          inbox.send(mine, message.uid, text, now);
+          const line: ServerMessage = { t: "chat", from: me.id, fromUid: mine, name: me.name, text, at: now, to: message.uid };
+          send(ws, line);
+          if (other) {
+            const target = sockets.get(other.id);
+            if (target) send(target, line);
+          }
+          return;
+        }
         case "ping":
           return send(ws, { t: "pong", ts: message.ts, serverTime: now });
         case "rtc": {
           if (!room.allow(me, "rtc", now)) return;
-          const target = sockets.get(message.to);
-          if (target) send(target, { t: "rtc", from: me.id, data: message.data });
-          return;
+          return handleCall(me, ws, message.to, message.data, now);
         }
         default:
           return;
@@ -397,6 +524,8 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     ws.on("close", () => {
       clearTimeout(helloTimer);
       if (me) {
+        const c = callOf(me);
+        if (c) endCall(c, "The call dropped.", me);
         room.leave(me.id);
         analytics.leave(me.id);
         if (sockets.get(me.id) === ws) sockets.delete(me.id);

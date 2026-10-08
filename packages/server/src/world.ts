@@ -1,5 +1,5 @@
 import { uidOf } from "./inbox.js";
-import { MINT, PLAYER, SINK, Sim, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
+import { AIRTIME_PER_CALL_MINUTE, MINT, PLAYER, SINK, Sim, isDead, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
@@ -305,18 +305,61 @@ export class Room {
   pay(from: Player, toId: string, amount: number, now: number): { ok: true; to: Player } | { ok: false; reason: string } {
     const to = this.players.get(toId);
     if (!to) return { ok: false, reason: "That player isn't here any more." };
+    return this.payPlayer(from, to, amount, now);
+  }
+
+  /** The same, to a player already known (found by their ID rather than their connection). */
+  payPlayer(from: Player, to: Player, amount: number, now: number): { ok: true; to: Player } | { ok: false; reason: string } {
     if (to.id === from.id) return { ok: false, reason: "You can't pay yourself." };
     if (!from.life || !to.life) return { ok: false, reason: "That player hasn't made their character yet." };
-    if (!Number.isInteger(amount) || amount <= 0) return { ok: false, reason: "Enter a whole amount above zero." };
-    if (amount > 1_000_000) return { ok: false, reason: "That is more than one payment can carry." };
-    const out = transfer(from.life.state.ledger, PLAYER, SINK, amount, `Sent to ${to.name}`, from.life.state.minute);
+    const checked = this.checkAmount(amount);
+    if (checked) return { ok: false, reason: checked };
+    const out = this.debit(from, amount, `Sent to ${to.name}`, now);
+    if (!out.ok) return out;
+    this.credit(to, amount, `From ${from.name}`, now);
+    return { ok: true, to };
+  }
+
+  checkAmount(amount: number): string | null {
+    if (!Number.isInteger(amount) || amount <= 0) return "Enter a whole amount above zero.";
+    if (amount > 1_000_000) return "That is more than one payment can carry.";
+    return null;
+  }
+
+  /** Takes money out of a life for a payment (to somebody who is not online, or a bill). */
+  debit(from: Player, amount: number, memo: string, now: number): { ok: true } | { ok: false; reason: string } {
+    if (!from.life) return { ok: false, reason: "You haven't made your character yet." };
+    const out = transfer(from.life.state.ledger, PLAYER, SINK, amount, memo, from.life.state.minute);
     if (!out.ok) return { ok: false, reason: "You don't have enough money." };
     from.life.state.stats.totalSpent += amount;
-    transfer(to.life.state.ledger, MINT, PLAYER, amount, `From ${from.name}`, to.life.state.minute);
-    to.life.state.stats.totalEarned += amount;
     this.saveLife(from, now);
+    return { ok: true };
+  }
+
+  /** Adds money that came from another player. */
+  credit(to: Player, amount: number, memo: string, now: number): void {
+    if (!to.life) return;
+    transfer(to.life.state.ledger, MINT, PLAYER, amount, memo, to.life.state.minute);
+    to.life.state.stats.totalEarned += amount;
     this.saveLife(to, now);
-    return { ok: true, to };
+  }
+
+  /** Why this player cannot make a call right now (a flat battery, no airtime), or null when they can. */
+  callBlocker(p: Player): string | null {
+    const phone = p.life?.state.phone;
+    if (!phone) return "You haven't made your character yet.";
+    if (isDead(phone)) return "Your phone's battery is empty.";
+    if (phone.airtime < AIRTIME_PER_CALL_MINUTE) return `You need at least ₦${AIRTIME_PER_CALL_MINUTE} airtime to call. Top up in the phone's Airtime app.`;
+    return null;
+  }
+
+  /** Takes one minute of call time from the caller's airtime; false when they can't pay for it. */
+  chargeCallMinute(p: Player, now: number): boolean {
+    const phone = p.life?.state.phone;
+    if (!phone || phone.airtime < AIRTIME_PER_CALL_MINUTE) return false;
+    phone.airtime -= AIRTIME_PER_CALL_MINUTE;
+    this.saveLife(p, now);
+    return true;
   }
 
   money(player: Player): number {

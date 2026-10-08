@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanLook, parseClientMessage } from "./net.js";
+import { cleanLook, formatPhone, normalisePhone, parseClientMessage } from "./net.js";
 
 describe("net messages", () => {
   it("keeps only known, short look fields", () => {
@@ -34,5 +34,23 @@ describe("net messages", () => {
   it("rejects numbers that are not finite and unknown messages", () => {
     expect(parseClientMessage(JSON.stringify({ t: "move", x: 1e20, y: 0, z: 0, yaw: 0, clip: "x", level: 0 }))).toBeNull();
     expect(parseClientMessage(JSON.stringify({ t: "nope" }))).toBeNull();
+  });
+});
+
+describe("phone numbers", () => {
+  it("accepts the ways people write an in-game number and nothing else", () => {
+    expect(normalisePhone("0990 123 4567")).toBe("09901234567");
+    expect(normalisePhone("+234 990 123 4567")).toBe("09901234567");
+    expect(normalisePhone("990-123-4567")).toBe("09901234567");
+    expect(normalisePhone("08031234567")).toBeNull(); // a real network's number is never an in-game one
+    expect(normalisePhone("0990123")).toBeNull();
+    expect(normalisePhone("hello")).toBeNull();
+    expect(formatPhone("09901234567")).toBe("0990 123 4567");
+  });
+  it("understands finding someone by number and paying by ID", () => {
+    expect(parseClientMessage({ t: "find", phone: "0990 123 4567" })).toEqual({ t: "find", phone: "09901234567" });
+    expect(parseClientMessage({ t: "find", phone: "12" })).toBeNull();
+    expect(parseClientMessage({ t: "payto", uid: "abcdef0123", amount: 25.9 })).toEqual({ t: "payto", uid: "abcdef0123", amount: 25 });
+    expect(parseClientMessage({ t: "payto", uid: "zz", amount: 5 })).toBeNull();
   });
 });

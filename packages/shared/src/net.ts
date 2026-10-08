@@ -79,20 +79,22 @@ export type ClientMessage =
   | { t: "chat"; text: string }
   /** A private message to one player by their ID (they get it when they next play if they are away). */
   | { t: "dm"; to: string; text: string }
-  /** Looks a player up by ID (to start a chat with them). */
-  | { t: "find"; uid: string }
+  /** Looks a player up by ID or phone number (to start a chat with them). */
+  | { t: "find"; uid?: string; phone?: string }
   /** A gesture the other players nearby can see (wave, cheer, talk). */
   | { t: "emote"; emote: string }
   | { t: "pay"; to: string; amount: number }
+  /** Sends money to a player by their ID: at once when they are online, otherwise it waits for them. */
+  | { t: "payto"; uid: string; amount: number }
   | { t: "ping"; ts: number }
-  /** WebRTC signalling for voice, passed to another player untouched. */
+  /** Voice call signalling (invite, accept, offer, answer...), passed to the other player; `to` is their player ID or session id. */
   | { t: "rtc"; to: string; data: unknown };
 
 export type ServerMessage =
-  | { t: "welcome"; id: string; /** Your own player ID. */ uid?: string; room: string; protocol: number; money: number; players: PlayerView[]; serverTime: number }
+  | { t: "welcome"; id: string; /** Your own player ID. */ uid?: string; /** Your phone number. */ phone?: string; room: string; protocol: number; money: number; players: PlayerView[]; serverTime: number }
   /** Every private conversation this player has, sent once after they arrive. */
-  | { t: "inbox"; threads: { uid: string; name: string; msgs: { from: string; text: string; at: number }[] }[] }
-  | { t: "person"; uid: string; name: string }
+  | { t: "inbox"; threads: { uid: string; name: string; phone?: string; msgs: { from: string; text: string; at: number }[] }[] }
+  | { t: "person"; uid: string; name: string; phone?: string }
   | { t: "join"; player: PlayerView }
   | { t: "leave"; id: string }
   /** Everyone who is inside the place you are in, sent when you walk in and whenever somebody comes or goes. */
@@ -113,7 +115,7 @@ export type ServerMessage =
   | { t: "needsLife" }
   | { t: "correct"; x: number; y: number; z: number; level: number }
   | { t: "pong"; ts: number; serverTime: number }
-  | { t: "rtc"; from: string; data: unknown }
+  | { t: "rtc"; from: string; /** Who is calling (their player ID and name), set on the first message of a call. */ fromUid?: string; name?: string; data: unknown }
   | { t: "error"; reason: string };
 
 const finite = (v: unknown, limit = 1e6): v is number => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= limit;
@@ -122,7 +124,7 @@ const finite = (v: unknown, limit = 1e6): v is number => typeof v === "number" &
 export function parseClientMessage(raw: unknown): ClientMessage | null {
   let value: unknown = raw;
   if (typeof raw === "string") {
-    if (raw.length > 7_000) return null;
+    if (raw.length > 8_000) return null;
     try {
       value = JSON.parse(raw);
     } catch {
@@ -192,18 +194,26 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       const text = m.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_CHAT);
       return text ? { t: "dm", to: m.to, text } : null;
     }
-    case "find":
+    case "find": {
+      if (typeof m.phone === "string") {
+        const phone = normalisePhone(m.phone);
+        return phone ? { t: "find", phone } : null;
+      }
       return typeof m.uid === "string" && /^[a-f0-9]{6,16}$/.test(m.uid.trim().toLowerCase()) ? { t: "find", uid: m.uid.trim().toLowerCase() } : null;
+    }
     case "emote":
       return typeof m.emote === "string" && (EMOTES as readonly string[]).includes(m.emote) ? { t: "emote", emote: m.emote } : null;
     case "pay":
       if (typeof m.to !== "string" || m.to.length > 40 || !finite(m.amount, 1e9)) return null;
       return { t: "pay", to: m.to, amount: Math.floor(m.amount) };
+    case "payto":
+      if (typeof m.uid !== "string" || !/^[a-f0-9]{6,16}$/.test(m.uid) || !finite(m.amount, 1e9)) return null;
+      return { t: "payto", uid: m.uid, amount: Math.floor(m.amount) };
     case "ping":
       return finite(m.ts, 1e15) ? { t: "ping", ts: m.ts } : null;
     case "rtc":
       if (typeof m.to !== "string" || m.to.length > 40) return null;
-      if (JSON.stringify(m.data ?? null).length > 3_000) return null;
+      if (JSON.stringify(m.data ?? null).length > 5_500) return null;
       return { t: "rtc", to: m.to, data: m.data ?? null };
     default:
       return null;
@@ -263,4 +273,22 @@ function cleanShape(raw: unknown): Record<string, unknown> | undefined {
 /** A display name: letters, digits, spaces and a few marks, 1 to 20 characters. */
 export function cleanName(name: string): string {
   return name.replace(/[^\p{L}\p{N} _.'-]/gu, "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME);
+}
+
+// ---- phone numbers
+/** In-game numbers are all "0990" to "0999" followed by seven digits: clearly not real Nigerian numbers, so nobody's real phone is ever dialled by accident. */
+export const PHONE_PATTERN = /^099\d{8}$/;
+
+/** What someone typed ("0990 123 4567", "+234 990 123 4567", "990-123-4567") as a plain in-game number, or null if it is not one. */
+export function normalisePhone(input: string): string | null {
+  let digits = input.replace(/[\s\-().]/g, "");
+  if (digits.startsWith("+234")) digits = `0${digits.slice(4)}`;
+  else if (digits.startsWith("234") && digits.length === 13) digits = `0${digits.slice(3)}`;
+  else if (/^99\d{8}$/.test(digits)) digits = `0${digits}`;
+  return PHONE_PATTERN.test(digits) ? digits : null;
+}
+
+/** "0990 123 4567" */
+export function formatPhone(phone: string): string {
+  return phone.length === 11 ? `${phone.slice(0, 4)} ${phone.slice(4, 7)} ${phone.slice(7)}` : phone;
 }

@@ -432,3 +432,122 @@ describe("game server", () => {
     expect(body.ok).toBe(true);
   });
 });
+
+async function lived(name: string, key = newKey(), dataDir?: string): Promise<{ c: Client; welcome: Extract<ServerMessage, { t: "welcome" }> }> {
+  const c = await connect(name, PROTOCOL_VERSION, key);
+  const welcome = await c.next("welcome");
+  await c.next("needsLife");
+  c.send({ t: "create", profile: { ...CHOICE, firstName: name } });
+  await c.next("life");
+  await new Promise((r) => setTimeout(r, 60));
+  c.inbox.splice(0); // "Your life begins." and the like
+  void dataDir;
+  return { c, welcome };
+}
+
+describe("phone numbers, payments and calls", () => {
+  it("gives every player a phone number that people can find them by", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await lived("Ada");
+    const b = await lived("Bayo");
+    expect(a.welcome.phone).toMatch(/^099\d{8}$/);
+    expect(b.welcome.phone).toMatch(/^099\d{8}$/);
+    expect(a.welcome.phone!).not.toBe(b.welcome.phone!);
+    a.c.send({ t: "find", phone: b.welcome.phone! });
+    const found = await a.c.next("person");
+    expect(found).toMatchObject({ uid: b.welcome.uid!, name: "Bayo Obi", phone: b.welcome.phone! });
+    a.c.send({ t: "find", phone: "09900000000" });
+    expect((await a.c.next("error")).reason).toMatch(/phone number/);
+    a.c.send({ t: "find", phone: a.welcome.phone! });
+    expect((await a.c.next("error")).reason).toMatch(/your own/);
+  });
+
+  it("sends money by ID to somebody online, and keeps it for somebody who is away", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "thelife-pay-"));
+    try {
+      server = await startGameServer({ port: 0, dataDir: dir });
+      const a = await lived("Ada");
+      const bKey = newKey();
+      const b = await lived("Bayo", bKey);
+      const players = () => [...server!.room.players.values()];
+      const moneyOf = (name: string) => server!.room.money(players().find((p) => p.name.startsWith(name))!);
+      const startA = moneyOf("Ada");
+      const startB = moneyOf("Bayo");
+      a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 4000 });
+      expect((await a.c.next("money")).note).toMatch(/You sent ₦4,000 to Bayo Obi/);
+      expect(moneyOf("Ada")).toBe(startA - 4000);
+      expect(moneyOf("Bayo")).toBe(startB + 4000);
+      expect((await b.c.next("chat")).text).toMatch(/₦4,000 sent/);
+      // Bayo leaves; Ada pays him anyway
+      b.c.ws.close();
+      await new Promise((r) => setTimeout(r, 200));
+      a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 1500 });
+      await a.c.next("money");
+      await a.c.next("money").catch(() => undefined);
+      expect(moneyOf("Ada")).toBe(startA - 5500);
+      // he comes back and it is there
+      const b2 = await connect("Bayo", PROTOCOL_VERSION, bKey);
+      await b2.next("welcome");
+      expect((await b2.next("money")).note).toMatch(/sent you ₦1,500 while you were away/);
+      expect(moneyOf("Bayo")).toBe(startB + 5500);
+      // and it is only paid once
+      b2.ws.close();
+      await new Promise((r) => setTimeout(r, 200));
+      const b3 = await connect("Bayo", PROTOCOL_VERSION, bKey);
+      await b3.next("welcome");
+      expect(moneyOf("Bayo")).toBe(startB + 5500);
+      a.c.send({ t: "payto", uid: a.welcome.uid!, amount: 10 });
+      expect((await a.c.next("error")).reason).toMatch(/yourself/);
+      a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 900_000_000 });
+      expect((await a.c.next("error")).reason).toBeTruthy();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rings, connects and ends a call, bills the caller's airtime and refuses a caller with none", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await lived("Ada");
+    const b = await lived("Bayo");
+    const airtime = (name: string) => [...server!.room.players.values()].find((p) => p.name.startsWith(name))!.life!.state.phone.airtime;
+    const before = airtime("Ada");
+    a.c.send({ t: "rtc", to: b.welcome.uid!, data: { k: "invite", call: "call000001" } });
+    const ring = await b.c.next("rtc");
+    expect(ring).toMatchObject({ fromUid: a.welcome.uid!, name: "Ada Obi", data: { k: "invite", call: "call000001" } });
+    b.c.send({ t: "rtc", to: ring.from, data: { k: "accept", call: "call000001" } });
+    expect((await a.c.next("rtc")).data).toMatchObject({ k: "accept" });
+    expect(airtime("Ada")).toBe(before - 20); // the first minute
+    // the voice setup passes between them
+    a.c.send({ t: "rtc", to: b.welcome.id, data: { k: "offer", call: "call000001", sdp: { type: "offer", sdp: "v=0" } } });
+    expect((await b.c.next("rtc")).data).toMatchObject({ k: "offer", sdp: { type: "offer" } });
+    b.c.send({ t: "rtc", to: a.welcome.id, data: { k: "ice", call: "call000001", candidate: { candidate: "x" } } });
+    expect((await a.c.next("rtc")).data).toMatchObject({ k: "ice", candidate: { candidate: "x" } });
+    // a stranger cannot join in
+    const c = await lived("Chidi");
+    c.c.send({ t: "rtc", to: a.welcome.id, data: { k: "offer", call: "call000001", sdp: "x" } });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(a.c.inbox.filter((m) => m.t === "rtc")).toHaveLength(0);
+    // hanging up tells the other side
+    a.c.send({ t: "rtc", to: b.welcome.id, data: { k: "end", call: "call000001" } });
+    expect((await b.c.next("rtc")).data).toMatchObject({ k: "end" });
+    // a busy line
+    a.c.send({ t: "rtc", to: b.welcome.uid!, data: { k: "invite", call: "call000002" } });
+    await b.c.next("rtc");
+    c.c.send({ t: "rtc", to: b.welcome.uid!, data: { k: "invite", call: "call000003" } });
+    expect((await c.c.next("rtc")).data).toMatchObject({ k: "end", why: expect.stringMatching(/busy/) });
+    a.c.send({ t: "rtc", to: b.welcome.id, data: { k: "cancel", call: "call000002" } });
+    await b.c.next("rtc");
+    // no airtime, no call
+    [...server.room.players.values()].find((p) => p.name.startsWith("Ada"))!.life!.state.phone.airtime = 5;
+    a.c.send({ t: "rtc", to: b.welcome.uid!, data: { k: "invite", call: "call000004" } });
+    expect((await a.c.next("rtc")).data).toMatchObject({ k: "end", why: expect.stringMatching(/airtime/) });
+    // somebody who is not online cannot be rung
+    const ghost = newKey();
+    const g = await lived("Gina", ghost);
+    g.c.ws.close();
+    await new Promise((r) => setTimeout(r, 200));
+    [...server.room.players.values()].find((p) => p.name.startsWith("Ada"))!.life!.state.phone.airtime = 500;
+    a.c.send({ t: "rtc", to: g.welcome.uid!, data: { k: "invite", call: "call000005" } });
+    expect((await a.c.next("rtc")).data).toMatchObject({ k: "end", why: expect.stringMatching(/reached/) });
+  });
+});

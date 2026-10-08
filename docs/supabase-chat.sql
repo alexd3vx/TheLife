@@ -11,6 +11,10 @@ create table if not exists public.players (
   seen_at    timestamptz not null default now()   -- last time they played
 );
 
+-- Phone numbers (in-game, always 0990 to 0999 followed by seven digits). Safe to run again; older databases get the column here.
+alter table public.players add column if not exists phone text;
+create unique index if not exists players_phone_idx on public.players (phone) where phone is not null;
+
 create table if not exists public.messages (
   id         bigint generated always as identity primary key,
   from_uid   text not null,
