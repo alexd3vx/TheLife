@@ -130,8 +130,16 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
     const v = videoRef.current;
     if (!v) return;
     v.currentTime = 0;
-    void v.play().catch(() => setVideoFailed(true));
-    const t = window.setTimeout(() => v.currentTime < 0.3 && setVideoFailed(true), 4000);
+    void v.play().catch((e) => {
+      if (import.meta.env.DEV) console.warn("film video: play refused", e);
+      setVideoFailed(true);
+    });
+    const t = window.setTimeout(() => {
+      if (v.currentTime < 0.3) {
+        if (import.meta.env.DEV) console.warn("film video: not moving", v.readyState, v.networkState, v.currentSrc);
+        setVideoFailed(true);
+      }
+    }, 4000);
     return () => window.clearTimeout(t);
   }, [lite, beat.kind]);
 
@@ -139,7 +147,7 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
     <div className={`film film-${tier} beat-${beat.kind}`} role="presentation" onPointerDown={onDone}>
       {lite && (
         <>
-          <video ref={videoRef} className={`film-video${beat.kind === "arrive" || beat.kind === "ride" ? " is-on" : ""}`} muted playsInline preload="auto" onError={() => setVideoFailed(true)} onEnded={(e) => e.currentTarget.pause()}>
+          <video ref={videoRef} className={`film-video${beat.kind === "arrive" || beat.kind === "ride" ? " is-on" : ""}`} muted playsInline preload="auto" onError={(e) => e.currentTarget.error && setVideoFailed(true)} onEnded={(e) => e.currentTarget.pause()}>
             <source src={`/assets/film/arrival-${tier}.mp4`} type="video/mp4" />
             <source src={`/assets/film/arrival-${tier}.webm`} type="video/webm" />
           </video>
@@ -162,8 +170,8 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
 
       {beat.kind === "arrive" && (
         <div className="film-caption">
-          <small>{words.flight}</small>
-          <p>{words.flightSub}</p>
+          <small>Lagos, evening</small>
+          <p>The city lights are coming up. {tier === "nepo" ? "Your driver is waiting." : tier === "middle" ? "Your ride is booked." : "No one is waiting for you. That is fine."}</p>
         </div>
       )}
 

@@ -36,7 +36,7 @@ export function AuthFilm() {
       {!(playing && !still && !failed) && <LagosScene />}
       {!still && !failed && (
         <div className={`auth-film${playing ? " is-playing" : ""}`} aria-hidden="true">
-          <video key={name} autoPlay muted loop playsInline preload="auto" poster={`${base}.jpg`} onPlaying={() => setPlaying(true)} onError={() => setFailed(true)}>
+          <video key={name} autoPlay muted loop playsInline preload="auto" poster={`${base}.jpg`} onPlaying={() => setPlaying(true)} onError={(e) => e.currentTarget.error && setFailed(true)}>
             {/* mp4 first: nearly every machine decodes H.264 in hardware, while VP9 is often done in software and stutters */}
             <source src={`${base}.mp4`} type="video/mp4" />
             <source src={`${base}.webm`} type="video/webm" />
