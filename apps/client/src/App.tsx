@@ -1,4 +1,5 @@
 import { isAdmin } from "./ui/admin";
+import { isLocked } from "./features";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "./auth/AuthProvider";
 import { useSettings } from "./settings/settings";
@@ -11,6 +12,7 @@ const PlayPage = lazy(() => import("./play/PlayPage"));
 const ShowroomPage = lazy(() => import("./play/ShowroomPage"));
 const PhoneTestPage = lazy(() => import("./phone/PhoneTestPage"));
 const MapPage = lazy(() => import("./map/MapPage"));
+const ComingSoon = lazy(() => import("./ui/ComingSoon"));
 const CreatorPage = lazy(() => import("./creator/CreatorPage"));
 const ArrivalFilm = lazy(() => import("./arrival/ArrivalFilm"));
 const BakePage = lazy(() => import("./iso/bake/BakePage"));
@@ -144,6 +146,13 @@ export function App() {
   const gameRoute = !import.meta.env.DEV && (hash.startsWith("#/map") || hash.startsWith("#/play") || hash.startsWith("#/iso") || hash.startsWith("#/create"));
   if (gameRoute && status === "loading") return <div className="splash" role="status" aria-label="Loading" />;
   if (gameRoute && status !== "inGame") return <AuthPage />;
+  if (hash.startsWith("#/map") && isLocked("map")) {
+    return (
+      <Suspense fallback={null}>
+        <ComingSoon id="map" />
+      </Suspense>
+    );
+  }
   if (hash.startsWith("#/map")) {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>

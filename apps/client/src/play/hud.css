@@ -56,3 +56,7 @@
 .hud-on .play-top { display: none; }
 .is-buying .hud-avatar { display: none; }
 @media (max-width: 400px) { .hud-ring { width: 26px; height: 26px; } .hud-needs-row { gap: 5px; padding: 4px 6px; } }
+
+/* locked parts of the nav */
+.hud-nav .is-locked { opacity: .55; }
+.hud-lock-note { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); width: max-content; max-width: min(300px, 86vw); padding: 10px 14px; border-radius: 14px; background: #12233f; color: #fff; font: 600 13px/1.35 system-ui; text-align: center; box-shadow: var(--hud-shadow); }

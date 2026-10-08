@@ -73,3 +73,10 @@ button, input { font: inherit; color: inherit; }
 
 /* Installed / phone play: no pull-to-refresh or bounce while dragging the camera, and room for notches. */
 html, body { overscroll-behavior: none; }
+
+/* a part of the game that is not built yet */
+.coming-soon { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(90% 60% at 50% 0%, #0e2347 0%, var(--bg) 70%); color: var(--text); }
+.coming-card { width: min(380px, 100%); display: grid; gap: 14px; justify-items: center; text-align: center; padding: 28px 22px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); }
+.coming-card h1 { margin: 0; font-family: var(--font-display); font-size: 1.5rem; }
+.coming-card p { margin: 0; color: var(--text-muted); line-height: 1.5; }
+.coming-card .btn { margin-top: 6px; text-decoration: none; display: inline-grid; place-items: center; min-height: 46px; padding: 0 22px; }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { NeedId } from "@thelife/game-core";
 import { GameIcon, type FaName } from "../ui/icons";
+import { isLocked, lockNote } from "../features";
 import type { HudSnapshot } from "./gameSession";
 import "./hud.css";
 
@@ -97,12 +98,21 @@ export function MoreMenu({ items }: { items: { label: string; icon: FaName; run(
 
 /** Bottom centre: Home, Buy (furniture), Map and Phone. */
 export function BottomNav({ active, unread = 0, onBuy, onMap, onBag }: { active: "home" | "map"; unread?: number; onBuy?: () => void; onMap?: () => void; onBag?: () => void }) {
+  const [note, setNote] = useState<string | null>(null);
+  const mapLocked = isLocked("map");
+  const tellLocked = () => {
+    setNote(lockNote("map"));
+    window.setTimeout(() => setNote(null), 3200);
+  };
   return (
     <nav className="hud-nav" aria-label="Where to">
+      {note && <p className="hud-lock-note" role="status">{note}</p>}
       <a className={active === "home" ? "is-on" : ""} href="#/play"><GameIcon name="home" size={20} /><span>Home</span></a>
       <button onClick={onBuy} disabled={!onBuy}><GameIcon name="cart" size={20} /><span>Buy</span></button>
       {onBag && <button onClick={onBag}><GameIcon name="bag" size={20} /><span>Bag</span></button>}
-      {onMap ? (
+      {mapLocked ? (
+        <button className="is-locked" onClick={tellLocked} aria-label="Map (coming soon)"><GameIcon name="map" size={20} /><span>Map · soon</span></button>
+      ) : onMap ? (
         <button className={active === "map" ? "is-on" : ""} onClick={onMap}><GameIcon name="map" size={20} /><span>Map</span></button>
       ) : (
         <a className={active === "map" ? "is-on" : ""} href="#/map"><GameIcon name="map" size={20} /><span>Map</span></a>

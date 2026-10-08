@@ -10,6 +10,7 @@ import { Icon } from "./icons";
 import { nameOf, styleOf, type ClientApp } from "./appStyle";
 import { useSocial } from "../net/social";
 import { AppActive, AppBack } from "./active";
+import { isLocked, lockNote } from "../features";
 import "./phone.css";
 
 /** Each model has its own look (CSS class). */
@@ -111,6 +112,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
 
   const open = useCallback(
     (next: ClientApp) => {
+      if (isLocked(next)) return say(lockNote(next), false);
       const s = session.sim.state;
       const alreadyOpen = running.includes(next);
       if (next !== "battery" && !alreadyOpen) {

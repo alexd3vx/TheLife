@@ -1,3 +1,4 @@
+import { isLocked } from "../features";
 import { useEffect, useState } from "react";
 import { PRESET_LABEL, applyPreset, getSettings, recommendedPreset, updateSettings, useSettings, type Preset, type Settings, type ShadowQuality } from "./settings";
 import { GameIcon } from "../ui/icons";
@@ -104,7 +105,7 @@ export default function SettingsPanel({ onClose }: { onClose?(): void }) {
             <GameIcon name="close" size={18} />
           </button>
         ) : (
-          <a className="st-close" href="#/map" aria-label="Back to the game">
+          <a className="st-close" href={isLocked("map") ? "#/play" : "#/map"} aria-label="Back to the game">
             <GameIcon name="close" size={18} />
           </a>
         )}
