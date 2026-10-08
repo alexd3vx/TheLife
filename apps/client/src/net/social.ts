@@ -185,9 +185,30 @@ class Social {
     world.send({ t: "find", phone });
   }
   /** Sends money to a player by their ID (it waits for them if they are away). */
-  pay(uid: string, amount: number): void {
+  pay(uid: string, amount: number, pin?: string): void {
     this.lastError = "";
-    world.send({ t: "payto", uid, amount: Math.floor(amount) });
+    world.send({ t: "payto", uid, amount: Math.floor(amount), ...(pin ? { pin } : {}) });
+  }
+  /** Sends to a phone number and waits for the server's answer (from the bank when a PIN is given). */
+  sendTo(phone: string, amount: number, pin?: string): Promise<{ ok: boolean; text: string }> {
+    return new Promise((resolve) => {
+      const done = (r: { ok: boolean; text: string }) => {
+        off();
+        window.clearTimeout(timer);
+        resolve(r);
+      };
+      const off = world.onMessage((m) => {
+        if (m.t === "money" && /^You sent/.test(m.note)) done({ ok: true, text: m.note });
+        else if (m.t === "error") done({ ok: false, text: m.reason });
+      });
+      const timer = window.setTimeout(() => done({ ok: false, text: "No answer from the bank. Check your connection." }), 6000);
+      this.payPhone(phone, amount, pin);
+    });
+  }
+  /** The same, to a phone number (from the bank: with the card's PIN). */
+  payPhone(phone: string, amount: number, pin?: string): void {
+    this.lastError = "";
+    world.send({ t: "payto", phone, amount: Math.floor(amount), ...(pin ? { pin } : {}) });
   }
 }
 

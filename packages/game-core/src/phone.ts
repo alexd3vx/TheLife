@@ -85,6 +85,8 @@ export interface PhoneState {
   job: string | null;
   application: { jobId: string; decideAt: number } | null;
   loan: { owed: number; sinceDay: number } | null;
+  /** What LifePay has sent today (the phone's transfer limit), by game day. */
+  sent?: { day: number; total: number };
   lowWarned: number;
   /** Apps downloaded from LifeStore. */
   installed: StoreAppId[];
@@ -211,6 +213,7 @@ export function parsePhone(raw: unknown, profile: Profile | null): PhoneState {
     job: typeof r.job === "string" && JOBS.some((j) => j.id === r.job) ? r.job : null,
     application: r.application && JOBS.some((j) => j.id === r.application?.jobId) ? { jobId: r.application.jobId, decideAt: num(r.application.decideAt, 0, 1e9, 0) } : null,
     loan,
+    ...(r.sent && typeof r.sent === 'object' ? { sent: { day: Math.floor(num(r.sent.day, 0, 1e6, 0)), total: Math.floor(num(r.sent.total, 0, 1e9, 0)) } } : {}),
     lowWarned: 0,
     installed: strings(r.installed, 40).filter((id): id is StoreAppId => STORE_IDS.has(id)),
     downloads: Array.isArray(r.downloads)
@@ -282,6 +285,26 @@ export function unreadChats(phone: PhoneState): number {
 export function groceriesFor(state: GameState, base: number, traitScale: number): number {
   const day = Math.floor(state.minute / DAY_MINUTES) + 1;
   return Math.round((base * traitScale * (groceryPromo(day) ? 0.85 : 1)) / 100) * 100;
+}
+
+/** LifePay lends little, whoever you are: the big loans are the bank's. */
+export const PHONE_LOAN_LIMIT = 20_000;
+/** What LifePay will send in a day, and what each send costs (1%, at least ₦10). */
+export const PHONE_SEND_LIMIT = 50_000;
+export const phoneSendFee = (amount: number): number => Math.max(10, Math.ceil(amount * 0.01));
+
+/** Checks a LifePay send against the day's limit and returns its fee (or the reason it can't go). Records nothing. */
+export function phoneSendCheck(state: GameState, amount: number): { ok: true; fee: number } | { ok: false; reason: string } {
+  const day = Math.floor(state.minute / DAY_MINUTES);
+  const total = state.phone.sent?.day === day ? state.phone.sent.total : 0;
+  if (total + amount > PHONE_SEND_LIMIT) return { ok: false, reason: `LifePay sends up to ₦${PHONE_SEND_LIMIT.toLocaleString()} a day (₦${Math.max(0, PHONE_SEND_LIMIT - total).toLocaleString()} left today). For more, use a bank account.` };
+  return { ok: true, fee: phoneSendFee(amount) };
+}
+
+export function phoneSendRecord(state: GameState, amount: number): void {
+  const day = Math.floor(state.minute / DAY_MINUTES);
+  const total = state.phone.sent?.day === day ? state.phone.sent.total : 0;
+  state.phone.sent = { day, total: total + amount };
 }
 
 export function loanLimit(profile: Profile | null): number {
@@ -444,10 +467,16 @@ export function payBill(state: GameState): PhoneResult {
 export function sendMoney(state: GameState, contact: string, amount: number): PhoneResult {
   const who = contactsFor(state.profile).find((c) => c.id === contact);
   if (!who?.receivesMoney) return fail("You can't send money to that contact.");
-  const r = transfer(state.ledger, PLAYER, SINK, Math.floor(amount), `Sent to ${who.name}`, state.minute);
+  const sum = Math.floor(amount);
+  const check = phoneSendCheck(state, sum);
+  if (!check.ok) return fail(check.reason);
+  if (balance(state.ledger, PLAYER) < sum + check.fee) return fail(`You need ₦${(sum + check.fee).toLocaleString()} (₦${check.fee} LifePay fee).`);
+  const r = transfer(state.ledger, PLAYER, SINK, sum, `Sent to ${who.name}`, state.minute);
   if (!r.ok) return fail(r.reason);
-  state.stats.totalSpent += Math.floor(amount);
-  return done(`Sent ₦${Math.floor(amount).toLocaleString()} to ${who.name}.`);
+  transfer(state.ledger, PLAYER, SINK, check.fee, "LifePay fee", state.minute);
+  phoneSendRecord(state, sum);
+  state.stats.totalSpent += sum + check.fee;
+  return done(`Sent ₦${sum.toLocaleString()} to ${who.name} (₦${check.fee} fee).`);
 }
 
 export function deposit(state: GameState, amount: number): PhoneResult {
@@ -467,7 +496,8 @@ export function borrow(state: GameState, amount: number): PhoneResult {
   if (!modelOf(p).banking) return fail("Loans aren't available on this phone.");
   if (p.loan) return fail("Pay off your current loan first.");
   const sum = Math.floor(amount);
-  if (sum <= 0 || sum > loanLimit(state.profile)) return fail(`You can borrow up to ₦${loanLimit(state.profile).toLocaleString()}.`);
+  const cap = Math.min(PHONE_LOAN_LIMIT, loanLimit(state.profile));
+  if (sum <= 0 || sum > cap) return fail(`LifePay lends up to ₦${cap.toLocaleString()}. Bigger loans are at the bank.`);
   transfer(state.ledger, MINT, PLAYER, sum, "Loan from LifePay", state.minute);
   p.loan = { owed: Math.round(sum * 1.1), sinceDay: Math.floor(state.minute / DAY_MINUTES) + 1 };
   return done(`Loan of ₦${sum.toLocaleString()} paid out. You owe ₦${p.loan.owed.toLocaleString()} (10% fee).`);
@@ -683,7 +713,8 @@ export function tickPhone(state: GameState, minutes: number): void {
   }
 }
 
-function weekly(state: GameState, day: number): void {
+/** What happens once a week: bills, pay, interest, the loan's late charge. */
+export function weekly(state: GameState, day: number): void {
   const p = state.phone;
   const bill = billPerWeek(state.profile);
   if (bill > 0) {
@@ -698,7 +729,8 @@ function weekly(state: GameState, day: number): void {
     notify(state, "pay", job.employer, `₦${job.retainer.toLocaleString()} weekly pay received.`);
   }
   const saved = balance(state.ledger, SAVINGS);
-  const interest = Math.floor(saved * 0.01);
+  // the bank pays three times what a phone-only saver gets
+  const interest = Math.floor(saved * (state.bank?.account ? 0.015 : 0.005));
   if (interest > 0) {
     transfer(state.ledger, MINT, SAVINGS, interest, "Savings interest", state.minute);
     notify(state, "pay", "Savings", `₦${interest.toLocaleString()} interest added.`);

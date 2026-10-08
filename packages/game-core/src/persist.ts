@@ -4,6 +4,7 @@ import { parseProfile } from "./profile";
 import { parseKitchen } from "./kitchen";
 import { parseHome } from "./home";
 import { parseRecords } from "./police";
+import { parseBank } from "./bank";
 import { createNeeds } from "./needs";
 import { NEED_IDS, type GameState } from "./types";
 
@@ -46,6 +47,7 @@ export function parseGameState(raw: unknown): GameState | null {
     kitchen: parseKitchen(r.kitchen, profile?.tier),
     ...(r.home ? { home: parseHome(r.home) } : {}),
     ...(r.records ? { records: parseRecords(r.records) } : {}),
+    ...(r.bank ? { bank: parseBank(r.bank) } : {}),
     ...(typeof r.look === "string" && r.look.length <= 1500 ? { look: r.look } : {}),
     skills: typeof r.skills === "object" && r.skills ? { ...r.skills } : {},
     incomeCarry: typeof r.incomeCarry === "number" ? r.incomeCarry : 0,

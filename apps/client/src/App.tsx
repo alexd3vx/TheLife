@@ -27,6 +27,7 @@ const CrowdLabPage = lazy(() => import("./lab/CrowdLabPage"));
 const CineLabPage = lazy(() => import("./lab/CineLabPage"));
 const FilmRenderPage = lazy(() => import("./lab/FilmRenderPage"));
 const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
+const BankTestPage = lazy(() => import("./place/BankTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -85,6 +86,13 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <ArrivalFilm tier={tier} onDone={() => (window.location.hash = "#/")} />
+      </Suspense>
+    );
+  }
+  if (import.meta.env.DEV && hash.startsWith("#/banktest")) {
+    return (
+      <Suspense fallback={null}>
+        <BankTestPage />
       </Suspense>
     );
   }

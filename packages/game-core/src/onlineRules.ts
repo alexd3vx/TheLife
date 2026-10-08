@@ -14,7 +14,7 @@ import { shopSnack } from "./shop";
 import { policeService } from "./police";
 import { worshipService } from "./worship";
 import { schoolService } from "./school";
-import { bankBorrow, bankDeposit, bankRepay, bankWithdraw } from "./bank";
+import { applyForAccount, atmAirtime, atmChangePin, atmDeposit, atmLogin, atmWithdraw, bankBorrow, bankDeposit, bankRepay, bankWithdraw, collectCard, unblockCard } from "./bank";
 import { buyIngredient, cancelRecipe, chooseDish, chooseRecipe, discardDish, discardLot } from "./kitchen";
 import { BACKGROUNDS, profileFrom, type Profile } from "./profile";
 import type { Sim } from "./sim";
@@ -53,10 +53,18 @@ const HANDLERS: Record<string, Handler> = {
   homeSell: (sim, [id, furniture]) => (str(id, 40) ? homeSell(sim.state, id as string, typeof furniture === "string" ? furniture : undefined) : no(bad)),
   homeBuy: (sim, [furniture, x, z, rot]) => (str(furniture, 40) && typeof x === "number" && typeof z === "number" && typeof rot === "number" ? homeBuy(sim.state, furniture as string, x, z, rot) : no(bad)),
   payRide: (sim, [id, meters]) => (str(id, 12) && typeof meters === "number" ? payRide(sim.state, id as string, meters) : no(bad)),
-  bankDeposit: (sim, [amount, atm]) => (typeof amount === "number" ? bankDeposit(sim.state, amount, atm === true) : no(bad)),
+  bankDeposit: (sim, [amount]) => (typeof amount === "number" ? bankDeposit(sim.state, amount) : no(bad)),
   bankBorrow: (sim, [amount]) => (typeof amount === "number" ? bankBorrow(sim.state, amount) : no(bad)),
   bankRepay: (sim, [amount]) => (typeof amount === "number" ? bankRepay(sim.state, amount) : no(bad)),
-  bankWithdraw: (sim, [amount, atm]) => (typeof amount === "number" ? bankWithdraw(sim.state, amount, atm === true) : no(bad)),
+  bankWithdraw: (sim, [amount]) => (typeof amount === "number" ? bankWithdraw(sim.state, amount) : no(bad)),
+  bankApply: (sim, [bank, dob, idType, idNo, address]) => (str(bank, 20) && str(dob, 10) && str(idType, 40) && str(idNo, 20) && str(address, 100) ? applyForAccount(sim.state, bank as string, dob as string, idType as string, idNo as string, address as string) : no(bad)),
+  bankCollect: (sim, [pin]) => (str(pin, 4) ? collectCard(sim.state, pin as string) : no(bad)),
+  bankUnblock: (sim) => unblockCard(sim.state),
+  atmLogin: (sim, [pin]) => (str(pin, 4) ? atmLogin(sim.state, pin as string) : no(bad)),
+  atmWithdraw: (sim, [amount, pin, machine]) => (typeof amount === "number" && str(pin, 4) && str(machine, 20) ? atmWithdraw(sim.state, amount, pin as string, machine as string) : no(bad)),
+  atmDeposit: (sim, [amount, pin]) => (typeof amount === "number" && str(pin, 4) ? atmDeposit(sim.state, amount, pin as string) : no(bad)),
+  atmAirtime: (sim, [amount, pin]) => (typeof amount === "number" && str(pin, 4) ? atmAirtime(sim.state, amount, pin as string) : no(bad)),
+  atmChangePin: (sim, [oldPin, newPin]) => (str(oldPin, 4) && str(newPin, 4) ? atmChangePin(sim.state, oldPin as string, newPin as string) : no(bad)),
   hospital: (sim, [id]) => (str(id, 20) ? hospitalService(sim.state, id as string) : no(bad)),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
   worship: (sim, [faith, id]) => (str(faith, 10) && str(id, 20) ? worshipService(sim.state, faith as "church" | "mosque", id as string) : no(bad)),

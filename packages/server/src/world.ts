@@ -1,5 +1,5 @@
 import { uidOf } from "./inbox.js";
-import { AIRTIME_PER_CALL_MINUTE, MINT, PLAYER, SINK, Sim, isDead, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
+import { AIRTIME_PER_CALL_MINUTE, MINT, bankTransferOut, phoneSendCheck, phoneSendRecord, PLAYER, SINK, Sim, isDead, buildProfile, createGameState, generateLagos, parseGameState, chargingSpotNear, homeFor, rpcCooldown, runRpc, simulateAbsence, transfer, walkableAt, type District, type GameState, type Home, type NewLifeChoices, type RpcArg, type SimEvent } from "@thelife/game-core";
 import { MAX_ROOM_PLAYERS, type PlayerView, type Where } from "@thelife/shared";
 import { LifeStore } from "./lives.js";
 
@@ -314,7 +314,7 @@ export class Room {
     if (!from.life || !to.life) return { ok: false, reason: "That player hasn't made their character yet." };
     const checked = this.checkAmount(amount);
     if (checked) return { ok: false, reason: checked };
-    const out = this.debit(from, amount, `Sent to ${to.name}`, now);
+    const out = this.lifePayDebit(from, amount, `Sent to ${to.name}`, now);
     if (!out.ok) return out;
     this.credit(to, amount, `From ${from.name}`, now);
     return { ok: true, to };
@@ -324,6 +324,30 @@ export class Room {
     if (!Number.isInteger(amount) || amount <= 0) return "Enter a whole amount above zero.";
     if (amount > 1_000_000) return "That is more than one payment can carry.";
     return null;
+  }
+
+  /** A LifePay send: within the day's limit, with its 1% fee. */
+  lifePayDebit(from: Player, amount: number, memo: string, now: number): { ok: true; fee: number } | { ok: false; reason: string } {
+    if (!from.life) return { ok: false, reason: "You haven't made your character yet." };
+    const check = phoneSendCheck(from.life.state, amount);
+    if (!check.ok) return check;
+    const cash = from.life.money;
+    if (cash < amount + check.fee) return { ok: false, reason: check.fee ? `You need ₦${(amount + check.fee).toLocaleString()} (₦${check.fee} LifePay fee).` : "You don't have enough money." };
+    const out = this.debit(from, amount, memo, now);
+    if (!out.ok) return out;
+    transfer(from.life.state.ledger, PLAYER, SINK, check.fee, "LifePay fee", from.life.state.minute);
+    from.life.state.stats.totalSpent += check.fee;
+    phoneSendRecord(from.life.state, amount);
+    this.saveLife(from, now);
+    return { ok: true, fee: check.fee };
+  }
+
+  /** A transfer out of the bank account: the PIN, the daily limit and the fee are checked by the bank rules. */
+  bankDebit(from: Player, amount: number, pin: string, memo: string, now: number): { ok: true } | { ok: false; reason: string } {
+    if (!from.life) return { ok: false, reason: "You haven't made your character yet." };
+    const r = bankTransferOut(from.life.state, amount, pin, memo);
+    this.saveLife(from, now);
+    return r.ok ? { ok: true } : { ok: false, reason: r.reason };
   }
 
   /** Takes money out of a life for a payment (to somebody who is not online, or a bill). */

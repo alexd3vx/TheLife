@@ -85,7 +85,7 @@ export type ClientMessage =
   | { t: "emote"; emote: string }
   | { t: "pay"; to: string; amount: number }
   /** Sends money to a player by their ID: at once when they are online, otherwise it waits for them. */
-  | { t: "payto"; uid: string; amount: number }
+  | { t: "payto"; /** Who gets it: their player ID, or their phone number. */ uid?: string; phone?: string; amount: number; /** The bank card's PIN: with it the money comes from the bank account (bigger limits, a smaller fee); without it, from LifePay. */ pin?: string }
   | { t: "ping"; ts: number }
   /** Voice call signalling (invite, accept, offer, answer...), passed to the other player; `to` is their player ID or session id. */
   | { t: "rtc"; to: string; data: unknown };
@@ -206,9 +206,17 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     case "pay":
       if (typeof m.to !== "string" || m.to.length > 40 || !finite(m.amount, 1e9)) return null;
       return { t: "pay", to: m.to, amount: Math.floor(m.amount) };
-    case "payto":
-      if (typeof m.uid !== "string" || !/^[a-f0-9]{6,16}$/.test(m.uid) || !finite(m.amount, 1e9)) return null;
-      return { t: "payto", uid: m.uid, amount: Math.floor(m.amount) };
+    case "payto": {
+      if (!finite(m.amount, 1e9)) return null;
+      if (m.pin !== undefined && !(typeof m.pin === "string" && /^\d{4}$/.test(m.pin))) return null;
+      const pin = typeof m.pin === "string" ? { pin: m.pin } : {};
+      if (typeof m.phone === "string") {
+        const phone = normalisePhone(m.phone);
+        return phone ? { t: "payto", phone, amount: Math.floor(m.amount), ...pin } : null;
+      }
+      if (typeof m.uid !== "string" || !/^[a-f0-9]{6,16}$/.test(m.uid)) return null;
+      return { t: "payto", uid: m.uid, amount: Math.floor(m.amount), ...pin };
+    }
     case "ping":
       return finite(m.ts, 1e15) ? { t: "ping", ts: m.ts } : null;
     case "rtc":

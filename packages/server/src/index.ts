@@ -476,19 +476,26 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         case "payto": {
           if (!room.allow(me, "pay", now)) return send(ws, { t: "error", reason: "Slow down: too many payments." });
           const mine = uidOf(me.key);
-          const name = inbox.nameOf(message.uid);
-          if (message.uid === mine) return send(ws, { t: "error", reason: "You can't pay yourself." });
-          if (name === null) return send(ws, { t: "error", reason: "There is no player with that ID." });
+          const target = message.phone ? inbox.uidOfPhone(message.phone) : (message.uid ?? null);
+          const name = target ? inbox.nameOf(target) : null;
+          if (target === mine) return send(ws, { t: "error", reason: "You can't pay yourself." });
+          if (!target || name === null) return send(ws, { t: "error", reason: message.phone ? "There is no player with that phone number." : "There is no player with that ID." });
           const bad = room.checkAmount(message.amount);
           if (bad) return send(ws, { t: "error", reason: bad });
-          const other = [...room.players.values()].find((p) => p.life && uidOf(p.key) === message.uid);
-          if (other) {
+          const other = [...room.players.values()].find((p) => p.life && uidOf(p.key) === target);
+          if (message.pin) {
+            // from the bank account: the card's PIN, the bank's limit and fee
+            const out = room.bankDebit(me, message.amount, message.pin, `Sent to ${name}`, now);
+            if (!out.ok) return send(ws, { t: "error", reason: out.reason });
+            if (other) room.credit(other, message.amount, `From ${me.name}`, now);
+            else payments.queue(target, { from: me.name, amount: message.amount, at: now });
+          } else if (other) {
             const result = room.payPlayer(me, other, message.amount, now);
             if (!result.ok) return send(ws, { t: "error", reason: result.reason });
           } else {
-            const out = room.debit(me, message.amount, `Sent to ${name}`, now);
+            const out = room.lifePayDebit(me, message.amount, `Sent to ${name}`, now);
             if (!out.ok) return send(ws, { t: "error", reason: out.reason });
-            payments.queue(message.uid, { from: me.name, amount: message.amount, at: now });
+            payments.queue(target, { from: me.name, amount: message.amount, at: now });
           }
           send(ws, { t: "money", balance: room.money(me), note: `You sent ₦${message.amount.toLocaleString()} to ${name}.` });
           sendLife(me);
@@ -501,8 +508,8 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           }
           // it shows in the conversation, for both of them, and stays there
           const text = `₦${message.amount.toLocaleString()} sent`;
-          inbox.send(mine, message.uid, text, now);
-          const line: ServerMessage = { t: "chat", from: me.id, fromUid: mine, name: me.name, text, at: now, to: message.uid };
+          inbox.send(mine, target, text, now);
+          const line: ServerMessage = { t: "chat", from: me.id, fromUid: mine, name: me.name, text, at: now, to: target };
           send(ws, line);
           if (other) {
             const target = sockets.get(other.id);

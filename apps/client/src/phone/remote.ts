@@ -120,10 +120,18 @@ export const payRide = remote("payRide", core.payRide as (s: GameState, id: stri
 
 // ---- the bank branch (in person: works on any phone)
 type BR = core.BankResult;
-export const bankDeposit = remote("bankDeposit", core.bankDeposit as (s: GameState, amount: number, atm?: boolean) => BR, (a) => [a[1], a[2] === true]);
-export const bankWithdraw = remote("bankWithdraw", core.bankWithdraw as (s: GameState, amount: number, atm?: boolean) => BR, (a) => [a[1], a[2] === true]);
+export const bankDeposit = remote("bankDeposit", core.bankDeposit as (s: GameState, amount: number) => BR);
+export const bankWithdraw = remote("bankWithdraw", core.bankWithdraw as (s: GameState, amount: number) => BR);
 export const bankBorrow = remote("bankBorrow", core.bankBorrow as (s: GameState, amount: number) => BR);
 export const bankRepay = remote("bankRepay", core.bankRepay as (s: GameState, amount: number) => BR);
+export const bankApply = remote("bankApply", core.applyForAccount as (s: GameState, bank: string, dob: string, idType: string, idNo: string, address: string) => BR);
+export const bankCollect = remote("bankCollect", core.collectCard as (s: GameState, pin: string) => BR);
+export const bankUnblock = remote("bankUnblock", core.unblockCard as (s: GameState) => BR);
+export const atmLogin = remote("atmLogin", core.atmLogin as (s: GameState, pin: string) => BR);
+export const atmWithdraw = remote("atmWithdraw", core.atmWithdraw as (s: GameState, amount: number, pin: string, machine: string) => BR);
+export const atmDeposit = remote("atmDeposit", core.atmDeposit as (s: GameState, amount: number, pin: string) => BR);
+export const atmAirtime = remote("atmAirtime", core.atmAirtime as (s: GameState, amount: number, pin: string) => BR);
+export const atmChangePin = remote("atmChangePin", core.atmChangePin as (s: GameState, oldPin: string, newPin: string) => BR);
 
 // ---- the hospital (in person)
 type HoR = core.HospitalResult;

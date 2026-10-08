@@ -16,6 +16,10 @@ export interface PanelProps {
   focus?: string;
   /** The buyer's price trait for groceries (1 = normal). */
   scale: number;
+  /** Which place this is (its machines belong to a bank by it). */
+  placeId?: string;
+  /** Redraws the sheet after something outside `run` changed the state (the cash machine). */
+  refresh?(): void;
 }
 
 /** Every place with a socket lets you charge your phone. */

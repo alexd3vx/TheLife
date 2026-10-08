@@ -348,7 +348,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
   const headline = sv ? (sv.on ? "Service is on" : `Service ${sv.text}`) : hours ? (hours.open ? (kind === "bank" ? "Counter open" : "Open now") : `Closed · ${hours.text}`) : "Open all day and night";
   const headlineOpen = sv ? sv.on : hours ? hours.open : true;
 
-  const panelProps = { state, run, note, scale, focus: open?.focus };
+  const panelProps = { state, run, note, scale, focus: open?.focus, placeId: place.id, refresh: () => bump((n) => n + 1) };
   const panel = !open ? null : open.focus === "charge" ? (
     <>
       <ChargeButton state={state} run={run} />

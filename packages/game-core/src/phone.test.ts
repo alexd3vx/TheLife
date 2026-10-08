@@ -209,7 +209,7 @@ describe("LifePay", () => {
     const s = sim("middle");
     const before = s.money;
     expect(sendMoney(s.state, "family", 1500).ok).toBe(true);
-    expect(s.money).toBe(before - 1500);
+    expect(s.money).toBe(before - 1500 - 15); // LifePay takes 1% (at least ₦10)
     expect(sendMoney(s.state, "lifepay", 100).ok).toBe(false);
     expect(sendMoney(s.state, "landlord", 100).ok).toBe(false);
     expect(sendMoney(s.state, "family", 1e12).ok).toBe(false);
@@ -223,9 +223,9 @@ describe("LifePay", () => {
     expect(s.money).toBe(money - 20_000);
     s.state.minute = 6 * 24 * 60 + 7 * 60;
     run(s, 120);
-    expect(balance(s.state.ledger, SAVINGS)).toBe(20_200);
+    expect(balance(s.state.ledger, SAVINGS)).toBe(20_100); // a phone-only saver gets 0.5% a week; a bank customer 1.5%
     expect(withdraw(s.state, 999_999).ok).toBe(false);
-    expect(withdraw(s.state, 20_200).ok).toBe(true);
+    expect(withdraw(s.state, 20_100).ok).toBe(true);
     expect(ledgerTotal(s.state.ledger)).toBe(0);
   });
 
@@ -239,11 +239,12 @@ describe("LifePay", () => {
     const s = sim("middle");
     expect(borrow(s.state, 999_999_999).ok).toBe(false);
     const before = s.money;
-    expect(borrow(s.state, 50_000).ok).toBe(true);
-    expect(s.money).toBe(before + 50_000);
-    expect(s.state.phone.loan!.owed).toBe(55_000);
+    expect(borrow(s.state, 50_000).ok).toBe(false); // LifePay lends at most ₦20,000; the bank lends more
+    expect(borrow(s.state, 20_000).ok).toBe(true);
+    expect(s.money).toBe(before + 20_000);
+    expect(s.state.phone.loan!.owed).toBe(22_000);
     expect(borrow(s.state, 1000).ok).toBe(false);
-    expect(repay(s.state, 55_000).ok).toBe(true);
+    expect(repay(s.state, 22_000).ok).toBe(true);
     expect(s.state.phone.loan).toBeNull();
     expect(ledgerTotal(s.state.ledger)).toBe(0);
   });

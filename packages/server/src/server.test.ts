@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
-import { BACKGROUNDS } from "@thelife/game-core";
+import { BACKGROUNDS, MINT, SAVINGS, applyForAccount, balance, collectCard, counterOpen, transfer } from "@thelife/game-core";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -329,7 +329,7 @@ describe("game server", () => {
     await a.next("money"); // "Your life begins."
     a.send({ t: "pay", to: wb.id, amount: 5000 });
     expect((await a.next("money", 3000)).note).toMatch(/You sent/);
-    expect(server.room.money([...server.room.players.values()][0]!)).toBe(startA - 5000);
+    expect(server.room.money([...server.room.players.values()][0]!)).toBe(startA - 5000 - 50); // LifePay takes 1%
     expect(server.room.money([...server.room.players.values()][1]!)).toBe(startB + 5000);
     a.send({ t: "pay", to: wb.id, amount: 100_000_000 });
     expect((await a.next("error")).reason).toBeTruthy();
@@ -475,7 +475,7 @@ describe("phone numbers, payments and calls", () => {
       const startB = moneyOf("Bayo");
       a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 4000 });
       expect((await a.c.next("money")).note).toMatch(/You sent ₦4,000 to Bayo Obi/);
-      expect(moneyOf("Ada")).toBe(startA - 4000);
+      expect(moneyOf("Ada")).toBe(startA - 4000 - 40);
       expect(moneyOf("Bayo")).toBe(startB + 4000);
       expect((await b.c.next("chat")).text).toMatch(/₦4,000 sent/);
       // Bayo leaves; Ada pays him anyway
@@ -484,7 +484,7 @@ describe("phone numbers, payments and calls", () => {
       a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 1500 });
       await a.c.next("money");
       await a.c.next("money").catch(() => undefined);
-      expect(moneyOf("Ada")).toBe(startA - 5500);
+      expect(moneyOf("Ada")).toBe(startA - 5500 - 40 - 15);
       // he comes back and it is there
       const b2 = await connect("Bayo", PROTOCOL_VERSION, bKey);
       await b2.next("welcome");
@@ -549,5 +549,36 @@ describe("phone numbers, payments and calls", () => {
     [...server.room.players.values()].find((p) => p.name.startsWith("Ada"))!.life!.state.phone.airtime = 500;
     a.c.send({ t: "rtc", to: g.welcome.uid!, data: { k: "invite", call: "call000005" } });
     expect((await a.c.next("rtc")).data).toMatchObject({ k: "end", why: expect.stringMatching(/reached/) });
+  });
+});
+
+describe("bank transfers between players", () => {
+  it("sends from the bank account with the card PIN, the bank's fee and no LifePay limit", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await lived("Ada");
+    const b = await lived("Bayo");
+    const players = () => [...server!.room.players.values()];
+    const ada = players().find((p) => p.name.startsWith("Ada"))!;
+    const bayo = players().find((p) => p.name.startsWith("Bayo"))!;
+    // Ada has a bank account with 300,000 in it
+    const st = ada.life!.state;
+    const saved = st.minute;
+    for (let d = 10; d < 17 && !counterOpen(st).open; d++) st.minute = d * 1440 + 10 * 60;
+    expect(applyForAccount(st, "ekotrust", "1998-04-23", "National ID (NIN)", "12345678901", "12 Awolowo Road, Ikoyi").ok).toBe(true);
+    st.minute += 240;
+    while (!counterOpen(st).open) st.minute += 30;
+    expect(collectCard(st, "2580").ok).toBe(true);
+    st.minute = saved;
+    transfer(st.ledger, MINT, SAVINGS, 300_000, "test", st.minute);
+    const before = server.room.money(bayo);
+    a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 150_000, pin: "0000" });
+    expect((await a.c.next("error")).reason).toMatch(/Wrong PIN/);
+    a.c.send({ t: "payto", uid: b.welcome.uid!, amount: 150_000, pin: "2580" });
+    expect((await a.c.next("money")).note).toMatch(/You sent ₦150,000/);
+    expect(balance(st.ledger, SAVINGS)).toBe(300_000 - 150_000 - 25);
+    expect(server.room.money(bayo)).toBe(before + 150_000);
+    // LifePay could not have sent that much
+    b.c.send({ t: "payto", uid: a.welcome.uid!, amount: 150_000 });
+    expect((await b.c.next("error")).reason).toMatch(/LifePay sends up to/);
   });
 });
