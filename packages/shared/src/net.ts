@@ -27,6 +27,23 @@ export interface PlayerView {
 }
 
 export type Where = "home" | "world";
+
+/** The most people shown together inside one place. */
+export const MAX_PLACE_PLAYERS = 20;
+/** A place's id as it travels on the wire (a landmark id). */
+export const PLACE_ID = /^[A-Za-z0-9:_.-]{1,48}$/;
+
+/** A player inside a place: where they stand in the room (the room's own coordinates), not in the city. */
+export interface PlaceView {
+  id: string;
+  name: string;
+  look?: string;
+  uid?: string;
+  x: number;
+  z: number;
+  yaw: number;
+  clip: string;
+}
 export type RpcArg = string | number | boolean | null;
 
 /** What a player chooses when making a character; everything else comes from the background on the server. */
@@ -53,6 +70,10 @@ export type ClientMessage =
   /** Asks the server to run one game action (a whitelisted function) on this player's life. */
   | { t: "do"; id: number; fn: string; args: RpcArg[] }
   | { t: "move"; x: number; y: number; z: number; yaw: number; clip: string; level: number }
+  /** Walks into a place (a bank, a market, a church...) or, with null, back out into the city. Inside, only the others in the same place see you. */
+  | { t: "inside"; place: string | null }
+  /** Where you stand inside the place you are in (the room's own coordinates). */
+  | { t: "pmove"; x: number; z: number; yaw: number; clip: string }
   /** Arrives somewhere by a paid ride (taxi, keke, danfo): the server moves the player there if they just paid for a trip. */
   | { t: "arrive"; x: number; z: number }
   | { t: "chat"; text: string }
@@ -74,6 +95,10 @@ export type ServerMessage =
   | { t: "person"; uid: string; name: string }
   | { t: "join"; player: PlayerView }
   | { t: "leave"; id: string }
+  /** Everyone who is inside the place you are in, sent when you walk in and whenever somebody comes or goes. */
+  | { t: "here"; place: string; players: PlaceView[] }
+  /** Where everyone inside your place stands now. */
+  | { t: "pstate"; place: string; players: Pick<PlaceView, "id" | "x" | "z" | "yaw" | "clip">[] }
   | { t: "state"; tick: number; serverTime: number; players: Pick<PlayerView, "id" | "x" | "y" | "z" | "yaw" | "clip" | "level">[] }
   | { t: "chat"; from: string; name: string; text: string; at: number; /** Set for a private message: the ID of the player it was sent to. */ to?: string; /** The ID of the sender, for private messages. */ fromUid?: string }
   | { t: "emote"; from: string; emote: string }
@@ -147,6 +172,13 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
     case "move":
       if (!finite(m.x) || !finite(m.y, 500) || !finite(m.z) || !finite(m.yaw, 100) || !finite(m.level, 20)) return null;
       return { t: "move", x: m.x, y: m.y, z: m.z, yaw: m.yaw, clip: typeof m.clip === "string" ? m.clip.slice(0, 40) : "Idle_Loop", level: Math.max(0, Math.round(m.level)) };
+    case "inside": {
+      if (m.place === null) return { t: "inside", place: null };
+      return typeof m.place === "string" && PLACE_ID.test(m.place) ? { t: "inside", place: m.place } : null;
+    }
+    case "pmove":
+      if (!finite(m.x, 200) || !finite(m.z, 200) || !finite(m.yaw, 100)) return null;
+      return { t: "pmove", x: m.x, z: m.z, yaw: m.yaw, clip: typeof m.clip === "string" ? m.clip.slice(0, 40) : "Idle_Loop" };
     case "arrive":
       if (!finite(m.x) || !finite(m.z)) return null;
       return { t: "arrive", x: m.x, z: m.z };

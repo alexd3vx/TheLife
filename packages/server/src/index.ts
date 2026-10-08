@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { HEARING_RANGE, PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@thelife/shared";
+import { HEARING_RANGE, MAX_PLACE_PLAYERS, PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from "@thelife/shared";
 import { join } from "node:path";
 import { LifeStore } from "./lives.js";
-import { Room, type Player } from "./world.js";
+import { Room, placeView, type Player } from "./world.js";
 import { Analytics } from "./analytics.js";
 import { Inbox, uidOf } from "./inbox.js";
 import { supabaseInbox } from "./supabaseInbox.js";
@@ -140,6 +140,25 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
     for (const [id, ws] of sockets) if (id !== except && ws.readyState === ws.OPEN) ws.send(text);
   };
 
+  /** Tells everyone inside a place who is in there now. */
+  const sendRoster = (place: string) => {
+    const members = room.inPlace(place).slice(0, MAX_PLACE_PLAYERS);
+    const text = JSON.stringify({ t: "here", place, players: members.map(placeView) } satisfies ServerMessage);
+    for (const m of members) {
+      const target = sockets.get(m.id);
+      if (target && target.readyState === target.OPEN) target.send(text);
+    }
+  };
+
+  /** Takes a player out of the place they are in. Back out in the city others see them again; going home they stay hidden. */
+  const leavePlace = (p: Player, backToCity: boolean) => {
+    const place = p.inside;
+    if (!place) return;
+    p.inside = null;
+    sendRoster(place);
+    if (backToCity && p.where === "world") broadcast({ t: "join", player: room.view(p) }, p.id);
+  };
+
   /** Tells a player where they live (and, if they are in the city, puts them at their door). */
   const sendHome = (p: Player, moveThere: boolean) => {
     const ws = sockets.get(p.id);
@@ -235,8 +254,32 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
           if (me.where === "world") broadcast({ t: "join", player: room.view(me) }, me.id); // others see the new look
           return;
         }
+        case "inside": {
+          if (me.where !== "world" || !room.allow(me, "move", now)) return;
+          if (message.place === null) return leavePlace(me, true);
+          if (me.inside === message.place) return;
+          if (me.inside) leavePlace(me, false);
+          if (room.inPlace(message.place).length >= MAX_PLACE_PLAYERS) return send(ws, { t: "error", reason: "That place is packed. Try again in a moment." });
+          me.inside = message.place;
+          me.px = 0;
+          me.pz = 0;
+          me.pyaw = 0;
+          me.pclip = "Idle_Loop";
+          broadcast({ t: "leave", id: me.id }, me.id); // out in the city they see you go in
+          sendRoster(message.place);
+          return;
+        }
+        case "pmove": {
+          if (!me.inside || !room.allow(me, "move", now)) return;
+          me.px = message.x;
+          me.pz = message.z;
+          me.pyaw = message.yaw;
+          me.pclip = message.clip;
+          return;
+        }
         case "place": {
           if (me.where === message.where) return;
+          if (message.where === "home") leavePlace(me, false);
           me.where = message.where;
           analytics.move(me.id, me.where === "world" ? "world" : "home");
           if (me.where === "world") {
@@ -272,6 +315,15 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         }
         case "chat": {
           if (!room.allow(me, "chat", now)) return send(ws, { t: "error", reason: "You're typing too fast." });
+          // inside a place, whoever is in there with you hears you, wherever they stand in the room
+          if (me.inside) {
+            const line: ServerMessage = { t: "chat", from: me.id, name: me.name, text: message.text, at: now };
+            for (const other of room.inPlace(me.inside)) {
+              const target = sockets.get(other.id);
+              if (target) send(target, line);
+            }
+            return;
+          }
           // out in the city, chat carries only so far; at home nobody hears you (use a private message)
           if (me.where !== "world") return send(ws, { t: "error", reason: "Nobody is near enough to hear you. Step outside, or send a private message." });
           const line: ServerMessage = { t: "chat", from: me.id, name: me.name, text: message.text, at: now };
@@ -348,6 +400,7 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
         room.leave(me.id);
         analytics.leave(me.id);
         if (sockets.get(me.id) === ws) sockets.delete(me.id);
+        if (me.inside) leavePlace(me, false);
         if (me.where === "world") broadcast({ t: "leave", id: me.id });
       }
     });
@@ -374,6 +427,17 @@ export async function startGameServer(options: GameServerOptions = {}): Promise<
 
   let tick = 0;
   const interval = setInterval(() => {
+    // inside the places: each place's people hear where the others stand
+    const byPlace = new Map<string, Player[]>();
+    for (const p of room.players.values()) if (p.inside) byPlace.set(p.inside, [...(byPlace.get(p.inside) ?? []), p]);
+    for (const [place, members] of byPlace) {
+      if (members.length < 2) continue;
+      const text = JSON.stringify({ t: "pstate", place, players: members.map((p) => ({ id: p.id, x: p.px, z: p.pz, yaw: p.pyaw, clip: p.pclip })) } satisfies ServerMessage);
+      for (const m of members) {
+        const target = sockets.get(m.id);
+        if (target && target.readyState === target.OPEN) target.send(text);
+      }
+    }
     const here = room.inWorld();
     if (here.length < 2) return; // nobody to tell
     tick++;

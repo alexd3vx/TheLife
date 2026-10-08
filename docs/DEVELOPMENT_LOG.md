@@ -393,3 +393,11 @@ Chronological record of decisions and changes. Newest first.
 
 ## Root cause of "ragdoll", long limbs and swollen feet (8 Oct)
 `SkeletonUtils.clone` gives each copy its own bones but shares the bone-inverse matrices, and `MorphBody.apply` writes the fitted bone inverses into them. Every person on screen together (the street's real characters, other players, NPCs, two people in a film) therefore shared one set of inverses, and each person's skin was bent by whoever was built last: stretched limbs, small heads, wrong feet. Fixed in `MorphBody.load` (each copy gets its own skeleton with its own inverses). The same session: real shoes, slimmer sneakers, the base underwear layer matte dark grey (not white), crowd people stand on the pavement (not in it), cars in the film never overtake each other.
+
+## Place presence (8 Oct)
+- Protocol: `inside` (walk into a place or, with null, out), `pmove` (where you stand in the room); server to client: `here` (who is in your place, sent on every change) and `pstate` (where they stand, 10 times a second). Chat sent while inside goes only to the people in the same place. Out in the street nobody sees you once you are inside (the city gets a `leave`; stepping out sends a `join`). A place holds 20 people.
+- Server: `Player.inside/px/pz/pyaw/pclip`, `Room.inPlace`, `room.inWorld()` leaves out people inside. Test: `place presence` in `server.test.ts`.
+- Client: `place/presence.ts` (`PlaceMates`) draws the other real people with name tags, speech bubbles and walking clips; `PlaceInterior` shows "N here", a chat box, and hides one made-up visitor for each real person in the room.
+- Fixed on the way: `RemotePlayers.remove` crashed on characters with several materials (it blocked other players leaving the street).
+- The map is locked, and places are entered from the map. Everything above works behind `localStorage.setItem("thelife.unlock", "1")`; players will meet in places once the map is open again.
+- **The VPS needs the update** (new protocol messages).

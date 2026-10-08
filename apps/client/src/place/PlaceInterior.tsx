@@ -24,6 +24,8 @@ import type { PlaceRoom, Spot } from "./roomKit";
 import { buildSchoolRoom } from "./schoolScene";
 import { buildShopRoom } from "./shopScene";
 import { Visitor, Walker } from "./walker";
+import { PlaceMates, type PlaceChatLine } from "./presence";
+import { world } from "../net/world";
 import { buildWorshipRoom } from "./worshipScene";
 import "./place.css";
 
@@ -45,6 +47,11 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
   const [leaving, setLeaving] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [, bump] = useState(0);
+  // the real people in here with you, what they say, and the box you say it in
+  const [others, setOthers] = useState(0);
+  const [lines, setLines] = useState<PlaceChatLine[]>([]);
+  const [draft, setDraft] = useState("");
+  const matesRef = useRef<PlaceMates | null>(null);
   const nearRef = useRef<Spot | null>(null);
   const openRef = useRef<Spot | null>(null);
   const leavingRef = useRef(false);
@@ -160,6 +167,21 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         return new Visitor(a, room, [start[0] + (i % 2 ? 0.25 : -0.25), start[1]]);
       });
 
+      // the real people inside with you; the more of them there are, the fewer made-up visitors wander about
+      let realOthers = 0;
+      const mates = new PlaceMates(scene, manifest, place.id, me, {
+        onCount: (n) => {
+          realOthers = n;
+          setOthers(n);
+        },
+        onChat: (line) => setLines((l) => [...l.slice(-5), line]),
+      });
+      matesRef.current = mates;
+      cleanups.push(() => {
+        mates.dispose();
+        matesRef.current = null;
+      });
+
       let bubble: { sprite: THREE.Sprite; until: number } | null = null;
       const talker = staff[0]!;
       const say = (text: string) => {
@@ -246,10 +268,14 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
         walker.update(dt, frozen ? { x: 0, y: 0, m: 0 } : input.move(), !frozen && input.running());
         me.update(dt);
         for (const a of staff) a.update(dt);
-        for (const v of visitors) {
+        visitors.forEach((v, i) => {
+          const shown = i < visitors.length - realOthers;
+          v.avatar.root.visible = shown;
+          if (!shown) return;
           v.update(dt);
           v.avatar.update(dt);
-        }
+        });
+        mates.update(dt, { x: walker.pos.x, z: walker.pos.z, yaw: me.root.rotation.y, clip: walker.clipName });
         const sp = frozen ? nearRef.current : walker.spot();
         if ((sp?.id ?? null) !== (nearRef.current?.id ?? null)) {
           nearRef.current = sp;
@@ -345,6 +371,25 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
           <b>{place.name}</b>
           <small className={headlineOpen ? "is-open" : ""}>{headline}</small>
         </div>
+        {ready && <span className="place-here" title="People in here">{others + 1} here</span>}
+        {ready && !open && (
+          <div className="place-chat">
+            {lines.slice(-4).map((l, i) => (
+              <p key={`${l.at}-${i}`} className={l.mine ? "is-mine" : ""}><b>{l.mine ? "You" : l.name}</b> {l.text}</p>
+            ))}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const text = draft.trim();
+                if (!text) return;
+                matesRef.current?.say(text);
+                setDraft("");
+              }}
+            >
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={200} placeholder={others > 0 ? `Say something to the ${others} ${others === 1 ? "person" : "people"} here` : "Say something"} aria-label="Say something to the people in here" autoComplete="off" />
+            </form>
+          </div>
+        )}
         {ready && !open && !near && <p className="place-tip">Tap the floor to walk, tap a counter to use it</p>}
         {ready && !open && near && (
           <button className="place-prompt" onClick={() => openSpot(near)}>

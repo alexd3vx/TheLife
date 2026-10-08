@@ -35,7 +35,7 @@ interface Remote {
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
-function nameTag(name: string): THREE.Sprite {
+export function nameTag(name: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 64;
@@ -228,7 +228,7 @@ export class RemotePlayers {
     this.root.remove(r.group);
     r.group.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.isMesh) (m.material as THREE.Material).dispose();
+      if (m.isMesh && !(o as THREE.Sprite).isSprite) for (const mat of Array.isArray(m.material) ? m.material : [m.material]) mat.dispose();
       const s = o as THREE.Sprite;
       if (s.isSprite) {
         s.material.map?.dispose();

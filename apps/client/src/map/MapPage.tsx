@@ -109,7 +109,7 @@ export default function MapPage() {
   useEffect(() => {
     runtimeRef.current?.setHome(home ? { door: home.door, spawn: home.spawn, tier: home.tier } : null);
   }, [home, loading]);
-  if (import.meta.env.DEV) (window as unknown as { __mapUi: unknown }).__mapUi = { pick: setPicked, open: () => setBigMap(true), enter: (id: string) => setInside(district.landmarks.find((l) => l.id === id) ?? null) };
+  if (import.meta.env.DEV) (window as unknown as { __mapUi: unknown }).__mapUi = { pick: setPicked, open: () => setBigMap(true), enter: (id: string) => setInside(district.landmarks.find((l) => l.id === id) ?? null), landmarks: () => district.landmarks.map((l) => ({ id: l.id, kind: l.kind, name: l.name })) };
   const atHome = !!(home && stats && Math.hypot(stats.position.x - home.spawn.x, stats.position.z - home.spawn.z) < 7);
 
   // Keyboard and on-screen controls: what the interact button does depends on what is close.

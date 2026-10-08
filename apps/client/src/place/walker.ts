@@ -142,6 +142,11 @@ export class Walker {
     return true;
   }
 
+  /** The clip being played (idle, walk or jog), for telling other players what this one is doing. */
+  get clipName(): string {
+    return this.clip || "Idle_Loop";
+  }
+
   get walking(): boolean {
     return this.route.length > 0;
   }

@@ -10,6 +10,13 @@ const MAX_STEP_SLACK = 1.2;
 export interface Player extends PlayerView {
   /** At home (invisible to others, not in the city) or out in the city. */
   where: Where;
+  /** The place (a landmark id) the player is inside, or null when they are in the city or at home. */
+  inside: string | null;
+  /** Where they stand inside it, in the room's own coordinates. */
+  px: number;
+  pz: number;
+  pyaw: number;
+  pclip: string;
   /** The secret that unlocks this player's life (kept on the server only). */
   key: string;
   /** The player's life, run here. Null until they have made a character. */
@@ -70,6 +77,11 @@ export class Room {
       level: 0,
       look,
       where,
+      inside: null,
+      px: 0,
+      pz: 0,
+      pyaw: 0,
+      pclip: "Idle_Loop",
       key,
       life: null,
       ack: 0,
@@ -313,10 +325,19 @@ export class Room {
 
   /** Everyone who is out in the city. */
   inWorld(): Player[] {
-    return [...this.players.values()].filter((p) => p.where === "world");
+    return [...this.players.values()].filter((p) => p.where === "world" && !p.inside);
+  }
+
+  /** Everyone inside one place. */
+  inPlace(place: string): Player[] {
+    return [...this.players.values()].filter((p) => p.inside === place);
   }
 
   view(p: Player): PlayerView {
     return { id: p.id, name: p.name, x: p.x, y: p.y, z: p.z, yaw: p.yaw, clip: p.clip, level: p.level, look: p.look, uid: uidOf(p.key) };
   }
+}
+
+export function placeView(p: Player): import("@thelife/shared").PlaceView {
+  return { id: p.id, name: p.name, look: p.look, uid: uidOf(p.key), x: p.px, z: p.pz, yaw: p.pyaw, clip: p.pclip };
 }

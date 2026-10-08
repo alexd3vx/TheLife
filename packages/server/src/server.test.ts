@@ -52,6 +52,46 @@ async function connect(name: string, protocol = PROTOCOL_VERSION, key = newKey()
   return c;
 }
 
+describe("place presence", () => {
+  it("shows people inside a place only to each other, with a place chat", async () => {
+    server = await startGameServer({ port: 0 });
+    const a = await connect("Ada");
+    const wa = await a.next("welcome");
+    const b = await connect("Bayo");
+    const wb = await b.next("welcome");
+    const c = await connect("Chidi");
+    await c.next("welcome");
+    await a.next("join");
+    await a.next("join");
+    // Ada walks into the bank: the street sees her go, and she is told who is in there (just her)
+    a.send({ t: "inside", place: "bank-1" });
+    expect((await b.next("leave")).id).toBe(wa.id);
+    expect((await a.next("here")).players.map((p) => p.name)).toEqual(["Ada"]);
+    // Bayo follows: both inside are told, Chidi (on the street) hears nothing of it
+    b.send({ t: "inside", place: "bank-1" });
+    const roster = await a.next("here");
+    expect(roster.players.map((p) => p.name).sort()).toEqual(["Ada", "Bayo"]);
+    await b.next("here");
+    // where they stand reaches the other one
+    a.send({ t: "pmove", x: 1.5, z: -2, yaw: 0.5, clip: "Walk_Loop" });
+    await new Promise((r) => setTimeout(r, 250));
+    const st = await b.next("pstate");
+    expect(st.place).toBe("bank-1");
+    expect(st.players.find((p) => p.id === wa.id)).toMatchObject({ x: 1.5, z: -2, clip: "Walk_Loop" });
+    // place chat reaches the people inside and not the street
+    a.send({ t: "chat", text: "Good morning" });
+    expect((await b.next("chat")).text).toBe("Good morning");
+    await new Promise((r) => setTimeout(r, 150));
+    expect(c.inbox.some((m) => m.t === "chat")).toBe(false);
+    expect(c.inbox.some((m) => m.t === "pstate" || m.t === "here")).toBe(false);
+    // Ada steps back out: the street sees her again and Bayo's roster shrinks
+    a.send({ t: "inside", place: null });
+    expect((await c.next("join")).player.id).toBe(wa.id);
+    expect((await b.next("here")).players.map((p) => p.name)).toEqual(["Bayo"]);
+    void wb;
+  });
+});
+
 describe("game server", () => {
   it("welcomes a player and tells others when they join and leave", async () => {
     server = await startGameServer({ port: 0 });
