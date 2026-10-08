@@ -66,7 +66,6 @@ function eachMaterial(root: THREE.Object3D, fn: (material: THREE.MeshStandardMat
 export const REAL_FOR_LIFE: Record<string, string> = {
   Life_Cheer_Loop: "KK_Cheering",
   Life_Talk_Loop: "Idle_Talking_Loop",
-  Idle_Loop: "XB_idle",
   Walk_Loop: "XB_walk",
   Walk_Formal_Loop: "XB_walk",
   Jog_Fwd_Loop: "XB_run",
@@ -77,9 +76,7 @@ export const REAL_FOR_LIFE: Record<string, string> = {
   Life_Drink_Loop: "U2_Consume",
   Life_Phone_Loop: "U2_Idle_TalkingPhone_Loop",
   Life_Wave_Loop: "KK_Waving",
-  Life_Cook_Loop: "KK_Work_B",
   Life_Type_Loop: "Driving_Loop",
-  Life_Wash_Loop: "KK_Working_B",
   Life_Brush_Loop: "KK_Use_Item",
   Life_Read_Loop: "KK_Holding_B",
 };
@@ -87,6 +84,15 @@ export const REAL_FOR_LIFE: Record<string, string> = {
 /** Iris colours for the morphable body's eye picture (brown is the picture itself). */
 export const CLOTH_PHYSICS = false;
 const IRIS_COLOURS: Record<string, string | null> = { brown: "#4a2c1a", hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
+
+/** One moment of a clip held as a still pose (a two-key clip that never moves). */
+function holdPose(moving: THREE.AnimationClip, name: string): THREE.AnimationClip {
+  return new THREE.AnimationClip(name, 1, moving.tracks.map((t) => {
+    const n = t.getValueSize();
+    const first = Array.from(t.values.slice(0, n));
+    return new (t.constructor as new (name: string, times: number[], values: number[]) => THREE.KeyframeTrack)(t.name, [0, 1], [...first, ...first]);
+  }));
+}
 
 export class Avatar {
   readonly root = new THREE.Group();
@@ -241,13 +247,9 @@ export class Avatar {
     const have = this.clips.get(name);
     if (name === "Idle_Loop" && !have) {
       // Standing still is a held pose (the first frame of a relaxed idle), not a moving clip: idling animations are the first thing to look wrong.
-      const moving = this.getClipUnheld(name);
+      const moving = this.getClipUnheld("XB_idle");
       if (!moving) return undefined;
-      const held = new THREE.AnimationClip(name, 1, moving.tracks.map((t) => {
-        const n = t.getValueSize();
-        const first = Array.from(t.values.slice(0, n));
-        return new (t.constructor as new (name: string, times: number[], values: number[]) => THREE.KeyframeTrack)(t.name, [0, 1], [...first, ...first]);
-      }));
+      const held = holdPose(moving, name);
       this.clips.set(name, held);
       return held;
     }
@@ -283,7 +285,11 @@ export class Avatar {
       this.clips.set(name, moved);
       return moved;
     }
-    return this.fallbacks.get(name);
+    const own = this.fallbacks.get(name);
+    if (own) return own;
+    // a move made in code that could not be made: a plain pose of the right kind, never nothing and never a broken one
+    if (name === "Life_Toilet_Loop" || name === "Life_Sit_Loop") return this.getClipUnheld("Sitting_Idle_Loop");
+    return undefined;
   }
 
   /** Every clip the editor can offer: the libraries' (retargeted when asked for) and the imported ones. */
@@ -355,9 +361,17 @@ export class Avatar {
     }
     this.clips.clear();
     this.fallbacks.clear();
-    for (const clip of buildLifeClips({ root: this.bodyScene, bones }, this.libraryClips)) {
-      if (!this.lazy.has(clip.name) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
-      else this.fallbacks.set(clip.name, clip); // used only when the real clip for this move can't be found
+    // The clips made in code are built on top of clips already fitted to this body (never the raw library ones, which are made for another
+    // skeleton and twist this body into knots): a held relaxed stand and the real sitting pose.
+    const standing = this.getClipUnheld("XB_idle");
+    const sitting = this.getClipUnheld("Sitting_Idle_Loop");
+    if (standing && sitting) {
+      const fitted = new Map<string, THREE.AnimationClip>([["Idle_Loop", holdPose(standing, "Idle_Loop")], ["Sitting_Idle_Loop", sitting]]);
+      for (const clip of buildLifeClips({ root: this.bodyScene, bones }, fitted)) {
+        // (the library has an "Idle_Loop" of its own, a fighter's crouch; the one made here is the everyday stance and replaces it)
+        if ((clip.name === "Idle_Loop" || !this.lazy.has(clip.name)) && !this.aliases.has(clip.name)) this.clips.set(clip.name, clip);
+        else this.fallbacks.set(clip.name, clip); // used only when the real clip for this move can't be found
+      }
     }
     const resume = playing ?? this.wanted;
     if (resume) this.play(resume, 0);

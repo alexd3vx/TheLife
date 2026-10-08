@@ -410,3 +410,10 @@ Chronological record of decisions and changes. Newest first.
 - The sand tint along the shore no longer paints a street's edge, so a bridge deck has no sand strip.
 - The `map` and `maps` locks are removed from `features.ts`; chat, LifeGram and Chirp stay locked.
 - Not done: raised arches (the walking surface is flat, so decks stay level with the ground), cable-stayed towers, the mainland ends of the long bridges (the island data stops at the lagoon edge).
+
+## Home animations: no more scattered bodies
+
+- Cause of the "character is scattering" reports: the moves made in code (yawn, stretch, belly rub, fidget, and any move whose real clip was not ready) were built from the library's raw clips, which are made for another skeleton, and twisted the body into knots. They are now built on top of clips already fitted to the body (a held relaxed stand and the real sitting pose), and a move that cannot be made falls back to a plain real pose, never a broken one.
+- `Idle_Loop` is now the relaxed stand with a 4 s breath, a drifting head and a small weight shift (`lifeClips.ts`), instead of a frozen frame.
+- New moves: `Life_Toilet_Loop` (leaning forward, hands together) for the toilet and `Life_Sit_Loop` (relaxed, leaning back a little, head drifting) for the sofa and sitting. The shower (`Life_Wash_Loop`, hands scrubbing the hair) and cooking (`Life_Cook_Loop`, stirring) are made in code too, replacing the closest-hand-movement stand-ins.
+- Still not real: a motion-captured shower, toilet and cooking clip. The free libraries have none; these are authored poses, good at the home's distance.

@@ -21,6 +21,8 @@ export const LIFE_CLIP_NAMES = [
   "Life_Read_Loop",
   "Life_Cook_Loop",
   "Life_Sleep_Loop",
+  "Life_Toilet_Loop",
+  "Life_Sit_Loop",
   // short body-language clips the character plays when idle (played once)
   "Life_Yawn",
   "Life_Stretch",
@@ -49,6 +51,7 @@ const CHILD: Record<string, string> = {
   spine_02: "spine_03",
   spine_03: "neck_01",
   neck_01: "Head",
+  pelvis: "spine_01",
 };
 
 interface Context {
@@ -180,6 +183,31 @@ export function buildLifeClips(
     idle = stand;
   }
 
+  // No T-pose to build from: the standing pose is the (fitted) relaxed stand with a slow breath, a drifting head and a small shift of weight,
+  // so a person standing still is alive rather than a statue.
+  if (idle === libraryIdle) {
+    const duration = 6;
+    const stand = cloneClip(libraryIdle, "Idle_Loop", duration);
+    posedAt(ctx, libraryIdle);
+    const chest = bend(ctx, "spine_03", FORWARD, 1.6);
+    const belly = bend(ctx, "spine_01", FORWARD, 0.8);
+    const nod = bend(ctx, "neck_01", FORWARD, 2.2);
+    const sway = bend(ctx, "pelvis", new THREE.Vector3(1, 0, 0), 1.6);
+    const lean = bend(ctx, "spine_02", new THREE.Vector3(-1, 0, 0), 1.4);
+    const sinkL = bend(ctx, "upperarm_l", new THREE.Vector3(0, -1, 0), 1.2);
+    const sinkR = bend(ctx, "upperarm_r", new THREE.Vector3(0, -1, 0), 1.2);
+    const breath = (p: number) => 0.5 + 0.5 * Math.sin(p * Math.PI * 2 * 1.5); // 4 s per breath
+    addRotation(stand, "spine_03", cycle(duration, 24, (p) => slerp(identity(), chest, breath(p))));
+    addRotation(stand, "spine_01", cycle(duration, 24, (p) => slerp(identity(), belly, breath(p))));
+    addRotation(stand, "upperarm_l", cycle(duration, 24, (p) => slerp(identity(), sinkL, breath(p))));
+    addRotation(stand, "upperarm_r", cycle(duration, 24, (p) => slerp(identity(), sinkR, breath(p))));
+    addRotation(stand, "neck_01", cycle(duration, 24, (p) => slerp(identity(), nod, 0.5 + 0.5 * Math.sin(p * Math.PI * 2 + 0.8))));
+    addRotation(stand, "pelvis", cycle(duration, 24, (p) => slerp(identity(), sway, Math.sin(p * Math.PI * 2))));
+    addRotation(stand, "spine_02", cycle(duration, 24, (p) => slerp(identity(), lean, Math.sin(p * Math.PI * 2))));
+    out.push(stand);
+    idle = stand;
+  }
+
   // The library walk leans forward like a sprinter. An ordinary walk keeps the back straight: the spine is eased back a few degrees.
   {
     const base = library.get("Walk_Formal_Loop") ?? library.get("Walk_Loop");
@@ -261,16 +289,20 @@ export function buildLifeClips(
     out.push(clip);
   }
 
-  // Washing in the shower: both hands up, scrubbing the head.
+  // Washing in the shower: both hands up at the head, scrubbing the hair, elbows out to the sides.
   {
     const clip = cloneClip(idle, "Life_Wash_Loop", 2);
     posedAt(ctx, idle);
     for (const side of ["l", "r"] as const) {
-      const shoulder = bend(ctx, `upperarm_${side}`, FORWARD, 70);
-      const elbow = bend(ctx, `lowerarm_${side}`, FORWARD, 112);
-      const scrub = bend(ctx, `lowerarm_${side}`, FORWARD, 14);
+      const sign = side === "l" ? -1 : 1;
+      const raise = bend(ctx, `upperarm_${side}`, FORWARD, 100);
+      const out = bend(ctx, `upperarm_${side}`, new THREE.Vector3(sign, 0, 0), 36);
+      const shoulder = out.clone().multiply(raise);
+      const elbow = bend(ctx, `lowerarm_${side}`, FORWARD, 122);
+      const scrub = bend(ctx, `lowerarm_${side}`, FORWARD, 16);
+      const rub = bend(ctx, `upperarm_${side}`, new THREE.Vector3(sign, 0, 0), 9);
       const offset = side === "l" ? 0 : 0.5;
-      addRotation(clip, `upperarm_${side}`, cycle(2, 4, () => shoulder.clone()));
+      addRotation(clip, `upperarm_${side}`, cycle(2, 16, (p) => shoulder.clone().multiply(slerp(identity(), rub, 0.5 + 0.5 * Math.sin((p * 4 + offset) * Math.PI * 2)))));
       addRotation(clip, `lowerarm_${side}`, cycle(2, 16, (p) => elbow.clone().multiply(slerp(identity(), scrub, 0.5 + 0.5 * Math.sin((p * 4 + offset) * Math.PI * 2)))));
     }
     out.push(clip);
@@ -298,6 +330,40 @@ export function buildLifeClips(
       addRotation(clip, `upperarm_${side}`, cycle(clip.duration, 4, () => shoulder.clone()));
       addRotation(clip, `lowerarm_${side}`, cycle(clip.duration, 4, () => elbow.clone()));
     }
+    out.push(clip);
+  }
+
+  // On the toilet: leaning forward, elbows on the knees, hands loosely together, head a little down.
+  {
+    const clip = cloneClip(sitting, "Life_Toilet_Loop", 5);
+    posedAt(ctx, sitting);
+    for (const [bone, deg] of [["spine_01", 7], ["spine_02", 8], ["spine_03", 7], ["neck_01", 9]] as const) {
+      const q = bend(ctx, bone, FORWARD, deg);
+      addRotation(clip, bone, cycle(5, 20, (p) => slerp(identity(), q, 0.9 + 0.1 * Math.sin(p * Math.PI * 2))));
+    }
+    for (const side of ["l", "r"] as const) {
+      const sign = side === "l" ? -1 : 1;
+      const shoulder = bend(ctx, `upperarm_${side}`, new THREE.Vector3(sign, 0, 0), 10).multiply(bend(ctx, `upperarm_${side}`, FORWARD, 24));
+      const elbow = bend(ctx, `lowerarm_${side}`, FORWARD, 38);
+      addRotation(clip, `upperarm_${side}`, cycle(5, 4, () => shoulder.clone()));
+      addRotation(clip, `lowerarm_${side}`, cycle(5, 4, () => elbow.clone()));
+    }
+    out.push(clip);
+  }
+
+  // Sitting back on the sofa or a chair: leaning back a little, one arm on the thigh, the head drifting as you look about.
+  {
+    const clip = cloneClip(sitting, "Life_Sit_Loop", 7);
+    posedAt(ctx, sitting);
+    for (const [bone, deg] of [["spine_01", -2], ["spine_02", -3], ["spine_03", -2]] as const) {
+      const q = bend(ctx, bone, FORWARD, deg);
+      addRotation(clip, bone, cycle(7, 28, (p) => slerp(identity(), q, 0.85 + 0.15 * Math.sin(p * Math.PI * 2 * 1.75))));
+    }
+    const tilt = bend(ctx, "neck_01", new THREE.Vector3(1, 0, 0), 5);
+    const nod = bend(ctx, "neck_01", FORWARD, 2);
+    addRotation(clip, "neck_01", cycle(7, 28, (p) => slerp(identity(), tilt, Math.sin(p * Math.PI * 2)).multiply(slerp(identity(), nod, 0.5 + 0.5 * Math.sin(p * Math.PI * 4)))));
+    const elbow = bend(ctx, "lowerarm_r", FORWARD, 18);
+    addRotation(clip, "lowerarm_r", cycle(7, 4, () => elbow.clone()));
     out.push(clip);
   }
 
