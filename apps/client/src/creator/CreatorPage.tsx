@@ -2,7 +2,7 @@ import { GameIcon } from "../ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BACKGROUNDS, TIER_LABEL, TRAITS, rollBackground, sanitizeTraits, strengthSlots, type Profile, type Tier } from "@thelife/game-core";
 import { DEFAULT_LOOK, sexOf, type Look } from "../lab/looks";
-import { DEFAULT_SHAPE } from "../lab/bodyShape";
+import { DEFAULT_SHAPE, type BodyShape } from "../lab/bodyShape";
 import CharacterStage, { type StageApi, type StageBackdrop, type StageFocus } from "../ui/CharacterStage";
 import StudioPanel from "./StudioPanel";
 import type { Tab } from "./randomise";
@@ -40,6 +40,13 @@ export default function CreatorPage() {
   const stageApi = useRef<StageApi | null>(null);
   const history = useRef(new LookHistory<Look>());
   const [, bump] = useState(0);
+  // a body slider that is still moving: shown at once on the stage, without rebuilding the clothes, and committed when it is let go
+  const [draft, setDraft] = useState<BodyShape | null>(null);
+  const draftRef = useRef<BodyShape | null>(null);
+  const previewShape = useCallback((s: BodyShape) => {
+    draftRef.current = s;
+    setDraft(s);
+  }, []);
 
   const update = useCallback((patch: Partial<Look>) => {
     const prev = lookRef.current;
@@ -54,6 +61,13 @@ export default function CreatorPage() {
     setLook(next);
     bump((n) => n + 1);
   }, []);
+  const commitShape = useCallback(() => {
+    const s = draftRef.current;
+    if (!s) return;
+    draftRef.current = null;
+    setDraft(null);
+    update({ shape: s });
+  }, [update]);
   const undo = useCallback(() => {
     const prev = history.current.undo(lookRef.current);
     if (prev) replace(prev);
@@ -122,7 +136,7 @@ export default function CreatorPage() {
   return (
     <div className={`creator${step === "look" ? "" : " is-full"}`}>
       <div className="creator-stage">
-        <CharacterStage look={look} walking={walking} onBusy={setBusy} focus={FOCUS[tab]} backdrop={backdrop} apiRef={stageApi} />
+        <CharacterStage look={look} walking={walking} onBusy={setBusy} focus={FOCUS[tab]} backdrop={backdrop} apiRef={stageApi} previewShape={draft} />
         {busy && <div className="creator-busy">Dressing…</div>}
         <div className="studio-hint">Drag to turn around</div>
       </div>
@@ -153,6 +167,9 @@ export default function CreatorPage() {
         {step === "look" && <StudioPanel
             look={look}
             update={update}
+            draft={draft}
+            previewShape={previewShape}
+            commitShape={commitShape}
             walking={walking}
             setWalking={setWalking}
             onNext={() => setStep("background")}

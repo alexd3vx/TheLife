@@ -133,3 +133,11 @@
   .creator-body { padding: 10px 14px calc(20px + env(safe-area-inset-bottom)); gap: 18px; }
   .creator-stage .studio-hint { display: none; }
 }
+
+/* the short creator: folded-away extras */
+.studio-more { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.studio-more > summary { cursor: pointer; padding: 10px 0; font-weight: 700; font-size: .9rem; color: var(--accent-strong); list-style: none; min-height: 24px; }
+.studio-more > summary::-webkit-details-marker { display: none; }
+.studio-more > summary::after { content: "  ▾"; }
+.studio-more[open] > summary::after { content: "  ▴"; }
+.studio-extras { margin-top: 4px; }

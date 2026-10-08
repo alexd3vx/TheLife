@@ -25,6 +25,8 @@ export interface CityScene {
 export interface CityOptions {
   shadowMapSize: number;
   seed?: number;
+  /** The old block figures. Off for the cinematic, which brings its own people. */
+  pedestrians?: boolean;
 }
 
 const STREET_LENGTH = 300;
@@ -153,7 +155,7 @@ export function createCityScene(options: CityOptions): CityScene {
   scene.add(props);
 
   const vehicles = createTraffic(rng, scene);
-  const people = createPedestrians(rng, scene);
+  const people = options.pedestrians === false ? [] : createPedestrians(rng, scene);
 
   return {
     scene,

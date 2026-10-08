@@ -3,6 +3,7 @@ import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { assetUrl, type AssetManifest, type AssetRecord } from "./manifest";
 import { loadGLTF, loadGltfTexture } from "./loaders";
 import { CLOTH_COLORS, EYE_COLORS, HAIR_COLORS, SKIN_TONES, isRealistic, lookShape, sexOf, type Look } from "./looks";
+import { shapeWeights, type BodyShape } from "./bodyShape";
 import { MorphBody } from "./bodyMorph";
 import { FaceRig, type Mood } from "./face";
 import { STYLISED_HEAD_BOX, headBox, readBodyRest, type BodyRest } from "./procedural/bodyRest";
@@ -83,6 +84,7 @@ export const REAL_FOR_LIFE: Record<string, string> = {
 };
 
 /** Iris colours for the morphable body's eye picture (brown is the picture itself). */
+export const CLOTH_PHYSICS = false;
 const IRIS_COLOURS: Record<string, string | null> = { brown: "#4a2c1a", hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
 
 export class Avatar {
@@ -96,6 +98,8 @@ export class Avatar {
   /** The realistic bodies are the morphable body (bodyMorph.ts); the stylised pair are plain glTF bodies. */
   private morph: MorphBody | null = null;
   private partRoots = new Map<string, THREE.Object3D>();
+  /** A body shape is being previewed with the clothes hidden (see previewShape). */
+  private previewing = false;
   private mixer: THREE.AnimationMixer | null = null;
   private currentAction: THREE.AnimationAction | null = null;
   private clips = new Map<string, THREE.AnimationClip>();
@@ -149,6 +153,7 @@ export class Avatar {
     this.colliders = null;
 
     const wasPlaying = this.currentAction?.getClip().name;
+    this.previewing = false;
     this.clearParts();
     if (this.bodyScene) this.root.remove(this.bodyScene);
     this.mixer?.stopAllAction();
@@ -355,6 +360,29 @@ export class Avatar {
     }
     const resume = playing ?? this.wanted;
     if (resume) this.play(resume, 0);
+  }
+
+  /**
+   * A quick look at a new body shape while a slider is still moving: the body is reshaped in place (a few milliseconds) and the hair and
+   * clothes, which are cut to the body, are hidden. Letting go of the slider calls `setLook({ shape })`, which rebuilds them once.
+   */
+  previewShape(shape: BodyShape): void {
+    if (!this.morph) return;
+    this.morph.apply(shapeWeights(shape));
+    // the clips were fitted to the old skeleton: stand in the rest pose until the final rebuild
+    this.mixer?.stopAllAction();
+    this.currentAction = null;
+    this.skeleton?.pose();
+    for (const part of this.partRoots.values()) part.visible = false;
+    // with the clothes hidden the skin under them must show again (the covered triangles are cut out of the body while they are worn)
+    const mesh = this.bodyMesh;
+    if (mesh && this.originalIndex && !this.previewing) {
+      const ArrayType = this.originalIndex instanceof Uint32Array ? Uint32Array : Uint16Array;
+      mesh.geometry.setIndex(new THREE.BufferAttribute(new ArrayType(this.originalIndex as ArrayLike<number> as never), 1));
+      this.previewing = true;
+    }
+    this.morph.setLayersVisible({ shorts: true, top: shape.sex < 0.5 });
+    this.bodyScene?.updateMatrixWorld(true);
   }
 
   async setLook(patch: Partial<Look>): Promise<void> {
@@ -792,7 +820,8 @@ export class Avatar {
   private buildProceduralGarment(id: string): THREE.Object3D | null {
     if (!this.bodyRest || !this.skeleton || !this.bodyMesh || !this.bodyScene) return null;
     // the people looked at close up get real cloth (a simulation of the hanging part); a crowd gets the cheap sway in the shader
-    const simulate = !!this.face;
+    // the cloth simulation tore at hems while people walked, and cost frames on phones; off until it is robust (the cheap sway still moves long cloth)
+    const simulate = CLOTH_PHYSICS && !!this.face;
     const result = buildGarment(this.bodyRest, id, simulate);
     if (!result) return null;
     const make = () => {

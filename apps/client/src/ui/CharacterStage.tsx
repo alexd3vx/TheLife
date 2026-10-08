@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { Avatar } from "../lab/avatar";
 import { createCharacter } from "../lab/character";
 import type { Look } from "../lab/looks";
+import type { BodyShape } from "../lab/bodyShape";
 import { locomotionRate } from "../lab/locomotion";
 import { getSettings } from "../settings/settings";
 import { addStageEnvironment } from "../lab/stageLight";
@@ -74,6 +75,7 @@ export default function CharacterStage({
   focus = "full",
   backdrop = "studio",
   apiRef,
+  previewShape = null,
 }: {
   look: Look;
   walking: boolean;
@@ -81,13 +83,15 @@ export default function CharacterStage({
   focus?: StageFocus;
   backdrop?: StageBackdrop;
   apiRef?: { current: StageApi | null };
+  /** A body shape being dragged on a slider: shown at once, without rebuilding the clothes (see Avatar.previewShape). */
+  previewShape?: BodyShape | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const focusRef = useRef(focus);
   focusRef.current = focus;
   const backdropRef = useRef(backdrop);
   backdropRef.current = backdrop;
-  const sceneApi = useRef<{ setBackdrop(k: StageBackdrop): void; aim(): void }>({ setBackdrop: () => {}, aim: () => {} });
+  const sceneApi = useRef<{ setBackdrop(k: StageBackdrop): void; aim(): void; refit(h: number): void }>({ setBackdrop: () => {}, aim: () => {}, refit: () => {} });
   const live = useRef<{ avatar: Avatar | null; look: Look; set(look: Look): Promise<void> }>({ avatar: null, look, set: async () => {} });
   const walkRef = useRef(walking);
   walkRef.current = walking;
@@ -100,7 +104,7 @@ export default function CharacterStage({
     const canvas = ref.current!;
     let gone = false;
     let raf = 0;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: "high-performance" });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
@@ -113,7 +117,7 @@ export default function CharacterStage({
     const key = new THREE.DirectionalLight("#fff0da", 2.6);
     key.position.set(-2.5, 3.5, 3.5);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(512, 512);
     Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2.5, bottom: -1, near: 0.5, far: 12 });
     scene.add(key);
     const fill = new THREE.DirectionalLight("#a9bcff", 0.8);
@@ -172,6 +176,10 @@ export default function CharacterStage({
       place();
     };
     sceneApi.current.aim = () => {
+      goal = aimFor(focusRef.current, personHeight);
+    };
+    sceneApi.current.refit = (h: number) => {
+      personHeight = h;
       goal = aimFor(focusRef.current, personHeight);
     };
     let backdropGroup: THREE.Group | null = null;
@@ -324,6 +332,12 @@ export default function CharacterStage({
     void live.current.set(look);
   }, [look]);
 
+  useEffect(() => {
+    const avatar = live.current.avatar;
+    if (!previewShape || !avatar) return;
+    avatar.previewShape(previewShape);
+    sceneApi.current.refit(avatar.headHeight() + 0.14);
+  }, [previewShape]);
   useEffect(() => sceneApi.current.aim(), [focus]);
   useEffect(() => sceneApi.current.setBackdrop(backdrop), [backdrop]);
 

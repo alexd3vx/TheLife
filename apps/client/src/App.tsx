@@ -24,6 +24,7 @@ const AnimEditorPage = lazy(() => import("./lab/AnimEditorPage"));
 const BodyLabPage = lazy(() => import("./lab/BodyLabPage"));
 const HairLabPage = lazy(() => import("./lab/HairLabPage"));
 const CrowdLabPage = lazy(() => import("./lab/CrowdLabPage"));
+const CineLabPage = lazy(() => import("./lab/CineLabPage"));
 const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
@@ -111,6 +112,13 @@ export function App() {
     return (
       <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
         <CrowdLabPage />
+      </Suspense>
+    );
+  }
+  if ((import.meta.env.DEV || admin) && hash.startsWith("#/cine")) {
+    return (
+      <Suspense fallback={<div className="splash" role="status" aria-label="Loading" />}>
+        <CineLabPage />
       </Suspense>
     );
   }
