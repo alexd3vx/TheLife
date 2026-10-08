@@ -16,7 +16,7 @@ export type CityBeat = "arrive" | "ride" | "street" | "face";
 export const CITY_SECS: Record<CityBeat, number> = { arrive: 6, ride: 7, street: 5, face: 4.5 };
 
 const VEHICLE: Record<Tier, { file: string; tint?: string }> = {
-  nepo: { file: "vehicles/suv-luxury.glb" },
+  nepo: { file: "vehicles/suv-luxury.glb", tint: "#16181f" },
   middle: { file: "vehicles/taxi.glb" },
   lapo: { file: "vehicles/van.glb", tint: "#f2c230" },
 };
@@ -248,15 +248,15 @@ export class CityFilm {
     } else if (this.beat === "ride") {
       // alongside the car from the middle of the road, drifting from behind it to the front, the sun behind the camera
       const u = smooth(k);
-      cam.position.set(carX + lerp(7.5, -6.5, u), lerp(1.5, 1.2, u), lerp(1.6, 1.2, u));
+      cam.position.set(carX + lerp(10, -8, u), lerp(1.6, 1.3, u), lerp(2.4, 1.6, u));
       cam.lookAt(carX, 1.0, LANE);
-      fov = lerp(34, 28, u);
+      fov = lerp(44, 34, u);
       cam.position.add(shake(0.8));
     } else if (this.beat === "street") {
       // she steps onto the pavement and walks; the camera keeps pace on the road side
-      cam.position.set(personX - lerp(2.3, 1.2, k), lerp(1.3, 1.4, k), PAVEMENT + lerp(2.9, 2.2, k));
-      cam.lookAt(personX - 0.3, 1.25, PAVEMENT - 0.3);
-      fov = 32;
+      cam.position.set(personX - lerp(3.4, 2.4, k), lerp(1.3, 1.4, k), PAVEMENT + lerp(3.6, 3.0, k));
+      cam.lookAt(personX - 0.3, 1.2, PAVEMENT - 0.3);
+      fov = 36;
       cam.position.add(shake(1.2));
     } else {
       // close-up
