@@ -187,7 +187,7 @@
 .auth.cine .auth-tagline p { margin: 0; font-size: clamp(1rem, 1.5vw, 1.25rem); max-width: 34ch; color: #ffe9cf; }
 .auth.cine .auth-tagline .brand-line { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; font-size: .8rem; color: #a8c8ff; }
 .auth.cine .auth-panel .auth-title, .auth.cine .auth-panel .auth-sub, .auth.cine .auth-panel .brand { display: none; }
-.auth.cine .auth-panel { position: relative; z-index: 2; margin: 5vh 0; border-radius: 22px; padding: 26px 26px 22px; background: rgba(18, 12, 28, .72); backdrop-filter: blur(14px) saturate(1.2); border: 1px solid rgba(168, 200, 255, .22); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); animation: rise-in 1.2s .6s cubic-bezier(.2,.7,.2,1) both; max-height: 84vh; overflow: auto; align-self: center; }
+.auth.cine .auth-panel { position: relative; z-index: 2; margin: 12px 0; border-radius: 22px; padding: 22px 24px 18px; background: rgba(14, 10, 26, .8); border: 1px solid rgba(168, 200, 255, .22); box-shadow: 0 30px 80px rgba(0, 0, 0, .55); animation: rise-in 1.2s .6s cubic-bezier(.2,.7,.2,1) both; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: auto; align-self: center; }
 @keyframes rise-in { from { opacity: 0; transform: translate3d(0, 22px, 0); } to { opacity: 1; transform: none; } }
 @media (max-width: 860px) {
   .auth.cine { grid-template-columns: 1fr; align-content: end; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); gap: 10px; }
@@ -215,3 +215,15 @@
 .auth-film video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .auth-film-shade { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8, 12, 30, .55) 0%, rgba(8, 12, 30, .1) 38%, rgba(8, 12, 30, .55) 100%), radial-gradient(120% 90% at 50% 40%, transparent 50%, rgba(4, 6, 18, .55) 100%); }
 @media (max-width: 860px) { .auth-film-shade { background: linear-gradient(180deg, rgba(8, 12, 30, .6) 0%, rgba(8, 12, 30, .05) 30%, rgba(8, 12, 30, .35) 55%, rgba(8, 12, 30, .8) 100%); } }
+
+/* short screens (a laptop, a phone on its side): everything in the form tightens up so none of it is cut off */
+@media (max-height: 760px) {
+  .auth.cine .auth-panel { padding: 14px 18px 12px; }
+  .auth.cine .form { gap: 8px; }
+  .auth.cine .field { gap: 3px; }
+  .auth.cine .field input { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+  .auth.cine .field-label { font-size: .78rem; }
+  .auth.cine .tabs { margin-bottom: 10px; }
+  .auth.cine .check { min-height: 34px; }
+  .auth.cine .fine { font-size: .7rem; line-height: 1.3; }
+}

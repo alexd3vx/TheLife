@@ -18,11 +18,13 @@ declare global {
 }
 
 const FPS = 24;
-const SECONDS = 12;
+const SECONDS = 24;
 // The sun sits on the +z side, so the buildings on the -z side are in golden light and anyone walking there is lit from the front
 const PAVEMENT = -6.9; // z of the pavement the heroes walk along
 const SHOT_B = 4.2;
 const SHOT_C = 8.2;
+const SHOT_D = 12; // she turns and follows the man down the street, toward the sun
+const SHOT_E = 18; // the camera lifts away over the street
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
@@ -63,7 +65,7 @@ export default function CineLabPage() {
     let simTime = 0;
     let rendered = -1;
 
-    const heroX = (t: number) => -30 + 1.35 * Math.min(t, SHOT_C);
+    const heroX = (t: number) => -30 + 1.35 * Math.min(t, SHOT_C) + (t > SHOT_D ? 1.35 * (t - SHOT_D) : 0);
 
     void Promise.all([createCharacter(WOMAN, { face: true }), createCharacter(MAN, { face: false }), Crowd.load(walkers.length)]).then(([woman, man, crowd]) => {
       if (gone) return;
@@ -98,20 +100,26 @@ export default function CineLabPage() {
       const { woman, man, crowd } = hero;
       if (!woman || !man || !crowd) return;
       const hx = heroX(t);
-      const stopped = t >= SHOT_C;
-      man.root.position.set(heroX(t) + (stopped ? 1.35 * (t - SHOT_C) : 0) + 0.2, 0.22, PAVEMENT - 0.8);
+      const stopped = t >= SHOT_C && t < SHOT_D;
+      man.root.position.set(-30 + 1.35 * t + 0.2, 0.22, PAVEMENT - 0.8);
       man.root.rotation.y = Math.PI / 2;
       woman.root.position.set(hx, 0.22, PAVEMENT);
+      if (t >= SHOT_C && t - dt < SHOT_C) {
+        woman.play("Idle_Loop", 0.4);
+        woman.setSpeed(1);
+      }
+      if (t >= SHOT_D && t - dt < SHOT_D) {
+        woman.play("Walk_Loop", 0.4);
+        woman.setSpeed(locomotionRate(1.35, "Walk_Loop"));
+      }
       if (stopped) {
-        if (t - dt < SHOT_C) {
-          woman.play("Idle_Loop", 0.4);
-          woman.setSpeed(1);
-        }
         // she turns to the camera, then smiles
         const turn = smooth(clamp01((t - SHOT_C - 0.2) / 1.0));
         woman.root.rotation.y = lerp(Math.PI / 2, Math.PI * 0.07, turn);
         woman.setMood("happy", smooth(clamp01((t - SHOT_C - 1.3) / 1.2)) * 0.9);
-        // (no head look-at: from this close it tipped her head down into the collar)
+      } else if (t >= SHOT_D) {
+        woman.root.rotation.y = lerp(Math.PI * 0.07, Math.PI / 2, smooth(clamp01((t - SHOT_D) / 0.8)));
+        woman.setMood("happy", 0.35);
       } else {
         woman.root.rotation.y = Math.PI / 2;
       }
@@ -153,13 +161,26 @@ export default function CineLabPage() {
         look = new THREE.Vector3(hx + 0.35, 1.28, PAVEMENT - 0.4);
         fov = 32;
         pos.add(shake(1.2));
-      } else {
+      } else if (t < SHOT_D) {
         // close-up: a slow push in on her face
         const u = smooth(clamp01((t - SHOT_C) / (SECONDS - SHOT_C)));
         pos = new THREE.Vector3(hx + lerp(-0.5, 0.1, u), lerp(1.58, 1.62, u), PAVEMENT + lerp(2.4, 1.6, u));
         look = new THREE.Vector3(hx, 1.6, PAVEMENT);
         fov = lerp(26, 22, u);
         pos.add(shake(0.5));
+      } else if (t < SHOT_E) {
+        // behind the two of them, low, walking away down the street into the glare of the sun
+        const u = clamp01((t - SHOT_D) / (SHOT_E - SHOT_D));
+        pos = new THREE.Vector3(hx - lerp(9, 7, u), lerp(1.0, 1.25, u), PAVEMENT + lerp(1.7, 1.3, u));
+        look = new THREE.Vector3(hx + 4.2, 1.35, PAVEMENT - 0.5);
+        fov = lerp(38, 32, u);
+        pos.add(shake(1));
+      } else {
+        // the camera lifts up and away, over the street
+        const u = smooth(clamp01((t - SHOT_E) / (SECONDS - SHOT_E)));
+        pos = new THREE.Vector3(hx - lerp(4.6, 52, u), lerp(1.4, 17, u), lerp(-5.0, 3.5, u));
+        look = new THREE.Vector3(hx + lerp(9, 24, u), lerp(1.5, 1.2, u), lerp(-6.8, -2, u));
+        fov = lerp(26, 34, u);
       }
       camera.fov = fov;
       camera.position.copy(pos);

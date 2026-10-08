@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FilmBeat } from "./filmCanvas";
-import { Film3D } from "./film3d";
+import { CITY_SECS, CityFilm, type CityBeat } from "./cityFilm";
 import "./arrival.css";
 
 type Tier = "lapo" | "middle" | "nepo";
@@ -8,16 +7,15 @@ type Tier = "lapo" | "middle" | "nepo";
 interface Beat {
   /** Seconds this part lasts. */
   secs: number;
-  kind: "title" | FilmBeat;
+  kind: "title" | CityBeat;
 }
 
 const TIMELINE: Beat[] = [
-  { secs: 3.4, kind: "title" },
-  { secs: 5.5, kind: "flight" },
-  { secs: 8.2, kind: "landing" },
-  { secs: 4, kind: "taxi" },
-  { secs: 7.5, kind: "ride" },
-  { secs: 3.8, kind: "home" },
+  { secs: 3.2, kind: "title" },
+  { secs: CITY_SECS.arrive, kind: "arrive" },
+  { secs: CITY_SECS.ride, kind: "ride" },
+  { secs: CITY_SECS.street, kind: "street" },
+  { secs: CITY_SECS.face, kind: "face" },
 ];
 
 const WORDS: Record<Tier, { flight: string; flightSub: string; landed: string; landedSub: string; ride: string; rideSub: string; home: string }> = {
@@ -60,7 +58,7 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
   const beat = TIMELINE[i]!;
   const words = WORDS[tier];
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderer = useRef<Film3D | null>(null);
+  const renderer = useRef<CityFilm | null>(null);
 
   // The page around the film redraws all the time; the film's own clock must not restart each time it does.
   const done = useRef(onDone);
@@ -74,9 +72,9 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const r = new Film3D(canvas, tier, look ?? undefined);
+    const r = new CityFilm(canvas, tier, look ?? undefined);
     renderer.current = r;
-    if (import.meta.env.DEV) (window as unknown as { __film?: Film3D }).__film = r;
+    if (import.meta.env.DEV) (window as unknown as { __film?: CityFilm }).__film = r;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -114,25 +112,10 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
         </div>
       )}
 
-      {beat.kind === "flight" && (
+      {beat.kind === "arrive" && (
         <div className="film-caption">
           <small>{words.flight}</small>
           <p>{words.flightSub}</p>
-        </div>
-      )}
-
-      {beat.kind === "landing" && (
-        <div className="film-caption">
-          <small>Lagos, evening</small>
-          <p>Lights below. Wheels down in a moment.</p>
-        </div>
-      )}
-
-      {beat.kind === "taxi" && (
-        <div className="film-landed">
-          <small>{words.landed}</small>
-          <h2>Murtala Muhammed International</h2>
-          <p>{words.landedSub}</p>
         </div>
       )}
 
@@ -143,9 +126,17 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
         </div>
       )}
 
-      {beat.kind === "home" && (
+      {beat.kind === "street" && (
         <div className="film-landed">
-          <small>Your door</small>
+          <small>{words.landed}</small>
+          <h2>Welcome to Lagos</h2>
+          <p>{words.landedSub}</p>
+        </div>
+      )}
+
+      {beat.kind === "face" && (
+        <div className="film-landed">
+          <small>Your life starts here</small>
           <h2>{words.home}</h2>
         </div>
       )}

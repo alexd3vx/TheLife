@@ -17,6 +17,8 @@ import { createBus, createCar } from "./vehicles";
 
 export interface CityScene {
   scene: THREE.Scene;
+  /** The traffic, so a film can keep it clear of its own vehicle. */
+  vehicles: { object: THREE.Object3D; speed: number; direction: 1 | -1 }[];
   /** Keeps the sky centred on the camera and moves cars and people. */
   update(deltaSeconds: number, camera: THREE.Camera): void;
   dispose(): void;
@@ -162,6 +164,7 @@ export function createCityScene(options: CityOptions): CityScene {
 
   return {
     scene,
+    vehicles,
     update(delta, camera) {
       sky.position.copy(camera.position);
       for (const vehicle of vehicles) {
