@@ -417,3 +417,11 @@ Chronological record of decisions and changes. Newest first.
 - `Idle_Loop` is now the relaxed stand with a 4 s breath, a drifting head and a small weight shift (`lifeClips.ts`), instead of a frozen frame.
 - New moves: `Life_Toilet_Loop` (leaning forward, hands together) for the toilet and `Life_Sit_Loop` (relaxed, leaning back a little, head drifting) for the sofa and sitting. The shower (`Life_Wash_Loop`, hands scrubbing the hair) and cooking (`Life_Cook_Loop`, stirring) are made in code too, replacing the closest-hand-movement stand-ins.
 - Still not real: a motion-captured shower, toilet and cooking clip. The free libraries have none; these are authored poses, good at the home's distance.
+
+## Character creation on phones: lighter stage
+
+- `lab/renderTier.ts` (`liteRender()`): a touch screen, 4 GB of memory or fewer, or 4 cores or fewer (or `?lite=1`) gets the light stage.
+- Light stage: no shadow map (a soft blob under the feet instead), no anti-aliasing on dense screens, pixel ratio 1.5 at most, 30 frames a second, plain standard skin without clear coat and sheen, hair without the sheen pass. In the software renderer used for tests a frame went from about 146 ms to about 60 ms.
+- Hairstyles no longer re-measure the head each time (`measureHead` is cached per body, it was the slowest part): a hair change went from 100 to 340 ms down to 25 to 70 ms. The head-surface grid is a little coarser (72 by 26).
+- Dragging a body slider reshapes the body at most about 14 times a second on a phone, and the newest value only; letting go cancels what was waiting.
+- A rebuild on a phone builds one piece at a time with a breath between them, so it is several short jobs and not one freeze.

@@ -7,6 +7,7 @@ import type { BodyShape } from "../lab/bodyShape";
 import { locomotionRate } from "../lab/locomotion";
 import { getSettings } from "../settings/settings";
 import { addStageEnvironment } from "../lab/stageLight";
+import { liteRender } from "../lab/renderTier";
 
 /**
  * The person on a small stage, in 3D: the very same character the game plays (same build path, same look, same clips), lit like a
@@ -104,19 +105,23 @@ export default function CharacterStage({
     const canvas = ref.current!;
     let gone = false;
     let raf = 0;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+    const lite = liteRender();
+    // On a phone: no anti-aliasing (the screen is dense enough that edges are already fine), no shadow map, a smaller picture and 30 frames
+    // a second. The stage is a small box, so the person still looks sharp.
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite && (window.devicePixelRatio || 1) < 2, alpha: true, powerPreference: "high-performance" });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = !lite;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
+    if (import.meta.env.DEV) (window as unknown as { __stage: unknown }).__stage = { renderer, scene };
     const dropEnvironment = addStageEnvironment(renderer, scene, 0.5);
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 40);
     // portrait lighting: warm key from the front-left, cool fill from the right, a rim from behind
     scene.add(new THREE.HemisphereLight("#fff1dc", "#6b7a99", 1.0));
     const key = new THREE.DirectionalLight("#fff0da", 2.6);
     key.position.set(-2.5, 3.5, 3.5);
-    key.castShadow = true;
+    key.castShadow = !lite;
     key.shadow.mapSize.set(512, 512);
     Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2.5, bottom: -1, near: 0.5, far: 12 });
     scene.add(key);
@@ -131,6 +136,21 @@ export default function CharacterStage({
     disc.position.y = -0.03;
     disc.receiveShadow = true;
     scene.add(disc);
+    if (lite) {
+      // with no shadow map, a soft dark blob under the feet keeps the person standing on the stage
+      const c = document.createElement("canvas");
+      c.width = c.height = 64;
+      const g = c.getContext("2d")!;
+      const grad = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+      grad.addColorStop(0, "rgba(10,20,50,0.5)");
+      grad.addColorStop(1, "rgba(10,20,50,0)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+      const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+      blob.rotation.x = -Math.PI / 2;
+      blob.position.y = 0.004;
+      scene.add(blob);
+    }
     const holder = new THREE.Group();
     scene.add(holder);
 
@@ -169,7 +189,7 @@ export default function CharacterStage({
     const fit = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, getSettings().resolution));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? 1.5 : getSettings().resolution));
       renderer.setSize(w, h, false);
       goal = aimFor(focusRef.current, personHeight);
       if (snapNext) Object.assign(cam, goal);
@@ -225,7 +245,11 @@ export default function CharacterStage({
             const patch: Partial<Look> = {};
             for (const k of Object.keys(target) as (keyof Look)[]) if (JSON.stringify(target[k]) !== JSON.stringify(current[k])) (patch as Record<string, unknown>)[k] = target[k];
             current = target;
-            if (Object.keys(patch).length) await live.current.avatar.setLook(patch);
+            if (Object.keys(patch).length) {
+              const t0 = performance.now();
+              await live.current.avatar.setLook(patch);
+              if (import.meta.env.DEV) (window as unknown as { __setLog: unknown[] }).__setLog = [...((window as unknown as { __setLog?: unknown[] }).__setLog ?? []), [Object.keys(patch).join(","), Math.round(performance.now() - t0)]];
+            }
             personHeight = live.current.avatar.headHeight() + 0.14;
             fit();
           }
@@ -261,6 +285,7 @@ export default function CharacterStage({
     let last = performance.now();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      if (lite && now - last < 30) return; // every other frame on a 60 Hz screen
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       yaw += (target - yaw) * Math.min(1, dt * 10);
@@ -332,11 +357,29 @@ export default function CharacterStage({
     void live.current.set(look);
   }, [look]);
 
+  // A slider dragged on a phone can send a change every few milliseconds; reshaping the body is a sum over thousands of vertices, so only the
+  // newest value is applied, at most about 14 times a second on a phone (and once a frame elsewhere). Letting go cancels what is waiting.
+  const previewTimer = useRef(0);
+  const previewLatest = useRef<BodyShape | null>(null);
+  const previewLast = useRef(0);
   useEffect(() => {
-    const avatar = live.current.avatar;
-    if (!previewShape || !avatar) return;
-    avatar.previewShape(previewShape);
-    sceneApi.current.refit(avatar.headHeight() + 0.14);
+    previewLatest.current = previewShape;
+    if (!previewShape) {
+      window.clearTimeout(previewTimer.current);
+      previewTimer.current = 0;
+      return;
+    }
+    if (previewTimer.current) return;
+    const wait = Math.max(0, previewLast.current + (liteRender() ? 70 : 16) - performance.now());
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = 0;
+      const avatar = live.current.avatar;
+      const shape = previewLatest.current;
+      if (!shape || !avatar) return;
+      previewLast.current = performance.now();
+      avatar.previewShape(shape);
+      sceneApi.current.refit(avatar.headHeight() + 0.14);
+    }, wait);
   }, [previewShape]);
   useEffect(() => sceneApi.current.aim(), [focus]);
   useEffect(() => sceneApi.current.setBackdrop(backdrop), [backdrop]);

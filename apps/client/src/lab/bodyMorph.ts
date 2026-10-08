@@ -29,6 +29,7 @@ export interface MorphMeta {
 export { DEFAULT_SHAPE, shapeWeights, type BodyShape } from "./bodyShape";
 import { shapeWeights, type BodyShape } from "./bodyShape";
 import { skinTextures } from "./procedural/skinTexture";
+import { liteRender } from "./renderTier";
 
 interface Part {
   mesh: THREE.SkinnedMesh;
@@ -178,14 +179,20 @@ export class MorphBody {
    */
   private upgradeSkin(old: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
     const part = this.parts.get("Body");
-    const mat = new THREE.MeshPhysicalMaterial();
+    // The clear coat and sheen are a second and third lighting pass for every skin pixel: too much for a phone's GPU, which keeps plain
+    // standard skin (still with the pore bumps).
+    const lite = liteRender();
+    const mat = lite ? new THREE.MeshStandardMaterial() : new THREE.MeshPhysicalMaterial();
     THREE.MeshStandardMaterial.prototype.copy.call(mat, old);
     mat.roughness = 0.58;
-    mat.clearcoat = 0.1;
-    mat.clearcoatRoughness = 0.42;
-    mat.sheen = 0.3;
-    mat.sheenRoughness = 0.55;
-    mat.sheenColor = new THREE.Color("#8a5a44");
+    if (!lite) {
+      const phys = mat as THREE.MeshPhysicalMaterial;
+      phys.clearcoat = 0.1;
+      phys.clearcoatRoughness = 0.42;
+      phys.sheen = 0.3;
+      phys.sheenRoughness = 0.55;
+      phys.sheenColor = new THREE.Color("#8a5a44");
+    }
     const pores = skinTextures().normal.clone();
     pores.wrapS = pores.wrapT = THREE.RepeatWrapping;
     pores.repeat.set(9, 9);

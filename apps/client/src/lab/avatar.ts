@@ -19,6 +19,7 @@ import { buildShoes, isShoe, type ShoeId } from "./procedural/shoes";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
+import { liteRender } from "./renderTier";
 import { animConfig, derive } from "./animConfig";
 import { KAYKIT_BONES, MIXAMO_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
 
@@ -84,6 +85,11 @@ export const REAL_FOR_LIFE: Record<string, string> = {
 /** Iris colours for the morphable body's eye picture (brown is the picture itself). */
 export const CLOTH_PHYSICS = false;
 const IRIS_COLOURS: Record<string, string | null> = { brown: "#4a2c1a", hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
+
+/** Gives the browser a turn (touches, a frame) between two big jobs. */
+function yieldToPaint(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
 
 /** One moment of a clip held as a still pose (a two-key clip that never moves). */
 function holdPose(moving: THREE.AnimationClip, name: string): THREE.AnimationClip {
@@ -656,6 +662,9 @@ export class Avatar {
         this.partRoots.delete(slot);
       }
       if (!want) continue;
+      // one piece at a time with a breath between them, so a rebuild is several short jobs and not one long freeze (touch and the stage stay alive)
+      if (liteRender()) await yieldToPaint();
+      if (token !== this.loadToken) return;
       const part = await this.buildPart(want.id, want.kind);
       if (token !== this.loadToken || !part) return;
       this.partRoots.set(slot, part);
@@ -752,7 +761,7 @@ export class Avatar {
     if (!result) return null;
     const material = new THREE.MeshPhysicalMaterial({
       map: hairTexture(result.texture, result.repeat),
-      sheen: 0.9,
+      sheen: liteRender() ? 0 : 0.9, // (the sheen is an extra lighting pass over every hair pixel: off on phones)
       sheenRoughness: 0.5,
       sheenColor: new THREE.Color("#7d6a5a"),
       roughness: result.texture === "wrap" ? 0.7 : 0.95,

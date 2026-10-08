@@ -32,12 +32,23 @@ export interface Head {
   k?: Float32Array;
 }
 
-const SURF_U = 96;
-const SURF_V = 34;
+const SURF_U = 72;
+const SURF_V = 26;
 const SURF_V0 = -0.55;
 
-/** The cranium's size and position, measured from the body's own head vertices. */
+const headCache = new WeakMap<BodyRest, Head>();
+
+/** The cranium's size and position, measured from the body's own head vertices. The same body is measured once (it is the slow part of every hairstyle). */
 export function measureHead(rest: BodyRest): Head {
+  let head = headCache.get(rest);
+  if (!head) {
+    head = measureHeadNow(rest);
+    headCache.set(rest, head);
+  }
+  return head;
+}
+
+function measureHeadNow(rest: BodyRest): Head {
   const headIndex = rest.boneIndex.get("Head");
   const neckY = jointPos(rest, "neck_01").y;
   const pos = rest.geometry.getAttribute("position");
