@@ -15,6 +15,7 @@ import { buildGarment, coversLegs, isProceduralGarment, tieTriangles } from "./p
 import { buildGeometry } from "./procedural/geometryClip";
 import { buildHair } from "./procedural/hair";
 import { buildAccessory } from "./procedural/accessories";
+import { buildShoes, isShoe, type ShoeId } from "./procedural/shoes";
 import { hairTexture } from "./procedural/hairTextures";
 import { skinTextures } from "./procedural/skinTexture";
 import { buildLifeClips } from "./procedural/lifeClips";
@@ -22,7 +23,7 @@ import { animConfig, derive } from "./animConfig";
 import { KAYKIT_BONES, MIXAMO_BONES, captureRest, retargetClip, type RestPose } from "./retarget";
 
 /** hair/clothing come from glTF files; proc-* are generated in code from the body. */
-type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment" | "proc-acc";
+type PartKind = "hair" | "clothing" | "proc-hair" | "proc-garment" | "proc-acc" | "proc-shoe";
 
 /** Body areas (by bone) that a garment covers; those triangles are removed from the skin mesh so skin never pokes through. */
 const COVERED_BONES: Record<string, string[]> = {
@@ -399,6 +400,13 @@ export class Avatar {
     if (patch.accessoryColor !== undefined) this.applyAccessoryColor();
     if (patch.height !== undefined || patch.build !== undefined) this.applyShape();
     if (patch.brows !== undefined) this.applyBuiltInBrows();
+    if (patch.shoesColor !== undefined) {
+      const shoes = this.partRoots.get("shoes");
+      if (shoes?.userData.kind === "proc-shoe") {
+        this.detachPart(shoes);
+        this.partRoots.delete("shoes");
+      }
+    }
     if (patch.outfitVariant !== undefined || patch.topColor !== undefined || patch.bottomColor !== undefined || patch.shoesColor !== undefined) {
       await this.applyOutfitTextures();
       await this.applyProceduralMaterials();
@@ -575,7 +583,7 @@ export class Avatar {
   // ------------------------------------------------------------------ attached parts (hair, clothing)
 
   private clearParts(): void {
-    for (const part of this.partRoots.values()) part.parent?.remove(part);
+    for (const part of this.partRoots.values()) this.detachPart(part);
     this.partRoots.clear();
   }
 
@@ -602,6 +610,7 @@ export class Avatar {
     const shoes = s === "none" ? this.look.shoes : null;
     const clothing = (outfit: string | null, slot: string) => {
       if (!outfit) return null;
+      if (slot === "shoes" && outfit && isShoe(outfit)) return { id: outfit, kind: "proc-shoe" as const };
       if (isProceduralGarment(outfit)) return slot === "top" || slot === "bottom" || slot === "shoes" ? { id: outfit, kind: "proc-garment" as const } : null;
       const id = `${body}_${outfit}_${slot}`;
       return this.find(id) ? { id, kind: "clothing" as const } : null;
@@ -629,8 +638,7 @@ export class Avatar {
       const current = this.partRoots.get(slot);
       if (current && current.userData.assetId === want?.id) continue;
       if (current) {
-        for (const sim of (current.userData.sims as ClothSim[] | undefined) ?? []) sim.dispose();
-        current.parent?.remove(current);
+        this.detachPart(current);
         this.partRoots.delete(slot);
       }
       if (!want) continue;
@@ -659,6 +667,7 @@ export class Avatar {
     if (kind === "proc-hair") return this.buildProceduralHair(id);
     if (kind === "proc-garment") return this.buildProceduralGarment(id);
     if (kind === "proc-acc") return this.buildProceduralAccessory(id);
+    if (kind === "proc-shoe") return this.buildShoe(id as ShoeId);
     const record = this.asset(id);
     const gltf = await loadGLTF(assetUrl(record.file));
     const clone = SkeletonUtils.clone(gltf.scene);
@@ -774,6 +783,45 @@ export class Avatar {
     group.add(mesh);
     bone.add(group);
     return group;
+  }
+
+  /** Real shoes: separate pieces built round the wearer's own foot, riding on the foot bones (see procedural/shoes.ts). */
+  private buildShoe(id: ShoeId): THREE.Object3D | null {
+    const rest = this.bodyRest;
+    if (!rest || !this.skeleton || !this.bodyScene) return null;
+    const colour = CLOTH_COLORS.find((c) => c.id === this.look.shoesColor)?.color ?? "#26262a";
+    const result = buildShoes(rest, id, colour);
+    if (!result) return null;
+    const group = new THREE.Group();
+    group.userData.assetId = id;
+    group.userData.kind = "proc-shoe";
+    group.userData.slot = "shoes";
+    group.userData.covers = result.covers;
+    const attached: THREE.Object3D[] = [];
+    for (const foot of result.feet) {
+      const bone = this.skeleton.bones.find((b) => b.name === foot.bone);
+      if (!bone) continue;
+      const material = new THREE.MeshStandardMaterial({ roughness: result.roughness, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(foot.geometry, material);
+      mesh.castShadow = true;
+      mesh.frustumCulled = false;
+      bone.add(mesh);
+      attached.push(mesh);
+    }
+    // the pieces ride on the feet; the group only remembers them so the shoe can be taken off again
+    group.userData.attached = attached;
+    this.bodyScene.add(group);
+    return group;
+  }
+
+  /** Takes a part off the person, including pieces that ride on bones. */
+  private detachPart(part: THREE.Object3D): void {
+    for (const sim of (part.userData.sims as ClothSim[] | undefined) ?? []) sim.dispose();
+    for (const piece of (part.userData.attached as THREE.Object3D[] | undefined) ?? []) {
+      piece.parent?.remove(piece);
+      (piece as THREE.Mesh).geometry?.dispose();
+    }
+    part.parent?.remove(part);
   }
 
   /** A necktie: a strip cut from the chest, so it moves with the body like the clothes do. */

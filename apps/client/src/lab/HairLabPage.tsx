@@ -45,10 +45,10 @@ export default function HairLabPage() {
       cam.aspect = w / h;
       cam.updateProjectionMatrix();
       const head = avatar?.headHeight() ?? 1.65;
-      const full = v === "full" || v === "upper" || v === "lower" || v === "feet";
-      const d = v === "full" ? 5.2 : v === "upper" ? 2.9 : v === "lower" ? 3.2 : v === "feet" ? 1.8 : 1.25;
-      const aim = v === "upper" ? 1.2 : v === "lower" ? 0.55 : v === "feet" ? 0.15 : 0.9;
-      const angle = v === "front" ? 0 : v === "side" ? Math.PI / 2 : v === "back" ? Math.PI : v === "three" ? Math.PI / 4 : 0;
+      const full = v === "full" || v === "upper" || v === "lower" || v === "feet" || v === "feet3" || v === "feetSide";
+      const d = v === "full" ? 5.2 : v === "upper" ? 2.9 : v === "lower" ? 3.2 : v === "feet" || v === "feet3" || v === "feetSide" ? 1.8 : 1.25;
+      const aim = v === "upper" ? 1.2 : v === "lower" ? 0.55 : v === "feet" || v === "feet3" || v === "feetSide" ? 0.15 : 0.9;
+      const angle = v === "front" ? 0 : v === "side" ? Math.PI / 2 : v === "back" ? Math.PI : v === "three" ? Math.PI / 4 : v === "feet3" ? Math.PI * 0.3 : v === "feetSide" ? Math.PI / 2 : 0;
       const up = v === "top" ? 0.9 : 0;
       cam.position.set(Math.sin(angle) * d * Math.cos(up), full ? aim + 0.1 : head + 0.04 + Math.sin(up) * d, Math.cos(angle) * d * Math.cos(up));
       cam.lookAt(0, full ? aim : head + 0.02, 0);
