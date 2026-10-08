@@ -6,13 +6,14 @@ import { AuthFilm } from "./AuthFilm";
 type Tab = "login" | "signup";
 
 interface FormState {
+  username: string;
   email: string;
   password: string;
   confirmPassword: string;
   isAdult: boolean;
 }
 
-const EMPTY_FORM: FormState = { email: "", password: "", confirmPassword: "", isAdult: false };
+const EMPTY_FORM: FormState = { username: "", email: "", password: "", confirmPassword: "", isAdult: false };
 
 export function AuthPage() {
   const { service, save, playOffline, startOver } = useAuth();
@@ -50,7 +51,7 @@ export function AuthPage() {
     try {
       const email = form.email.trim();
       const result =
-        tab === "login" ? await service.signIn(email, form.password) : await service.signUp(email, form.password);
+        tab === "login" ? await service.signIn(email, form.password) : await service.signUp(email, form.password, form.username.trim());
       if (!result.ok) {
         setFormError(result.message);
       } else if (result.needsEmailConfirmation) {
@@ -144,6 +145,22 @@ export function AuthPage() {
         )}
 
         <form className="form" onSubmit={handleSubmit} noValidate>
+          {isSignUp && (
+            <Field label="Username" error={errors.username}>
+              <input
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={20}
+                value={form.username}
+                onChange={(e) => update("username", e.target.value)}
+                aria-invalid={!!errors.username}
+                placeholder="What other players call you"
+              />
+            </Field>
+          )}
+
           <Field label="Email" error={errors.email}>
             <input
               type="email"

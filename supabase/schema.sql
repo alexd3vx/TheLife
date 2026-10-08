@@ -45,12 +45,23 @@ create trigger saves_touch before update on public.saves for each row execute fu
 
 -- Create the profile row when a user signs up.
 create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  wanted text := left(coalesce(nullif(btrim(new.raw_user_meta_data ->> 'username'), ''), nullif(split_part(new.email, '@', 1), ''), 'Player'), 20);
+  chosen text := wanted;
 begin
-  insert into public.profiles (id, display_name)
-  values (new.id, left(coalesce(nullif(split_part(new.email, '@', 1), ''), 'Player'), 20))
-  on conflict (id) do nothing;
+  -- the sign-up form already checks the name is free; if two people race for it, the second gets a number added
+  while exists (select 1 from public.profiles where lower(display_name) = lower(chosen)) loop
+    chosen := left(wanted, 16) || (100 + floor(random() * 900))::int;
+  end loop;
+  insert into public.profiles (id, display_name) values (new.id, chosen) on conflict (id) do nothing;
   return new;
 end $$;
+
+-- Is this username free? The sign-up form asks before it creates the account (it cannot read other people's profiles itself).
+create or replace function public.username_available(u text) returns boolean language sql security definer set search_path = public stable as $$
+  select not exists (select 1 from public.profiles where lower(display_name) = lower(btrim(u)));
+$$;
+grant execute on function public.username_available(text) to anon, authenticated;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
 

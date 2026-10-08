@@ -55,7 +55,8 @@ export function createDevService(): AuthService {
       if (!user || user.password !== password) return { ok: false, message: "Wrong email or password." };
       return { ok: true, user: startSession(user) };
     },
-    async signUp(email, password): Promise<AuthResult> {
+    async signUp(email, password, username): Promise<AuthResult> {
+      void username;
       const normalized = email.trim().toLowerCase();
       const users = readUsers();
       if (users.some((u) => u.email === normalized)) {

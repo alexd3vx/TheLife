@@ -1,6 +1,7 @@
 export const MIN_PASSWORD_LENGTH = 8;
 
 export interface SignUpInput {
+  username: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -17,6 +18,16 @@ export function validateEmail(email: string): string | null {
   if (trimmed.length > 254 || !EMAIL_PATTERN.test(trimmed)) {
     return "That doesn't look like a valid email address.";
   }
+  return null;
+}
+
+/** The name other players see: 3 to 20 letters, numbers or underscores. */
+export function validateUsername(username: string): string | null {
+  const trimmed = username.trim();
+  if (!trimmed) return "Pick a username.";
+  if (trimmed.length < 3) return "Use at least 3 characters.";
+  if (trimmed.length > 20) return "Use 20 characters or fewer.";
+  if (!/^[A-Za-z0-9_]+$/.test(trimmed)) return "Letters, numbers and underscores only.";
   return null;
 }
 
@@ -44,6 +55,8 @@ export function validateLogin(
 
 export function validateSignUp(input: SignUpInput): FieldErrors<SignUpInput> {
   const errors: FieldErrors<SignUpInput> = {};
+  const usernameError = validateUsername(input.username);
+  if (usernameError) errors.username = usernameError;
   const emailError = validateEmail(input.email);
   if (emailError) errors.email = emailError;
   const passwordError = validatePassword(input.password);

@@ -9,6 +9,7 @@ function toAuthUser(user: User | null | undefined): AuthUser | null {
 function friendlyMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("invalid login")) return "Wrong email or password.";
+  if (lower.includes("database error saving new user")) return "That username is taken. Try another.";
   if (lower.includes("already registered")) return "An account with this email already exists. Try logging in.";
   if (lower.includes("rate limit")) return "Too many attempts. Please wait a moment and try again.";
   if (lower.includes("email not confirmed")) return "Please confirm your email first — check your inbox.";
@@ -41,8 +42,11 @@ export function createSupabaseService(url: string, anonKey: string): AuthService
       return { ok: true, user: toAuthUser(data.user) };
     },
 
-    async signUp(email, password): Promise<AuthResult> {
-      const { data, error } = await client.auth.signUp({ email, password });
+    async signUp(email, password, username): Promise<AuthResult> {
+      // is the name free? (the database answers; if its setup has not been run yet there is no answer and we go on)
+      const free = await client.rpc("username_available", { u: username });
+      if (!free.error && free.data === false) return { ok: false, message: "That username is taken. Try another." };
+      const { data, error } = await client.auth.signUp({ email, password, options: { data: { username } } });
       if (error) return { ok: false, message: friendlyMessage(error.message) };
       // With email confirmation enabled Supabase returns a user but no session.
       return { ok: true, user: toAuthUser(data.session?.user), needsEmailConfirmation: !data.session };

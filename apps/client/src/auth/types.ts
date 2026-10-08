@@ -20,7 +20,7 @@ export interface AuthService {
   getUser(): Promise<AuthUser | null>;
   onChange(listener: (user: AuthUser | null) => void): () => void;
   signIn(email: string, password: string): Promise<AuthResult>;
-  signUp(email: string, password: string): Promise<AuthResult>;
+  signUp(email: string, password: string, username: string): Promise<AuthResult>;
   signOut(): Promise<void>;
   /** A fresh access token for the game server, or null when there is no real account. */
   getAccessToken(): Promise<string | null>;
