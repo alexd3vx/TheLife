@@ -160,7 +160,7 @@ if (edge > 0.0) {
 }
 // The shore: a pale strip of sand where the land is about to end.
 float shore = smoothstep(0.82, 0.52, land);
-col = mix(col, vec3(0.78, 0.72, 0.58), shore * 0.7);
+col = mix(col, vec3(0.78, 0.72, 0.58), shore * 0.7 * (edge > 0.0 ? 0.0 : 1.0)); // no sand along a street's edge: on a bridge that edge is the deck
 diffuseColor.rgb = col;
 `,
       );

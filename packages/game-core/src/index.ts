@@ -33,3 +33,4 @@ export * from "./shop.js";
 export * from "./police.js";
 export * from "./worship.js";
 export * from "./school.js";
+export { findBridges, type BridgeSpan } from "./bridges.js";

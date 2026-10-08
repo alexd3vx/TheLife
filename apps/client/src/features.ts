@@ -4,8 +4,6 @@
  * own device with `localStorage.setItem("thelife.unlock", "1")` in the browser console.
  */
 export const LOCKED_FEATURES: Record<string, { title: string; note: string }> = {
-  map: { title: "The city map", note: "The map of Lagos is being rebuilt, with real streets, water and bridges. For now your life happens at home." },
-  maps: { title: "Maps", note: "Maps comes back with the city map." },
   gram: { title: "LifeGram", note: "LifeGram, the photo feed, is being built." },
   chirp: { title: "Chirp", note: "Chirp, the short-post feed, is being built." },
 };

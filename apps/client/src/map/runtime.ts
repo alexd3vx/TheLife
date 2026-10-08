@@ -13,6 +13,7 @@ import { grassTexture } from "../play/world";
 import type { TapMenu } from "../play/runtime";
 import { buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
 import { buildTerrain } from "./terrain";
+import { buildBridges } from "./bridges";
 import { Pedestrians } from "./pedestrians";
 import { AdaptiveQuality } from "../graphics";
 import { getSettings, shadowMapSize, subscribeSettings, type Settings } from "../settings/settings";
@@ -179,6 +180,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   // Ground: water, streets, blocks and parks painted into textures that follow the player.
   const terrain = buildTerrain(district);
   scene.add(terrain.group);
+  const bridges = buildBridges(district);
+  scene.add(bridges.group);
 
   // Map pins floating above every named place.
   const pinSprites: THREE.Sprite[] = [];
@@ -290,6 +293,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     const inside = lot !== null;
     streamer.root.visible = !inside;
     terrain.setVisible(!inside);
+    bridges.setVisible(!inside);
     peds.setVisible(!inside);
     traffic.setVisible(!inside);
     doors.setVisible(!inside);
@@ -945,6 +949,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     },
     dispose() {
       terrain.dispose();
+      bridges.dispose();
       unsubscribeSettings();
       fx?.dispose();
       remotes.dispose();

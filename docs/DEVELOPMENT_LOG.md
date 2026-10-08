@@ -401,3 +401,12 @@ Chronological record of decisions and changes. Newest first.
 - Fixed on the way: `RemotePlayers.remove` crashed on characters with several materials (it blocked other players leaving the street).
 - The map is locked, and places are entered from the map. Everything above works behind `localStorage.setItem("thelife.unlock", "1")`; players will meet in places once the map is open again.
 - **The VPS needs the update** (new protocol messages).
+
+
+## Map unlocked: 3D bridges
+
+- `packages/game-core/src/bridges.ts` (`findBridges`) finds the places where a street has lagoon on both sides (the island data paints a bridge as ordinary street): 12 crossings, the longest about 300 m. Test in `bridges.test.ts`.
+- `apps/client/src/map/bridges.ts` builds one merged mesh for all of them: deck underside and side girders, parapet and rail on each side, a median on the wide ones, piers standing in the water every 26 to 34 m, lamp posts. The street surface is still the ground shader's.
+- The sand tint along the shore no longer paints a street's edge, so a bridge deck has no sand strip.
+- The `map` and `maps` locks are removed from `features.ts`; chat, LifeGram and Chirp stay locked.
+- Not done: raised arches (the walking surface is flat, so decks stay level with the ground), cable-stayed towers, the mainland ends of the long bridges (the island data stops at the lagoon edge).
