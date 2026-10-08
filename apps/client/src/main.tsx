@@ -4,6 +4,7 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
 import { Boot } from "./boot/Boot";
 import { installCachedFetch } from "./boot/assetCache";
+import CallOverlay from "./net/CallOverlay";
 import { startPwa } from "./pwa/pwa";
 import "./styles/global.css";
 import "./styles/auth.css";
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
     <Boot>
       <AuthProvider>
         <App />
+        <CallOverlay />
       </AuthProvider>
     </Boot>
   </StrictMode>,

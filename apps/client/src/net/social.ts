@@ -15,6 +15,8 @@ export interface Line {
 export interface Thread {
   uid: string;
   name: string;
+  /** Their phone number, once known. */
+  phone?: string;
   lines: Line[];
   unread: number;
 }
@@ -27,6 +29,7 @@ export interface Thread {
 class Social {
   selfId = "";
   selfUid = "";
+  selfPhone = "";
   threads = new Map<string, Thread>();
   people = new Map<string, PlayerView>();
   nearby: Line[] = [];
@@ -84,21 +87,26 @@ class Social {
       case "welcome":
         this.selfId = m.id;
         if (m.uid) this.selfUid = m.uid;
+        if (m.phone) this.selfPhone = m.phone;
         this.people = new Map(m.players.map((p) => [p.id, p]));
         for (const p of m.players) if (p.uid && this.threads.has(p.uid)) this.threads.get(p.uid)!.name = p.name;
         break;
       case "inbox":
         for (const t of m.threads) {
           const th = this.thread(t.uid, t.name);
+          if (t.phone) th.phone = t.phone;
           th.lines = t.msgs.map((x) => ({ id: this.n++, from: x.from, name: x.from === this.selfUid ? "You" : t.name, text: x.text, at: x.at, mine: x.from === this.selfUid }));
           // what came while you were away counts as unread
           th.unread = t.msgs.filter((x) => x.from !== this.selfUid).length > 0 && th.lines.at(-1)?.mine === false ? 1 : 0;
         }
         break;
-      case "person":
-        this.thread(m.uid, m.name);
+      case "person": {
+        const th = this.thread(m.uid, m.name);
+        if (m.phone) th.phone = m.phone;
+        this.pendingThread = m.uid;
         this.lastError = "";
         break;
+      }
       case "join":
         this.people.set(m.player.id, m.player);
         if (m.player.uid && this.threads.has(m.player.uid)) this.threads.get(m.player.uid)!.name = m.player.name;
@@ -123,7 +131,7 @@ class Social {
         break;
       }
       case "error":
-        if (/player with that ID|own ID|typing too fast|Nobody is near/.test(m.reason)) this.lastError = m.reason;
+        if (/player with that|own ID|own number|typing too fast|Nobody is near|enough money|yourself|whole amount|one payment|too many payments|phone number/.test(m.reason)) this.lastError = m.reason;
         else return;
         break;
       default:
@@ -171,9 +179,20 @@ class Social {
     this.lastError = "";
     world.send({ t: "find", uid: uid.trim().toLowerCase() });
   }
+  /** Looks somebody up by their phone number (any way of writing it). */
+  findPhone(phone: string): void {
+    this.lastError = "";
+    world.send({ t: "find", phone });
+  }
+  /** Sends money to a player by their ID (it waits for them if they are away). */
+  pay(uid: string, amount: number): void {
+    this.lastError = "";
+    world.send({ t: "payto", uid, amount: Math.floor(amount) });
+  }
 }
 
 export const social = new Social();
+if (import.meta.env.DEV) (window as unknown as { __social: Social }).__social = social;
 
 /** Re-renders when anything social changes. */
 export function useSocial(): Social {
