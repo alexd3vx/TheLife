@@ -63,7 +63,7 @@ export class CityFilm {
   private released = false;
   private dropEnv: () => void;
 
-  constructor(private canvas: HTMLCanvasElement, private tier: Tier, private lookJson?: string | null) {
+  constructor(private canvas: HTMLCanvasElement, private tier: Tier, private lookJson?: string | null, private opts: { character?: boolean } = {}) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -90,7 +90,7 @@ export class CityFilm {
       });
     });
     void this.loadVehicle();
-    void this.loadCharacter();
+    if (this.opts.character !== false) void this.loadCharacter();
     this.resize();
     window.addEventListener("resize", this.resize);
   }
@@ -101,6 +101,14 @@ export class CityFilm {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   };
+
+  /** The vehicle and the crowd have loaded (the film renderer waits for this). */
+  get ready(): boolean {
+    return !!this.vehicle && !!this.crowd;
+  }
+
+  /** Hides the person (the film renderer makes the empty street for the backdrop with it). */
+  hidePerson = false;
 
   setBeat(kind: CityBeat) {
     this.beat = kind;
@@ -206,7 +214,7 @@ export class CityFilm {
     let focusX = STOP_X;
     if (a) {
       const onFoot = this.beat === "street" || this.beat === "face";
-      a.root.visible = onFoot;
+      a.root.visible = onFoot && !this.hidePerson;
       if (onFoot) {
         const walk = this.beat === "street" ? this.t : CITY_SECS.street;
         const hx = STOP_X - 0.4 - 1.3 * Math.min(walk, CITY_SECS.street);

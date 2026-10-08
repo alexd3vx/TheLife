@@ -38,3 +38,11 @@
 .welcome-text p { margin: 0; opacity: .92; font-size: 1.05rem; }
 .welcome-text em { font-style: normal; opacity: .75; }
 @keyframes welcome-in { 0% { opacity: 0; transform: translate3d(0, 14px, 0); } 18%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* the phone version: a video for the crane and the ride, then a picture of the street behind the live character */
+.film-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s ease; }
+.film-video.is-on { opacity: 1; }
+.film-plate { position: absolute; inset: 0; background: #1a1020 url(/assets/film/arrival-plate.jpg) center / cover no-repeat; opacity: 0; transform: scale(1.12); }
+.film-plate.is-street { opacity: 1; animation: plate-walk 5s linear both; }
+.film-plate.is-face { opacity: 1; filter: blur(7px) brightness(.9); transform: scale(1.5) translateX(-6%); transition: filter 1.2s ease; }
+@keyframes plate-walk { from { transform: scale(1.12) translateX(-4%); } to { transform: scale(1.12) translateX(4%); } }

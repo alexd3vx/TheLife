@@ -39,6 +39,12 @@
 .phone-side .pa-seg button { color: #fff; }
 .phone-side .pa-seg button[aria-pressed="true"] { background: #fff; color: #0b1426; }
 
+/* on a PC the handset has the size of a real phone and is scaled to the window (--fit, set by PhoneUI), so a short window cannot squeeze it */
+@media (min-width: 720px) and (not ((pointer: coarse) and (max-height: 520px))) {
+  .phone-stage { zoom: var(--fit, 1); }
+  .phone { width: 390px; height: 823px; max-width: none; aspect-ratio: auto; }
+}
+
 @media (max-width: 719px), (pointer: coarse) and (max-height: 520px) {
   .phone, .phone-go, .phone-plus, .phone-max { width: 100vw; max-width: none; height: 100dvh; aspect-ratio: auto; padding: 0; border-radius: 0; box-shadow: none; background: var(--bg); }
   .phone .phone-screen { inset: 0; border-radius: 0; box-shadow: none; }

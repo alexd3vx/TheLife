@@ -77,9 +77,9 @@ export const REAL_FOR_LIFE: Record<string, string> = {
   Life_Drink_Loop: "U2_Consume",
   Life_Phone_Loop: "U2_Idle_TalkingPhone_Loop",
   Life_Wave_Loop: "KK_Waving",
-  Life_Cook_Loop: "KK_Work_A",
+  Life_Cook_Loop: "KK_Work_B",
   Life_Type_Loop: "Driving_Loop",
-  Life_Wash_Loop: "KK_Work_C",
+  Life_Wash_Loop: "KK_Working_B",
   Life_Brush_Loop: "KK_Use_Item",
   Life_Read_Loop: "KK_Holding_B",
 };

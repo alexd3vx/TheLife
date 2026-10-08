@@ -53,7 +53,16 @@ interface Props {
   initialApp?: ClientApp | null;
 }
 
+/** A phone on a PC is always drawn at a real phone's size (390 by 823) and then scaled to fit the window, so a short window never squeezes it narrower than a phone. */
+const phoneFit = () => Math.max(0.5, Math.min(1.5, (window.innerHeight - 24) / 823, (window.innerWidth - 16) / 390));
+
 export default function PhoneUI({ session, onClose, initialApp = null }: Props) {
+  const [fit, setFit] = useState(phoneFit);
+  useEffect(() => {
+    const on = () => setFit(phoneFit());
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
   const [, setTick] = useState(0);
   /** Apps that are open (in the background or in front), oldest first. They stay alive so you come back to where you were. */
   const [running, setRunning] = useState<ClientApp[]>([]);
@@ -245,7 +254,7 @@ export default function PhoneUI({ session, onClose, initialApp = null }: Props) 
   const clock = clockOf(state.minute);
   const wall = wallPower(state);
   const unread = unreadCount(phone);
-  const style = { "--phone-speed": `${model.slowness}` } as React.CSSProperties;
+  const style = { "--phone-speed": `${model.slowness}`, "--fit": fit } as React.CSSProperties;
 
   return (
     <div className={`phone-overlay${leaving ? " is-leaving" : ""}`} onPointerDown={(e) => e.target === e.currentTarget && close()} style={style}>

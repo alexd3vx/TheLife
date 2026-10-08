@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CITY_SECS, CityFilm, type CityBeat } from "./cityFilm";
+import { LiteFilm } from "./liteFilm";
 import "./arrival.css";
 
 type Tier = "lapo" | "middle" | "nepo";
@@ -53,12 +54,33 @@ const WORDS: Record<Tier, { flight: string; flightSub: string; landed: string; l
  * the taxi to the terminal, the ride to the front door in a vehicle that matches the person's background, and the door itself. It is real 3D
  * with the player's own character (a few simple sets, so it runs on weak phones). Tap to skip.
  */
+/** A phone (or any small or touch screen): the street is played as a video and only the person is drawn live, so it stays smooth. */
+const smallScreen = (): boolean => {
+  try {
+    return window.matchMedia("(pointer: coarse)").matches || Math.min(window.innerWidth, window.innerHeight) < 700;
+  } catch {
+    return false;
+  }
+};
+
+interface Reel {
+  setBeat(kind: CityBeat): void;
+  draw(dt: number): void;
+  dispose(): void;
+}
+
 export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?: string | null; onDone(): void }) {
   const [i, setI] = useState(0);
   const beat = TIMELINE[i]!;
   const words = WORDS[tier];
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderer = useRef<CityFilm | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const renderer = useRef<Reel | null>(null);
+  const beatRef = useRef<string>(beat.kind);
+  beatRef.current = beat.kind;
+  // on a phone the first two beats are a video; if it cannot play, the full 3D street is drawn instead
+  const [videoFailed, setVideoFailed] = useState(false);
+  const lite = useRef(smallScreen()).current && !videoFailed;
 
   // The page around the film redraws all the time; the film's own clock must not restart each time it does.
   const done = useRef(onDone);
@@ -72,9 +94,16 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const r = new CityFilm(canvas, tier, look ?? undefined);
+    let r: Reel;
+    if (lite) {
+      const l = new LiteFilm(canvas, tier, look ?? undefined);
+      r = { setBeat: (k) => (k === "street" || k === "face") && l.setBeat(k), draw: (dt) => (beatRef.current === "street" || beatRef.current === "face") && l.draw(dt), dispose: () => l.dispose() };
+    } else {
+      const c = new CityFilm(canvas, tier, look ?? undefined);
+      if (import.meta.env.DEV) (window as unknown as { __film?: CityFilm }).__film = c;
+      r = c;
+    }
     renderer.current = r;
-    if (import.meta.env.DEV) (window as unknown as { __film?: CityFilm }).__film = r;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -91,14 +120,33 @@ export default function ArrivalFilm({ tier, look, onDone }: { tier: Tier; look?:
     };
     // the look is read once when the film starts; changing it mid-film would restart the clock
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tier]);
+  }, [tier, lite]);
   useEffect(() => {
     if (beat.kind !== "title") renderer.current?.setBeat(beat.kind);
-  }, [beat.kind]);
+  }, [beat.kind, lite]);
+  // the video starts with the crane shot; if it has not started moving a few seconds later it will not, so the 3D street takes over
+  useEffect(() => {
+    if (!lite || beat.kind !== "arrive") return;
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    void v.play().catch(() => setVideoFailed(true));
+    const t = window.setTimeout(() => v.currentTime < 0.3 && setVideoFailed(true), 4000);
+    return () => window.clearTimeout(t);
+  }, [lite, beat.kind]);
 
   return (
     <div className={`film film-${tier} beat-${beat.kind}`} role="presentation" onPointerDown={onDone}>
-      <canvas ref={canvasRef} className={`film-canvas${beat.kind === "title" ? " is-hidden" : ""}`} />
+      {lite && (
+        <>
+          <video ref={videoRef} className={`film-video${beat.kind === "arrive" || beat.kind === "ride" ? " is-on" : ""}`} muted playsInline preload="auto" onError={() => setVideoFailed(true)} onEnded={(e) => e.currentTarget.pause()}>
+            <source src={`/assets/film/arrival-${tier}.mp4`} type="video/mp4" />
+            <source src={`/assets/film/arrival-${tier}.webm`} type="video/webm" />
+          </video>
+          <div className={`film-plate${beat.kind === "street" ? " is-street" : beat.kind === "face" ? " is-face" : ""}`} />
+        </>
+      )}
+      <canvas ref={canvasRef} className={`film-canvas${lite ? (beat.kind === "street" || beat.kind === "face" ? "" : " is-hidden") : beat.kind === "title" ? " is-hidden" : ""}`} />
       <div className="film-vignette" />
       <div className="film-bars top" />
       <div className="film-bars bottom" />
