@@ -89,6 +89,7 @@ export class Crowd {
   private readonly data: Record<"a" | "b" | "c" | "d" | "e", Float32Array>;
   private readonly speed: Float32Array;
   private readonly spot: Float32Array;
+  private readonly lift: Float32Array;
   private readonly want: Int8Array;
   private readonly female: boolean[];
   private dirty = true;
@@ -105,6 +106,7 @@ export class Crowd {
     this.data = { a: mk(4), b: mk(4), c: mk(4), d: mk(4), e: mk(4) };
     this.speed = mk(1);
     this.spot = mk(3);
+    this.lift = mk(1);
     this.want = new Int8Array(capacity).fill(-1);
     this.female = new Array(capacity).fill(false);
     for (const sex of ["male", "female"] as const) {
@@ -175,7 +177,8 @@ export class Crowd {
   }
 
   /** Put a person on the ground and say how they are drawn: not at all, mid detail or far detail. Takes effect at the next update. */
-  place(i: number, x: number, z: number, yaw: number, level: CrowdLevel): void {
+  place(i: number, x: number, z: number, yaw: number, level: CrowdLevel, y = 0): void {
+    this.lift[i] = y;
     this.spot[i * 3] = x;
     this.spot[i * 3 + 1] = z;
     this.spot[i * 3 + 2] = yaw;
@@ -208,7 +211,7 @@ export class Crowd {
       for (let j = 0; j < n; j++) {
         const i = slots[j]!;
         this.q.setFromAxisAngle(this.axis, this.spot[i * 3 + 2]!);
-        this.pos.set(this.spot[i * 3]!, 0, this.spot[i * 3 + 1]!);
+        this.pos.set(this.spot[i * 3]!, this.lift[i]!, this.spot[i * 3 + 1]!);
         this.m.compose(this.pos, this.q, this.one);
         mesh.setMatrixAt(j, this.m);
       }

@@ -15,6 +15,7 @@ declare global {
       info(): { triangles: number; calls: number; crowdTriangles: number; frameMs: number };
       level(l: 0 | 1 | 2): void;
       redress(a: number, b: number): Promise<number>;
+      topBox(look: Record<string, unknown>, again?: boolean): Promise<{ v: number; maxY: number }[]>;
       timePatch(seed: number, patch: Record<string, unknown>): Promise<number>;
       redressCheap(a: number, b: number): Promise<number>;
     };
@@ -119,6 +120,20 @@ export default function CrowdLabPage() {
       },
       info: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls, crowdTriangles: crowd?.drawnTriangles() ?? 0, frameMs }),
       level: (l) => (level = l),
+      async topBox(look, again) {
+        const av = await createCharacter({ ...npcLookFromSeed(1), ...(look as object) } as never, { face: (look as { faceRig?: boolean }).faceRig === true });
+        if (again) await av.setLook({ shape: { ...(look as { shape: object }).shape, age: 27 } } as never);
+        const out: { v: number; maxY: number }[] = [];
+        av.root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh && m.parent?.userData?.slot === "top") {
+            m.geometry.computeBoundingBox();
+            out.push({ v: m.geometry.getAttribute("position").count, maxY: Math.round(m.geometry.boundingBox!.max.y * 100) / 100 });
+          }
+        });
+        av.dispose();
+        return out;
+      },
       async timePatch(seed, patch) {
         const av = await createCharacter(npcLookFromSeed(seed), { face: false });
         const t0 = performance.now();

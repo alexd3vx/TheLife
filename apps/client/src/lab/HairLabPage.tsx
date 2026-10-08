@@ -57,6 +57,7 @@ export default function HairLabPage() {
     createCharacter(look).then((a) => {
       if (gone) return a.dispose();
       avatar = a;
+      (window as unknown as { __hairAvatar: () => Avatar | null }).__hairAvatar = () => avatar;
       scene.add(a.root);
       a.play("Idle_Loop", 0);
       let chain = Promise.resolve();

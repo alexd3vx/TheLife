@@ -35,9 +35,9 @@ interface ShoeStyle {
 
 const ANKLE = 0.075;
 const STYLES: Record<ShoeId, ShoeStyle> = {
-  p_sneakers: { sole: 0.03, heel: 0.012, soleColour: "#f1efe9", ease: 0.011, collar: ANKLE + 0.03, laces: true, roughness: 0.62, toeCap: 0.9 },
-  p_formal: { sole: 0.016, heel: 0.016, soleColour: "#1b1512", ease: 0.007, collar: ANKLE - 0.005, laces: true, roughness: 0.32, toeCap: 0.88 },
-  p_boots: { sole: 0.03, heel: 0.016, soleColour: "#2a2420", ease: 0.012, collar: ANKLE + 0.02, shaft: 0.21, roughness: 0.7, toeCap: 0.85 },
+  p_sneakers: { sole: 0.024, heel: 0.01, soleColour: "#f1efe9", ease: 0.007, collar: ANKLE + 0.03, laces: true, roughness: 0.62, toeCap: 0.9 },
+  p_formal: { sole: 0.015, heel: 0.014, soleColour: "#1b1512", ease: 0.005, collar: ANKLE - 0.005, laces: true, roughness: 0.32, toeCap: 0.88 },
+  p_boots: { sole: 0.026, heel: 0.014, soleColour: "#2a2420", ease: 0.008, collar: ANKLE + 0.02, shaft: 0.21, roughness: 0.7, toeCap: 0.85 },
   p_slippers: { sole: 0.013, heel: 0.004, soleColour: "#ece6da", ease: 0.008, collar: 0.05, openFrom: 0.5, lowWall: 0.03, roughness: 0.85 },
   p_sandals: { sole: 0.014, heel: 0.006, soleColour: "#3a2b21", ease: 0.006, collar: ANKLE, straps: true, roughness: 0.6 },
 };
@@ -159,7 +159,7 @@ function buildOne(rest: BodyRest, side: "l" | "r", style: ShoeStyle, upperColour
   {
     const pos: number[] = [];
     const idx: number[] = [];
-    const over = style.ease + 0.004;
+    const over = style.ease * 0.7 + 0.002;
     const n = stations.length;
     // outline chain: left side heel to toe, then right side toe to heel
     const chain: { x: number; z: number; thick: number }[] = [];
@@ -198,7 +198,7 @@ function buildOne(rest: BodyRest, side: "l" | "r", style: ShoeStyle, upperColour
       for (let k = 0; k < K; k++) {
         const ang = -Math.PI + (k / K) * Math.PI * 2;
         // the shell hugs the foot, thicker at the toes (a toe box has volume)
-        const room = style.ease + (frac > 0.72 ? (frac - 0.72) * 0.03 : 0);
+        const room = style.ease + (frac > 0.72 ? (frac - 0.72) * 0.014 : 0);
         const rr = s.r[k]! + room;
         let x = s.cx + Math.cos(ang) * rr;
         let y = s.cy + Math.sin(ang) * rr;

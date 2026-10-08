@@ -27,6 +27,8 @@ export interface CityOptions {
   seed?: number;
   /** The old block figures. Off for the cinematic, which brings its own people. */
   pedestrians?: boolean;
+  /** Every car in a lane drives at this speed, so none ever drives through another (the cinematic). */
+  trafficSpeed?: number;
 }
 
 const STREET_LENGTH = 300;
@@ -155,6 +157,7 @@ export function createCityScene(options: CityOptions): CityScene {
   scene.add(props);
 
   const vehicles = createTraffic(rng, scene);
+  if (options.trafficSpeed) for (const v of vehicles) v.speed = options.trafficSpeed;
   const people = options.pedestrians === false ? [] : createPedestrians(rng, scene);
 
   return {

@@ -20,7 +20,7 @@ declare global {
 const FPS = 24;
 const SECONDS = 12;
 // The sun sits on the +z side, so the buildings on the -z side are in golden light and anyone walking there is lit from the front
-const PAVEMENT = -7.4; // z of the pavement the heroes walk along
+const PAVEMENT = -6.9; // z of the pavement the heroes walk along
 const SHOT_B = 4.2;
 const SHOT_C = 8.2;
 
@@ -29,7 +29,7 @@ const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 const MAN: Look = { ...DEFAULT_LOOK, body: "realmale", hair: "p_fade", skinTone: "rich", top: "p_polo", topColor: "teal", bottom: "p_trousers", bottomColor: "khaki", shoes: "p_sneakers", shoesColor: "white", shape: { ...DEFAULT_SHAPE, sex: 1, age: 29, height: -0.2, muscle: 0.2 } };
-const WOMAN: Look = { ...DEFAULT_LOOK, body: "realfemale", hair: "p_braids", hairColor: "black", skinTone: "deep", top: "p_shirt", topColor: "orange", topFabric: "ankara", bottom: "p_jeans", bottomColor: "navy", shoes: "p_sneakers", shoesColor: "white", accessory: "a_hoops", shape: { ...DEFAULT_SHAPE, sex: 0, age: 26, height: -0.2, bust: 0.25, weight: 0.05 } };
+const WOMAN: Look = { ...DEFAULT_LOOK, body: "realfemale", hair: "p_braids", hairColor: "black", skinTone: "deep", top: "p_tee", topColor: "orange", topFabric: "ankara", bottom: "p_jeans", bottomColor: "navy", shoes: "p_sneakers", shoesColor: "white", accessory: "a_hoops", shape: { ...DEFAULT_SHAPE, sex: 0, age: 26, height: -0.2, bust: 0.25, weight: 0.05 } };
 
 /**
  * A developer page that plays the sign-in film one frame at a time: golden-hour Lagos, a crane move down the street, a tracking shot of
@@ -47,16 +47,19 @@ export default function CineLabPage() {
     renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    const city = createCityScene({ shadowMapSize: 4096, seed: 11, pedestrians: false });
+    const city = createCityScene({ shadowMapSize: 4096, seed: 11, pedestrians: false, trafficSpeed: 6 });
     const scene = city.scene;
     addStageEnvironment(renderer, scene, 0.35);
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 600);
     const hero: { woman: Avatar | null; man: Avatar | null; crowd: Crowd | null } = { woman: null, man: null, crowd: null };
-    const walkers = Array.from({ length: 26 }, (_, i) => {
-      const r = seeded(500 + i * 31);
-      const side = r() < 0.55 ? 1 : -1;
-      return { x: -125 + r() * 110, z: side * (6.5 + r() * 2.1), dir: r() < 0.5 ? 1 : -1, speed: 1.0 + r() * 0.55, phase: r() * 6 };
-    });
+    // Three lanes, each with one speed and an even gap, so nobody ever catches up with anybody and walks through them. Lamp posts stand at
+    // |z| 8.4 and power poles at 9, the pair walk at -6.9 and -7.7, and the lane coming the other way keeps to the kerb (-6.2), 0.7 m from her.
+    const lanes = [
+      { z: -6.2, dir: -1 as const, speed: 1.2, n: 5, gap: 14, x0: -118 },
+      { z: 6.7, dir: 1 as const, speed: 1.25, n: 10, gap: 11, x0: -122 },
+      { z: 7.6, dir: -1 as const, speed: 1.15, n: 11, gap: 10, x0: -120 },
+    ];
+    const walkers = lanes.flatMap((l, li) => Array.from({ length: l.n }, (_, k) => ({ x: l.x0 + k * l.gap, z: l.z, dir: l.dir, speed: l.speed, phase: (k * 1.7 + li) % 6 })));
     let simTime = 0;
     let rendered = -1;
 
@@ -85,6 +88,7 @@ export default function CineLabPage() {
         crowd.setGait(i, w.speed, w.phase);
       });
       woman.setMood("happy", 0.0);
+      (window as unknown as { __cineHero: unknown }).__cineHero = hero;
       window.__cine = { ready: true, fps: FPS, frames: FPS * SECONDS, frame, cam: (p, l, fov = 30) => (override = p ? { p: new THREE.Vector3(...p), l: new THREE.Vector3(...(l ?? [0, 1, 0])), fov } : null) };
     });
 
@@ -95,7 +99,7 @@ export default function CineLabPage() {
       if (!woman || !man || !crowd) return;
       const hx = heroX(t);
       const stopped = t >= SHOT_C;
-      man.root.position.set(heroX(t) + (stopped ? 1.35 * (t - SHOT_C) : 0) + 0.2, 0.22, PAVEMENT - 0.95);
+      man.root.position.set(heroX(t) + (stopped ? 1.35 * (t - SHOT_C) : 0) + 0.2, 0.22, PAVEMENT - 0.8);
       man.root.rotation.y = Math.PI / 2;
       woman.root.position.set(hx, 0.22, PAVEMENT);
       if (stopped) {
@@ -107,7 +111,7 @@ export default function CineLabPage() {
         const turn = smooth(clamp01((t - SHOT_C - 0.2) / 1.0));
         woman.root.rotation.y = lerp(Math.PI / 2, Math.PI * 0.07, turn);
         woman.setMood("happy", smooth(clamp01((t - SHOT_C - 1.3) / 1.2)) * 0.9);
-        woman.setLookTarget(camera.position);
+        // (no head look-at: from this close it tipped her head down into the collar)
       } else {
         woman.root.rotation.y = Math.PI / 2;
       }
@@ -118,7 +122,7 @@ export default function CineLabPage() {
         if (w.x > 20) w.x = -125;
         if (w.x < -125) w.x = 20;
         const near = Math.abs(w.x - hx) < 48;
-        crowd.place(i, w.x, w.z, w.dir > 0 ? Math.PI / 2 : -Math.PI / 2, near ? 1 : 2);
+        crowd.place(i, w.x, w.z, w.dir > 0 ? Math.PI / 2 : -Math.PI / 2, near ? 1 : 2, 0.22);
       });
       crowd.update(dt);
       city.update(dt, camera);
@@ -139,20 +143,20 @@ export default function CineLabPage() {
       if (t < SHOT_B) {
         // crane: high above the middle of the street, swooping down toward the pavement
         const u = smooth(t / SHOT_B);
-        pos = new THREE.Vector3(lerp(-112, -52, u), lerp(14, 3.2, u), lerp(1.5, -3.2, u));
+        pos = new THREE.Vector3(lerp(-112, -50, u), lerp(14, 2.4, u), lerp(1.5, -5.2, u));
         look = new THREE.Vector3(lerp(-30, hx + 3, u), lerp(1.5, 1.35, u), lerp(-3, PAVEMENT, u));
         fov = lerp(36, 30, u);
       } else if (t < SHOT_C) {
         // tracking: alongside the two of them from the road, pushing in a little, the sun behind the camera
         const u = clamp01((t - SHOT_B) / (SHOT_C - SHOT_B));
-        pos = new THREE.Vector3(hx + lerp(2.6, 1.0, u), lerp(1.25, 1.4, u), PAVEMENT + lerp(4.6, 3.3, u));
+        pos = new THREE.Vector3(hx + lerp(2.6, 1.0, u), lerp(1.25, 1.4, u), PAVEMENT + lerp(2.9, 2.3, u));
         look = new THREE.Vector3(hx + 0.35, 1.28, PAVEMENT - 0.4);
         fov = 32;
         pos.add(shake(1.2));
       } else {
         // close-up: a slow push in on her face
         const u = smooth(clamp01((t - SHOT_C) / (SECONDS - SHOT_C)));
-        pos = new THREE.Vector3(hx + lerp(-0.5, 0.1, u), lerp(1.58, 1.62, u), PAVEMENT + lerp(2.5, 1.65, u));
+        pos = new THREE.Vector3(hx + lerp(-0.5, 0.1, u), lerp(1.58, 1.62, u), PAVEMENT + lerp(2.4, 1.6, u));
         look = new THREE.Vector3(hx, 1.6, PAVEMENT);
         fov = lerp(26, 22, u);
         pos.add(shake(0.5));

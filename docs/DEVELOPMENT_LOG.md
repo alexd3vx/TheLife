@@ -390,3 +390,6 @@ Chronological record of decisions and changes. Newest first.
 - `lab/npcSpec.ts` (seeded looks, crowd look from a look, recolour and restyle), `map/crowd.ts` (instanced crowd with shader walk), `map/pedestrians.ts` rebuilt on both (replaces the box figures), `lab/CrowdLabPage.tsx` (`#/crowd`).
 - Instances are packed to the front of each mesh every frame so hidden people are never drawn (first version drew all four meshes at full capacity: 230k triangles for 60 people instead of 90k).
 - Found while measuring: a garment or hairstyle rebuild costs 80 to 200 ms, a colour change 3 ms.
+
+## Root cause of "ragdoll", long limbs and swollen feet (8 Oct)
+`SkeletonUtils.clone` gives each copy its own bones but shares the bone-inverse matrices, and `MorphBody.apply` writes the fitted bone inverses into them. Every person on screen together (the street's real characters, other players, NPCs, two people in a film) therefore shared one set of inverses, and each person's skin was bent by whoever was built last: stretched limbs, small heads, wrong feet. Fixed in `MorphBody.load` (each copy gets its own skeleton with its own inverses). The same session: real shoes, slimmer sneakers, the base underwear layer matte dark grey (not white), crowd people stand on the pavement (not in it), cars in the film never overtake each other.

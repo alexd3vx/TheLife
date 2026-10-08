@@ -135,9 +135,18 @@ export class MorphBody {
   static async load(shape?: BodyShape, file = "characters/body_mpfb"): Promise<MorphBody> {
     const shared = await loadShared(file);
     const scene = SkeletonUtils.clone(shared.gltf.scene);
+    // SkeletonUtils.clone gives every copy its own bones but the SAME bone-inverse matrices; fitting one person's skeleton to their body
+    // (apply) would then bend everybody else's skin to it, and people on screen together came out with stretched limbs and swollen feet
+    const ownSkeletons = new Map<THREE.Skeleton, THREE.Skeleton>();
     scene.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (!m.isSkinnedMesh) return;
+      let own = ownSkeletons.get(m.skeleton);
+      if (!own) {
+        own = new THREE.Skeleton(m.skeleton.bones, m.skeleton.boneInverses.map((x) => x.clone()));
+        ownSkeletons.set(m.skeleton, own);
+      }
+      m.skeleton = own;
       m.geometry = m.geometry.clone();
       m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
     });
@@ -150,6 +159,14 @@ export class MorphBody {
       skinMat.polygonOffsetFactor = 1;
       skinMat.polygonOffsetUnits = 1;
       body.maleSkin = skinMat.map;
+    }
+    // the modest base layer: a plain, dark, matte grey, so it reads as underwear and does not draw the eye
+    for (const n of ["Shorts", "Top"]) {
+      const m = body.parts.get(n)?.mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (m) {
+        m.color.set("#33363f");
+        m.roughness = 0.95;
+      }
     }
     body.apply(shape ? shapeWeights(shape) : {});
     return body;
