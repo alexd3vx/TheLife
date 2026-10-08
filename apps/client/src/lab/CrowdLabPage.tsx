@@ -4,6 +4,7 @@ import { createCharacter } from "./character";
 import type { Avatar } from "./avatar";
 import { Crowd } from "../map/crowd";
 import { crowdLookOf, diffLook, npcLookFromSeed, recolourLook, seeded } from "./npcSpec";
+import { addStageEnvironment } from "./stageLight";
 import "./bodylab.css";
 
 declare global {
@@ -33,6 +34,7 @@ export default function CrowdLabPage() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#9cc4ee");
     scene.fog = new THREE.Fog("#9cc4ee", 40, 140);
+    const dropEnvironment = addStageEnvironment(renderer, scene, 0.5);
     const cam = new THREE.PerspectiveCamera(40, 1, 0.1, 300);
     scene.add(new THREE.HemisphereLight("#fff1dc", "#6b7a99", 1.1));
     const sun = new THREE.DirectionalLight("#fff0da", 2.4);
@@ -149,6 +151,7 @@ export default function CrowdLabPage() {
       delete window.__crowd;
       crowd?.dispose();
       for (const a of reals) a.dispose();
+      dropEnvironment();
       renderer.dispose();
     };
   }, []);

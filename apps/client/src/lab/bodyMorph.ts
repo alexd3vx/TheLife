@@ -28,6 +28,7 @@ export interface MorphMeta {
 
 export { DEFAULT_SHAPE, shapeWeights, type BodyShape } from "./bodyShape";
 import { shapeWeights, type BodyShape } from "./bodyShape";
+import { skinTextures } from "./procedural/skinTexture";
 
 interface Part {
   mesh: THREE.SkinnedMesh;
@@ -141,8 +142,9 @@ export class MorphBody {
       m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
     });
     const body = new MorphBody(scene, shared);
-    const skinMat = body.parts.get("Body")?.mesh.material as THREE.MeshStandardMaterial | undefined;
+    let skinMat = body.parts.get("Body")?.mesh.material as THREE.MeshStandardMaterial | undefined;
     if (skinMat) {
+      skinMat = body.upgradeSkin(skinMat);
       // the base layer sits a few millimetres above the skin; keep the skin a hair behind it so the two never flicker
       skinMat.polygonOffset = true;
       skinMat.polygonOffsetFactor = 1;
@@ -151,6 +153,30 @@ export class MorphBody {
     }
     body.apply(shape ? shapeWeights(shape) : {});
     return body;
+  }
+
+  /**
+   * Skin that catches light like skin: a soft sheen (the velvety edge of peach fuzz and oil), a thin clear coat for the highlights that
+   * make dark skin read as skin and not as a black cut-out, and fine pore bumps. Standard glTF materials have none of these.
+   */
+  private upgradeSkin(old: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+    const part = this.parts.get("Body");
+    const mat = new THREE.MeshPhysicalMaterial();
+    THREE.MeshStandardMaterial.prototype.copy.call(mat, old);
+    mat.roughness = 0.58;
+    mat.clearcoat = 0.1;
+    mat.clearcoatRoughness = 0.42;
+    mat.sheen = 0.3;
+    mat.sheenRoughness = 0.55;
+    mat.sheenColor = new THREE.Color("#8a5a44");
+    const pores = skinTextures().normal.clone();
+    pores.wrapS = pores.wrapT = THREE.RepeatWrapping;
+    pores.repeat.set(9, 9);
+    pores.needsUpdate = true;
+    mat.normalMap = pores;
+    mat.normalScale.set(0.3, 0.3);
+    if (part) part.mesh.material = mat;
+    return mat;
   }
 
   /** Switch on exactly these morphs (id -> weight). */

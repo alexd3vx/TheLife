@@ -396,7 +396,7 @@ const SPECS: Record<string, Spec> = {
   },
   p_jeans: {
     slot: "bottom",
-    offset: 0.017,
+    offset: 0.021,
     smooth: 6,
     covers: ["pelvis", ...both("thigh"), ...both("calf")],
     cut(tris, rest) {
@@ -404,7 +404,7 @@ const SPECS: Record<string, Spec> = {
       const ankle = jointPos(rest, "foot_l").y + 0.045;
       return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
     },
-    legs: legCut((t) => 0.008 * t, 0.004),
+    legs: legCut((t) => 0.018 * t, 0.016),
   },
   p_capri: {
     slot: "bottom",
@@ -497,7 +497,7 @@ const SPECS: Record<string, Spec> = {
       const ankle = jointPos(rest, "foot_l").y + 0.03;
       return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
     },
-    legs: legCut((t) => 0.006 * t, 0.012),
+    legs: legCut((t) => 0.02 * t, 0.024),
   },
   p_shorts: {
     slot: "bottom",
@@ -523,7 +523,7 @@ const SPECS: Record<string, Spec> = {
       const ankle = jointPos(rest, "foot_l").y + 0.035;
       return clipPlane(clipPlane(withoutArms(tris, rest), [0, -1, 0], waist), [0, 1, 0], -ankle);
     },
-    legs: legCut((t) => 0.012 * t, 0.006),
+    legs: legCut((t) => 0.03 * t, 0.02),
   },
   p_sneakers: {
     slot: "shoes",

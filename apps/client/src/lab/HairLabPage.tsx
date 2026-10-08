@@ -4,6 +4,7 @@ import { createCharacter } from "./character";
 import type { Avatar } from "./avatar";
 import { DEFAULT_LOOK, HAIR_COLORS, SKIN_TONES, type Look } from "./looks";
 import { HAIR_STYLES } from "../iso/wardrobe";
+import { addStageEnvironment } from "./stageLight";
 import "./bodylab.css";
 
 /** A developer page for hair: one person, a close camera (front, side, back, top), every style and colour. Open it at #/hair. */
@@ -22,6 +23,7 @@ export default function HairLabPage() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     const scene = new THREE.Scene();
+    addStageEnvironment(renderer, scene, 0.5);
     const cam = new THREE.PerspectiveCamera(24, 1, 0.05, 20);
     scene.add(new THREE.HemisphereLight("#fff1dc", "#6b7a99", 1.0));
     const key = new THREE.DirectionalLight("#fff0da", 2.6);

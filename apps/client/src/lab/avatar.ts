@@ -83,7 +83,7 @@ export const REAL_FOR_LIFE: Record<string, string> = {
 };
 
 /** Iris colours for the morphable body's eye picture (brown is the picture itself). */
-const IRIS_COLOURS: Record<string, string | null> = { brown: null, hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
+const IRIS_COLOURS: Record<string, string | null> = { brown: "#4a2c1a", hazel: "#8a6a2a", green: "#3f8a52", blue: "#3b72bd", grey: "#808a94" };
 
 export class Avatar {
   readonly root = new THREE.Group();

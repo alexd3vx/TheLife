@@ -5,6 +5,7 @@ import { createCharacter } from "../lab/character";
 import type { Look } from "../lab/looks";
 import { locomotionRate } from "../lab/locomotion";
 import { getSettings } from "../settings/settings";
+import { addStageEnvironment } from "../lab/stageLight";
 
 /**
  * The person on a small stage, in 3D: the very same character the game plays (same build path, same look, same clips), lit like a
@@ -105,6 +106,7 @@ export default function CharacterStage({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const scene = new THREE.Scene();
+    const dropEnvironment = addStageEnvironment(renderer, scene, 0.5);
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 40);
     // portrait lighting: warm key from the front-left, cool fill from the right, a rim from behind
     scene.add(new THREE.HemisphereLight("#fff1dc", "#6b7a99", 1.0));
@@ -310,6 +312,7 @@ export default function CharacterStage({
       canvas.removeEventListener("pointercancel", up);
       live.current.avatar?.dispose();
       live.current.avatar = null;
+      dropEnvironment();
       renderer.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
