@@ -9,6 +9,6 @@ NAME="signin-$KIND"
 # a warm grade, a soft vignette, a little film grain, and a fade in and out so the loop does not jump
 VF="eq=contrast=1.05:saturation=1.12:gamma=0.97,vignette=PI/6,noise=alls=6:allf=t,fade=t=in:st=0:d=0.7,fade=t=out:st=11.3:d=0.7,format=yuv420p"
 ffmpeg -y -loglevel error -framerate 24 -i "$IN/f%04d.jpg" -vf "$VF" -c:v libx264 -preset slow -crf 27 -movflags +faststart -an "$OUT/$NAME.mp4"
-ffmpeg -y -loglevel error -framerate 24 -i "$IN/f%04d.jpg" -vf "$VF" -c:v libvpx-vp9 -crf 38 -b:v 0 -row-mt 1 -an "$OUT/$NAME.webm"
+ffmpeg -y -loglevel error -framerate 24 -i "$IN/f%04d.jpg" -vf "$VF" -c:v libvpx-vp9 -crf 43 -b:v 0 -row-mt 1 -an "$OUT/$NAME.webm"
 ffmpeg -y -loglevel error -i "$IN/f0110.jpg" -vf "eq=contrast=1.05:saturation=1.12,vignette=PI/6" -q:v 4 "$OUT/$NAME.jpg"
 ls -l "$OUT" | grep "$NAME"
