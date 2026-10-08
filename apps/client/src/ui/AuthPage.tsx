@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { validateLogin, validateSignUp } from "@thelife/shared";
 import { useAuth } from "../auth/AuthProvider";
-import { LagosScene } from "./LagosScene";
+import { AuthFilm } from "./AuthFilm";
 
 type Tab = "login" | "signup";
 
@@ -68,7 +68,7 @@ export function AuthPage() {
 
   return (
     <main className="auth cine">
-      <LagosScene />
+      <AuthFilm />
       <section className="auth-tagline">
         <div className="brand-line">
           <span className="brand-mark" aria-hidden="true" />

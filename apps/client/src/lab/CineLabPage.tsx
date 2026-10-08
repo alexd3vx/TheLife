@@ -178,6 +178,7 @@ export default function CineLabPage() {
         step(1 / FPS);
       }
       aim(want);
+      city.update(0, camera); // keeps the sky round the camera
       renderer.render(scene, camera);
       rendered = i;
     }

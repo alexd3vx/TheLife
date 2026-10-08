@@ -39,4 +39,8 @@ Everyone opens the same Vercel link, goes to `#/map`, taps **Go online**, picks 
 In every case, type the address into **Go online -> Server** (it is remembered), or set `VITE_SERVER_URL` in Vercel and redeploy.
 
 ## Supabase tables
-Open Supabase -> **SQL Editor** -> New query, paste `supabase/schema.sql`, Run. It creates `profiles` and `saves` with row-level security (each player can only see and change their own rows). The game does not read these yet; cloud saves and the admin flag are the next steps.
+**One paste does everything:** Supabase -> **SQL Editor** -> New query -> paste all of `supabase/setup.sql` -> Run (safe to run again). It has accounts and cloud saves (`supabase/schema.sql`), player IDs and private messages (`docs/supabase-chat.sql`) and a few commented test helpers at the bottom (make yourself admin, list sign-ups, confirm an email by hand, delete a test account).
+
+For testing sign-up: Supabase -> Authentication -> Providers -> Email: switch **Confirm email** off (or keep it on and use the helper to confirm by hand), and under Authentication -> URL Configuration set the Site URL to the Vercel address.
+
+The older note, `supabase/schema.sql` alone: It creates `profiles` and `saves` with row-level security (each player can only see and change their own rows). The game does not read these yet; cloud saves and the admin flag are the next steps.
