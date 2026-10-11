@@ -4,10 +4,10 @@ import { BLOCK, STREET, WATER, chargingSpotNear, generateLagos, generatePlan, ha
 const d = generateLagos();
 const t = lagosTerrain();
 
-describe("Lagos Island", () => {
-  it("is the real island: about 4.5 by 3.2 km, lagoon all round", () => {
-    expect(d.bounds.maxX).toBeGreaterThan(4400);
-    expect(d.bounds.maxZ).toBeGreaterThan(3200);
+describe("Lagos", () => {
+  it("is the city board: 2.7 by 2.1 km, the lagoon in the middle and the sea round the edge", () => {
+    expect(d.bounds.maxX).toBeGreaterThan(2600);
+    expect(d.bounds.maxZ).toBeGreaterThan(2000);
     let water = 0, block = 0, street = 0;
     for (const c of t.cls) {
       if (c === WATER) water++;
@@ -15,15 +15,15 @@ describe("Lagos Island", () => {
       else if (c === STREET) street++;
     }
     expect(water).toBeGreaterThan(t.cls.length * 0.15);
-    expect(block).toBeGreaterThan(300_000);
-    expect(street).toBeGreaterThan(100_000);
+    expect(block).toBeGreaterThan(150_000);
+    expect(street).toBeGreaterThan(50_000);
   });
 
-  it("has the real buildings of the island, on land, hardly any inside another", () => {
+  it("has the buildings of the city, on land, hardly any inside another", () => {
     const houses = d.lots.filter((l) => l.kind === "house" || l.kind === "flats" || l.kind === "shop");
-    expect(houses.length).toBeGreaterThan(6_000);
+    expect(houses.length).toBeGreaterThan(3_500);
     const chunks = indexChunks(d);
-    expect(chunks.size).toBeGreaterThan(1_000);
+    expect(chunks.size).toBeGreaterThan(600);
     for (const l of houses.slice(0, 3_000)) {
       const f = l.footprint;
       expect(t.classAt((f.minX + f.maxX) / 2, (f.minZ + f.maxZ) / 2), l.id).not.toBe(WATER);

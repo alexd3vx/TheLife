@@ -461,3 +461,15 @@ The Lagos Island map was bland at street level: 200 randomly parked cars and not
 - Walking and path-finding use a per-kind footprint (`propHalfSize`), so a bin no longer blocks the path like a car did; boats, billboards and pitches don't block at all.
 
 Not done yet: ground-colour variety between buildings (the flat beige), richer landmark buildings, a night-lighting pass for the new props. Needs a look on a real phone.
+
+## New Lagos: the city board replaces the OpenStreetMap island
+
+Owner request: use a map like Lagos Life (a whole-Lagos board), not just Lagos Island. The OpenStreetMap island data is replaced by a Lagos the game generates itself (`tools/city/build.mjs`, run with `node tools/city/build.mjs [--png preview.png]`), written to the same three data files the game already reads (`lagosData.ts`, `lagosBuildings.ts`, `lagosRoads.ts`), so the terrain, streaming, bridges, roads, homes, places and street-life code did not change. No outside map data and nothing copied from another game.
+
+- **Layout** (2.7 by 2.1 km, 3 m cells), laid out the way Lagos lies: the mainland to the north (Ikeja, Mushin, Surulere, Yaba, Oshodi, Ketu, Apapa with its ports), the lagoon across the middle, and to the south Lagos Island, Onikan, Ikoyi, Victoria Island, Eko Atlantic, Lekki and Banana Island, with the Atlantic beyond and a ring of water round the edge.
+- **Bridges**: Third Mainland, Carter and Eko Bridges over the lagoon, Falomo over the creek between Lagos Island and Ikoyi, the Lekki-Ikoyi Link over the Lekki channel, and the way on to Banana Island. Long arterials: Agege Motor Road, Ikorodu Road, Western Avenue, the Lagos-Ibadan Expressway, Marina, Awolowo Road, Ozumba Mbadiwe Way, the Lekki-Epe Expressway.
+- **Each district builds differently**: dense one- and two-floor houses in Mushin, mixed blocks in Ikeja, flats and shops in Yaba, warehouses at Apapa, tight old town and tall towers on the Marina, big detached houses in Ikoyi and Lekki, towers in Victoria Island and Eko Atlantic. Homes still follow the player's background (poor in the west, middle in the centre, rich in the east); every tier has plenty of homes.
+- **149 named places** (hospitals, banks, police, schools, churches, mosques, markets, parks, stadiums, ports, hotels, stations, fuel) in the right districts; the spawn is still Tafawa Balewa Square Bus Terminal.
+- Tests updated for the new size. Players whose saved position is not on dry ground in the new map are put back at the spawn (existing server rule).
+
+To do next: more detail per district (landmark buildings, coastal roads, beaches), a look at night, and more building density in the mainland.
