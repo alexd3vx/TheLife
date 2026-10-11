@@ -6,7 +6,8 @@ import type { Avatar } from "../lab/avatar";
 import { createCharacter, resolveLook } from "../lab/character";
 import { locomotionRate } from "../lab/locomotion";
 import { assetUrl } from "../lab/manifest";
-import type { FilmBeat, Tier } from "./filmCanvas";
+export type Tier = "lapo" | "middle" | "nepo";
+export type FilmBeat = "flight" | "landing" | "taxi" | "ride" | "home" | "welcome";
 
 /**
  * The opening film in real 3D, with the player's own character: the plane over the city at dusk, the landing, the terminal, the ride

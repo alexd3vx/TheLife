@@ -58,7 +58,7 @@ export default function MapPage() {
   const [miniSpan, setMiniSpan] = useState(320);
   const [picked, setPicked] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [trip, setTrip] = useState<{ id: string; name: string; line: string; seconds: number; x: number; z: number } | null>(null);
+  const [trip, setTrip] = useState<{ id: string; name: string; line: string; ride: string; seconds: number; x: number; z: number } | null>(null);
   const settings = useSettings();
   const admin = isAdmin();
   const district = getDistrict();
@@ -248,6 +248,7 @@ export default function MapPage() {
       {trip && (
         <TravelFilm
           tier={(life.session?.sim.state.profile?.tier ?? "middle") as "lapo" | "middle" | "nepo"}
+          ride={trip.ride}
           to={trip.name}
           line={trip.line}
           seconds={trip.seconds}
@@ -338,7 +339,7 @@ export default function MapPage() {
               const o = options.find((x) => x.id === id)!;
               setBigMap(false);
               setPicked(null);
-              setTrip({ id: lm.id, name: lm.name, line: o.line, seconds: Math.max(3.5, Math.min(7, 3 + dist / 600)), x: lm.entrance.x, z: lm.entrance.z });
+              setTrip({ id: lm.id, name: lm.name, line: o.line, ride: id, seconds: Math.max(3.5, Math.min(7, 3 + dist / 600)), x: lm.entrance.x, z: lm.entrance.z });
             };
             return (
               <div className="map-sheet">

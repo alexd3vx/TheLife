@@ -485,3 +485,9 @@ Owner feedback: the map was not like the reference (Lagos Life): a city board wi
 - Dev: `?hour=21` forces night or day on the board; `window.__board` is the board.
 
 Not done: the walking (street) world still uses its own blocks and props, not the kit models; people are not shown on the board; landmark buildings use ordinary kit models tinted by their pins rather than unique models.
+
+## Street view uses the city kit; real 3D vehicles everywhere (no more 2D scenes)
+
+- **Street buildings**: the walking world's ordinary buildings are now Kenney City Kit models too (`map/kit.ts` is the shared library, used by the 3D board and the chunk builder). Near chunks get the full models, farther ones the light ones, merged into one mesh per chunk. Named places with an inside keep their own cutaway walls.
+- **Traffic** (`map/traffic.ts`): cars, taxis, SUVs, the danfo (a yellow-tinted van) and trucks are Kenney Car Kit models (`map/vehicleKit.ts`); the okada (with its rider) and the keke are our own real 3D shapes (`map/vehicles3d.ts`: round tyres and rims, tank, seat, bars, lamps, canopy). The kit has no motorbike or three-wheeler, so those two are built in code.
+- **Ride and welcome-back scenes** (`arrival/rideScene.ts`): the flat hand-drawn 2D canvas film is gone (`filmCanvas.ts` deleted). The trip scene is a real 3D street (kit buildings, trees, poles and cables, oncoming traffic, an okada and keke passing) with the vehicle you paid for (danfo, keke, taxi, your driver's car); the welcome-back screen is the same street at the real hour. Dev: `#/ridetest?ride=keke&hour=13`.

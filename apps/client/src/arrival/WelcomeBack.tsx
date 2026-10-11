@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FilmRenderer } from "./filmCanvas";
+import { RideScene } from "./rideScene";
 import "./arrival.css";
 
 const hello = (hour: number) => (hour < 5 ? "Still up" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : hour < 21 ? "Good evening" : "Good night");
@@ -23,10 +23,7 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, r
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const r = new FilmRenderer(canvas, tier);
-    r.lite = true;
-    r.setHour(hour);
-    r.setBeat("welcome");
+    const r = new RideScene(canvas, { ride: null, hour, mode: "welcome" });
     let raf = 0;
     let last = performance.now();
     // drawn at about 30 frames a second: it is a slow scene, and the phone keeps its power for loading the game behind it
@@ -38,7 +35,10 @@ export default function WelcomeBack({ name, tier, hour, date, time, awayCount, r
       r.draw(dt);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      r.dispose();
+    };
   }, [tier, hour]);
   return (
     <div className="film welcome" role="presentation" onPointerDown={() => ready && onDone()}>

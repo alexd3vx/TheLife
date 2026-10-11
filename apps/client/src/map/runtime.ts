@@ -210,6 +210,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   scene.add(peds.root);
   const traffic = new Traffic(small ? 22 : 36);
   scene.add(traffic.root);
+  void traffic.load();
 
   // Walking: a 0.5 m navigation grid for a 180 m window around the player, rebuilt as they move (the island is far too big for one grid).
   const NAV_HALF = 90;

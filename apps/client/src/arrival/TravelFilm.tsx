@@ -1,14 +1,14 @@
 import { useEffect, useRef } from "react";
-import { FilmRenderer } from "./filmCanvas";
+import { RideScene, type RideKind } from "./rideScene";
 import "./arrival.css";
 
 type Tier = "lapo" | "middle" | "nepo";
 
 /**
- * A short scene for a trip across Lagos: the road, the traffic and the vehicle that suits who you are, drawn in the same hand-inked
- * style as the arrival film. It covers the screen while the character is moved, then hands the city back.
+ * A short scene for a trip across Lagos in real 3D: the road, the traffic and the vehicle you paid for (danfo, keke, taxi or your
+ * driver's car), with the city kit's buildings along the street. It covers the screen while the character is moved, then hands the city back.
  */
-export default function TravelFilm({ tier, to, line, seconds, onDone }: { tier: Tier; to: string; line: string; seconds: number; onDone(): void }) {
+export default function TravelFilm({ tier, ride, hourOverride, to, line, seconds, onDone }: { tier: Tier; ride?: string; hourOverride?: number; to: string; line: string; seconds: number; onDone(): void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const done = useRef(onDone);
   done.current = onDone;
@@ -19,9 +19,9 @@ export default function TravelFilm({ tier, to, line, seconds, onDone }: { tier: 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const r = new FilmRenderer(canvas, tier);
-    r.setHour(new Date().getUTCHours() + 1);
-    r.setBeat("ride");
+    // a ride you did not pay for by name (or on foot) is the vehicle that suits who you are
+    const kind: RideKind = ride === "danfo" || ride === "keke" || ride === "taxi" || ride === "driver" ? ride : tier === "nepo" ? "driver" : tier === "middle" ? "taxi" : "danfo";
+    const r = new RideScene(canvas, { ride: kind, hour: hourOverride ?? (new Date().getUTCHours() + 1) % 24, mode: "ride" });
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -31,8 +31,11 @@ export default function TravelFilm({ tier, to, line, seconds, onDone }: { tier: 
       r.draw(dt);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [tier]);
+    return () => {
+      cancelAnimationFrame(raf);
+      r.dispose();
+    };
+  }, [tier, ride]);
   return (
     <div className={`film film-${tier} beat-ride travel`} role="status" aria-label={`On the way to ${to}`} onPointerDown={() => done.current()}>
       <canvas ref={canvasRef} className="film-canvas" />

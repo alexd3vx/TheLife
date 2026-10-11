@@ -28,6 +28,7 @@ const CineLabPage = lazy(() => import("./lab/CineLabPage"));
 const FilmRenderPage = lazy(() => import("./lab/FilmRenderPage"));
 const LiveTestPage = lazy(() => import("./iso/LiveTestPage"));
 const BankTestPage = lazy(() => import("./place/BankTestPage"));
+const TravelFilm = lazy(() => import("./arrival/TravelFilm"));
 const SettingsPanel = lazy(() => import("./settings/SettingsPanel"));
 
 function useHashRoute(): string {
@@ -86,6 +87,14 @@ export function App() {
     return (
       <Suspense fallback={null}>
         <ArrivalFilm tier={tier} onDone={() => (window.location.hash = "#/")} />
+      </Suspense>
+    );
+  }
+  if (import.meta.env.DEV && hash.startsWith("#/ridetest")) {
+    const q = new URLSearchParams(hash.split("?")[1] ?? "");
+    return (
+      <Suspense fallback={null}>
+        <TravelFilm hourOverride={q.get("hour") ? Number(q.get("hour")) : undefined} tier="middle" ride={q.get("ride") ?? "taxi"} to="Ikoyi" line="A cab through the traffic" seconds={600} onDone={() => undefined} />
       </Suspense>
     );
   }
