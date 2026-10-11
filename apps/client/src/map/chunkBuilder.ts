@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ROAD_CENTRES, ROAD_WIDTH, SIDEWALK, generatePlan, hasInterior, type ChunkData, type District, type Facing, type Lamp, type Lot, type Rect } from "@thelife/game-core";
 import { MeshBuilder } from "./meshBuilder";
 import { addProp } from "./props";
+import { kitLibrary, lotMatrix, modelsFor, type Model } from "./kit";
 import { addInterior } from "./interior";
 import { addPrism } from "./prism";
 import { FacadeBuilder, facadeMaterial } from "./facade";
@@ -298,6 +299,74 @@ export interface BuiltChunk {
   geometries: THREE.BufferGeometry[];
 }
 
+interface FlatModel {
+  pos: Float32Array;
+  nor: Float32Array;
+  uv: Float32Array;
+}
+const flatCache = new WeakMap<THREE.BufferGeometry, FlatModel>();
+/** A model's triangles written out one after another (no index), so many copies can be joined into one geometry cheaply. */
+function flatten(geo: THREE.BufferGeometry): FlatModel {
+  const hit = flatCache.get(geo);
+  if (hit) return hit;
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const out = { pos: g.getAttribute("position").array as Float32Array, nor: g.getAttribute("normal").array as Float32Array, uv: (g.getAttribute("uv")?.array ?? new Float32Array((g.getAttribute("position").count) * 2)) as Float32Array };
+  flatCache.set(geo, out);
+  return out;
+}
+
+const KM = new THREE.Matrix4();
+const KN = new THREE.Matrix3();
+/** All the kit buildings of a chunk, one merged mesh per colour picture (the full models near the player, the light ones further out). */
+function kitBuildings(lib: NonNullable<ReturnType<typeof kitLibrary>>, lots: Lot[], lod: Lod): { geo: THREE.BufferGeometry; mat: THREE.Material; triangles: number }[] {
+  const byMat = new Map<THREE.Material, { model: Model; lot: Lot; h: number }[]>();
+  for (const lot of lots) {
+    const m = modelsFor(lib, lot);
+    const model = lod === 0 ? m.high : m.low;
+    let list = byMat.get(model.mat);
+    if (!list) byMat.set(model.mat, (list = []));
+    list.push({ model, lot, h: m.h });
+  }
+  const out: { geo: THREE.BufferGeometry; mat: THREE.Material; triangles: number }[] = [];
+  for (const [mat, items] of byMat) {
+    let verts = 0;
+    const flats = items.map((it) => flatten(it.model.geo));
+    for (const f of flats) verts += f.pos.length / 3;
+    const pos = new Float32Array(verts * 3), nor = new Float32Array(verts * 3), uv = new Float32Array(verts * 2);
+    let at = 0;
+    items.forEach((it, k) => {
+      const f = flats[k]!;
+      lotMatrix(it.lot, it.model, it.h, KM);
+      KN.getNormalMatrix(KM);
+      const e = KM.elements;
+      const n = f.pos.length / 3;
+      for (let i = 0; i < n; i++) {
+        const x = f.pos[i * 3]!, y = f.pos[i * 3 + 1]!, z = f.pos[i * 3 + 2]!;
+        pos[(at + i) * 3] = e[0]! * x + e[4]! * y + e[8]! * z + e[12]!;
+        pos[(at + i) * 3 + 1] = e[1]! * x + e[5]! * y + e[9]! * z + e[13]!;
+        pos[(at + i) * 3 + 2] = e[2]! * x + e[6]! * y + e[10]! * z + e[14]!;
+        const nx = f.nor[i * 3]!, ny = f.nor[i * 3 + 1]!, nz = f.nor[i * 3 + 2]!;
+        const ne = KN.elements;
+        let ax = ne[0]! * nx + ne[3]! * ny + ne[6]! * nz, ay = ne[1]! * nx + ne[4]! * ny + ne[7]! * nz, az = ne[2]! * nx + ne[5]! * ny + ne[8]! * nz;
+        const l = Math.hypot(ax, ay, az) || 1;
+        ax /= l; ay /= l; az /= l;
+        nor[(at + i) * 3] = ax; nor[(at + i) * 3 + 1] = ay; nor[(at + i) * 3 + 2] = az;
+        uv[(at + i) * 2] = f.uv[i * 2]!;
+        uv[(at + i) * 2 + 1] = f.uv[i * 2 + 1]!;
+      }
+      at += n;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    geo.computeBoundingBox();
+    out.push({ geo, mat, triangles: verts / 3 });
+  }
+  return out;
+}
+
 /** Builds the 3D objects for one chunk at one level of detail. */
 export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
   const group = new THREE.Group();
@@ -306,7 +375,13 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
   const b = new MeshBuilder();
   const cap = new MeshBuilder();
   const fb = new FacadeBuilder();
-  for (const lot of chunk.lots) addBuilding(b, cap, fb, lot, lod);
+  const lib = kitLibrary();
+  const kitLots: Lot[] = [];
+  for (const lot of chunk.lots) {
+    // ordinary buildings are Kenney City Kit models (the named places with an inside keep their own cutaway walls)
+    if (lib && lot.poly && lot.kind !== "stall") kitLots.push(lot);
+    else addBuilding(b, cap, fb, lot, lod);
+  }
   if (lod <= 1) for (const p of chunk.props) addProp(b, p, lod === 0);
   if (lod === 0) for (const l of chunk.lamps) b.box(l.x - 0.06, 0, l.z - 0.06, l.x + 0.06, 6.2, l.z + 0.06, POLE, 0.9);
   const geo = b.build();
@@ -327,6 +402,17 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
     group.add(mesh);
     geometries.push(capGeo);
     triangles += cap.triangles;
+  }
+  if (lib && kitLots.length) {
+    const built = kitBuildings(lib, kitLots, lod);
+    for (const k of built) {
+      const mesh = new THREE.Mesh(k.geo, k.mat);
+      mesh.castShadow = lod === 0;
+      mesh.receiveShadow = lod === 0;
+      group.add(mesh);
+      geometries.push(k.geo);
+      triangles += k.triangles;
+    }
   }
   const facadeGeo = fb.build();
   if (facadeGeo) {

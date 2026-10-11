@@ -83,7 +83,7 @@ export default function MapPage() {
         if (!runtime) setError("Your browser can't run WebGL, which the game needs.");
         else {
           runtimeRef.current = runtime;
-          if (import.meta.env.DEV) (window as unknown as { __map: MapRuntime["debug"] & { tour: MapRuntime["tour"] } }).__map = { ...runtime.debug, tour: runtime.tour, setNight: runtime.setNight } as never;
+          if (import.meta.env.DEV) (window as unknown as { __map: MapRuntime["debug"] & { tour: MapRuntime["tour"] } }).__map = { ...runtime.debug, tour: runtime.tour, setNight: runtime.setNight, zoomOut: runtime.zoomOut } as never;
         }
         setLoading(false);
       })

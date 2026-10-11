@@ -29,6 +29,7 @@ import { input } from "../controls/input";
 import { SkySystem } from "./sky";
 import { Traffic } from "./traffic";
 import { weatherFor } from "@thelife/game-core";
+import { loadKitLibrary, setKitNight } from "./kit";
 
 export interface MapStats {
   fps: number;
@@ -176,6 +177,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
   sky.onNight = (on) => {
     night = on;
     terrain.setNight(on);
+    setKitNight(on);
   };
 
   // Ground: water, streets, blocks and parks painted into textures that follow the player.
@@ -393,6 +395,8 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     }
     return null;
   }
+  // the buildings are models from the city kit: have them before the first chunk is built (plain blocks if the files cannot be fetched)
+  await loadKitLibrary().then(() => setKitNight(night), () => {});
   streamer.prime(district.spawn.x, district.spawn.z);
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.3, 700);
