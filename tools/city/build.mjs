@@ -33,15 +33,34 @@ const poly = (pts) => pts;
 // ---------------------------------------------------------------- the land and the water
 const MAINLAND = [[0, 0], [2700, 0], [2700, 560], [2400, 610], [2050, 650], [1700, 640], [1400, 670], [1150, 720], [930, 740], [780, 770], [690, 830], [640, 930], [600, 1050], [540, 1180], [470, 1330], [380, 1470], [230, 1540], [90, 1520], [0, 1440]];
 const ISLANDS = [[800, 985], [920, 950], [1050, 925], [1200, 935], [1400, 960], [1650, 975], [1900, 970], [2200, 985], [2450, 1000], [2700, 1030], [2700, 1890], [2400, 1905], [2000, 1890], [1750, 1960], [1350, 1970], [1250, 1870], [1000, 1800], [880, 1650], [820, 1400], [800, 1180]];
-g.fillRings([MAINLAND], BLOCK);
-g.fillRings([ISLANDS], BLOCK);
+// ---------------------------------------------------------------- the board: every district is its own plate in the water
+const DISTRICTS = [
+  // mainland
+  { name: "Ikeja", rect: [0, 0, 790, 430], sx: 95, sz: 85, w: 8 },
+  { name: "Mushin", rect: [0, 430, 400, 830], sx: 55, sz: 50, w: 6, every: 4, wide: 9 },
+  { name: "Surulere", rect: [400, 430, 820, 800], sx: 75, sz: 68, w: 7 },
+  { name: "Oshodi", rect: [790, 0, 1300, 410], sx: 90, sz: 80, w: 8 },
+  { name: "Yaba", rect: [820, 410, 1300, 760], sx: 68, sz: 60, w: 7 },
+  { name: "Ketu", rect: [1300, 0, 2700, 760], sx: 105, sz: 92, w: 8 },
+  { name: "Apapa", rect: [0, 830, 640, 1560], sx: 70, sz: 66, w: 7 },
+  // the islands
+  { name: "Lagos Island", rect: [790, 925, 1285, 1250], sx: 46, sz: 42, w: 6, every: 4, wide: 9 },
+  { name: "Onikan", rect: [790, 1250, 1345, 1900], sx: 82, sz: 76, w: 8 },
+  { name: "Ikoyi", rect: [1345, 925, 1835, 1450], sx: 120, sz: 100, w: 8 },
+  { name: "Victoria Island", rect: [1345, 1450, 1990, 1910], sx: 110, sz: 95, w: 9, every: 2, wide: 12 },
+  { name: "Lekki", rect: [1990, 925, 2700, 1920], sx: 135, sz: 112, w: 8 },
+  { name: "Eko Atlantic", rect: [1300, 1930, 1760, 2040], sx: 115, sz: 105, w: 12 },
+  { name: "Banana Island", rect: [1600, 770, 1790, 885], sx: 48, sz: 40, w: 6, inset: 10 },
+];
+const INSET = 22;
+const plate = ([x0, z0, x1, z1], inset) => {
+  const a = x0 + inset, b = z0 + inset, c = x1 - inset, d = z1 - inset, k = 16;
+  g.fillRings([[[a + k, b], [c - k, b], [c, b + k], [c, d - k], [c - k, d], [a + k, d], [a, d - k], [a, b + k]]], BLOCK);
+};
+for (const d of DISTRICTS) plate(d.rect, d.inset ?? INSET);
 // a ring of open water round the world, so nobody walks off the edge
-for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) if (x < 12 || z < 12 || x >= W - 12 || z >= H - 12) g.a[z * W + x] = WATER;
-// the creek between Lagos Island and Ikoyi, and the Lekki channel
-g.fillRings([[[1290, 925], [1340, 925], [1340, 1340], [1315, 1365], [1290, 1340]]], WATER);
-g.fillRings([[[1840, 955], [2000, 955], [2000, 1480], [1920, 1525], [1840, 1480]]], WATER);
-// Banana Island, a small island in the lagoon
-g.fillRings([[[1620, 800], [1700, 785], [1770, 805], [1775, 860], [1700, 878], [1625, 868]]], BLOCK);
+for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) if (x < 5 || z < 5 || x >= W - 5 || z >= H - 5) g.a[z * W + x] = WATER;
+
 
 // ---------------------------------------------------------------- streets
 const roadRows = [];
@@ -98,25 +117,27 @@ function streets([x0, z0, x1, z1], sx, sz, w, every = 3, wide = w + 3) {
   n = 0;
   for (let z = z0 + between(0, sz * 0.4); z < z1; z += sz * between(0.8, 1.25), n++) road([[x0, z], [x1, z]], n % every === 0 ? wide : w);
 }
-const DISTRICTS = [
-  // mainland
-  { name: "Ikeja", rect: [0, 0, 790, 430], sx: 95, sz: 85, w: 8 },
-  { name: "Mushin", rect: [0, 430, 400, 830], sx: 55, sz: 50, w: 6, every: 4, wide: 9 },
-  { name: "Surulere", rect: [400, 430, 820, 800], sx: 75, sz: 68, w: 7 },
-  { name: "Oshodi", rect: [790, 0, 1300, 410], sx: 90, sz: 80, w: 8 },
-  { name: "Yaba", rect: [820, 410, 1300, 760], sx: 68, sz: 60, w: 7 },
-  { name: "Ketu", rect: [1300, 0, 2700, 760], sx: 105, sz: 92, w: 8 },
-  { name: "Apapa", rect: [0, 830, 640, 1560], sx: 70, sz: 66, w: 7 },
-  // the islands
-  { name: "Lagos Island", rect: [790, 925, 1285, 1250], sx: 46, sz: 42, w: 6, every: 4, wide: 9 },
-  { name: "Onikan", rect: [790, 1250, 1345, 1980], sx: 82, sz: 76, w: 8 },
-  { name: "Ikoyi", rect: [1345, 925, 1835, 1450], sx: 120, sz: 100, w: 8 },
-  { name: "Victoria Island", rect: [1345, 1450, 1990, 1900], sx: 110, sz: 95, w: 9, every: 2, wide: 12 },
-  { name: "Lekki", rect: [1990, 925, 2700, 1920], sx: 135, sz: 112, w: 8 },
-  { name: "Eko Atlantic", rect: [1300, 1860, 1760, 1965], sx: 115, sz: 105, w: 12 },
-  { name: "Banana Island", rect: [1625, 795, 1770, 870], sx: 48, sz: 40, w: 6 },
-];
 for (const d of DISTRICTS) streets(d.rect, d.sx, d.sz, d.w, d.every ?? 3, d.wide ?? d.w + 3);
+// a waterfront road round the edge of every plate
+for (const d of DISTRICTS) {
+  const i = (d.inset ?? INSET) + 8, [x0, z0, x1, z1] = d.rect;
+  road([[x0 + i, z0 + i], [x1 - i, z0 + i], [x1 - i, z1 - i], [x0 + i, z1 - i], [x0 + i, z0 + i]], 7);
+}
+// bridges between plates that face each other across a channel
+for (let i = 0; i < DISTRICTS.length; i++) {
+  for (let j = i + 1; j < DISTRICTS.length; j++) {
+    const a = DISTRICTS[i].rect, b = DISTRICTS[j].rect, ia = DISTRICTS[i].inset ?? INSET, ib = DISTRICTS[j].inset ?? INSET;
+    const dx = Math.max(b[0] - a[2], a[0] - b[2]), dz = Math.max(b[1] - a[3], a[1] - b[3]);
+    const oz0 = Math.max(a[1], b[1]) + 40, oz1 = Math.min(a[3], b[3]) - 40, ox0 = Math.max(a[0], b[0]) + 40, ox1 = Math.min(a[2], b[2]) - 40;
+    if (dx >= -2 && dx <= 60 && oz1 - oz0 >= 40) {
+      const left = a[2] <= b[0] + 2 ? [a, b, ia, ib] : [b, a, ib, ia];
+      for (const f of [0.25, 0.75]) { const z = oz0 + (oz1 - oz0) * f; road([[left[0][2] - left[2] - 14, z], [left[1][0] + left[3] + 14, z]], 10, true); }
+    } else if (dz >= -2 && dz <= 60 && ox1 - ox0 >= 40) {
+      const top = a[3] <= b[1] + 2 ? [a, b, ia, ib] : [b, a, ib, ia];
+      for (const f of [0.25, 0.75]) { const x = ox0 + (ox1 - ox0) * f; road([[x, top[0][3] - top[2] - 14], [x, top[1][1] + top[3] + 14]], 10, true); }
+    }
+  }
+}
 
 // the long roads that tie it together
 const ARTERIALS = [
@@ -134,7 +155,7 @@ const ARTERIALS = [
   [[[1345, 1600], [1990, 1640], [2680, 1720]], 17, "Ozumba Mbadiwe Way"],
   [[[1345, 1740], [1990, 1745]], 15, "Adetokunbo Ademola Street"],
   [[[2000, 1100], [2680, 1180]], 17, "Lekki-Epe Expressway"],
-  [[[1300, 1920], [1760, 1925]], 15, "Eko Atlantic Boulevard"],
+  [[[1300, 1985], [1760, 1985]], 15, "Eko Atlantic Boulevard"],
 ];
 for (const [pts, w] of ARTERIALS) road(pts, w);
 // bridges: the Third Mainland, Carter and Eko Bridges over the lagoon, Falomo over the creek, the Lekki-Ikoyi Link, and the way on to Banana Island
@@ -144,7 +165,7 @@ const BRIDGES = [
   [[[770, 640], [790, 790], [840, 985]], 13, "Eko Bridge"],
   [[[1240, 1080], [1390, 1080]], 12, "Falomo Bridge"],
   [[[1790, 1160], [2060, 1160]], 15, "Lekki-Ikoyi Link Bridge"],
-  [[[1700, 900], [1700, 1000]], 8, "Banana Island Bridge"],
+  [[[1700, 880], [1700, 965]], 8, "Banana Island Bridge"],
 ];
 for (const [pts, w] of BRIDGES) road(pts, w, true);
 
@@ -163,7 +184,7 @@ const rectCells = (cx, cz, w, d, value, keepFree = true) => {
 const PARKS = [
   [1160, 1160, 110, 80], [1130, 1560, 150, 120], [1560, 1120, 160, 110], [1650, 1800, 140, 70], [2300, 1350, 340, 220],
   [2150, 1800, 260, 70], [520, 520, 90, 70], [1100, 1630, 120, 80], [1750, 520, 120, 90], [700, 260, 100, 80], [240, 640, 80, 70], [1900, 340, 110, 90],
-  [1540, 1530, 90, 70], [1360, 1790, 100, 70], [1850, 1270, 80, 60], [1030, 360, 90, 70],
+  [1540, 1530, 90, 70], [1360, 1790, 100, 70], [1730, 1330, 80, 60], [1030, 360, 90, 70],
 ];
 for (const [x, z, w, d] of PARKS) rectCells(x, z, w, d, PARK);
 const MARKETS = [
@@ -174,7 +195,7 @@ for (const [x, z, w, d] of MARKETS) rectCells(x, z, w, d, MARKET);
 // stadiums keep a wide lawn (the pitch, the track and the stands go on it), the ports and the airport a yard
 const STADIUMS = [[600, 690, 190, 150], [1210, 1490, 180, 150]];
 for (const [x, z, w, d] of STADIUMS) rectCells(x, z, w, d, PARK);
-const YARDS = [[300, 1280, 90, 70], [190, 1400, 90, 70], [2540, 1760, 100, 80], [420, 140, 200, 110]];
+const YARDS = [[300, 1280, 90, 70], [190, 1400, 90, 70], [2540, 1760, 100, 80], [420, 135, 440, 130]];
 for (const [x, z, w, d] of YARDS) rectCells(x, z, w, d, BLOCK);
 
 // ---------------------------------------------------------------- buildings
@@ -195,7 +216,7 @@ const STYLES = {
 };
 // where each style applies: the first rectangle that holds the point (the small special areas come before the districts)
 const STYLE_AREAS = [
-  ["cbd", [840, 960, 1180, 1070]], ["eko", [1300, 1860, 1760, 1965]], ["banana", [1625, 795, 1770, 870]],
+  ["cbd", [840, 960, 1180, 1070]], ["eko", [1300, 1930, 1760, 2040]], ["banana", [1600, 770, 1790, 885]],
   ["vi", [1345, 1450, 1990, 1860]], ["old", [810, 960, 1285, 1250]], ["island", [810, 1250, 1285, 1800]], ["ikoyi", [1345, 960, 1835, 1450]], ["lekki", [1835, 960, 2700, 1900]],
   ["dense", [0, 430, 400, 830]], ["yaba", [400, 440, 1300, 760]], ["apapa", [0, 830, 620, 1560]],
 ];
@@ -261,6 +282,11 @@ for (let start = 0; start < W * H; start++) {
   }
 }
 
+// the airport: a runway along the north of its yard, a terminal and hangars on the apron
+g.line([[220, 92], [640, 92]], 34, STREET, null);
+buildings.push({ kind: 4, floors: 2, roof: 0, x0: 365, z0: 120, w: 110, d: 30 });
+for (const x of [230, 262, 560, 596]) buildings.push({ kind: 3, floors: 1, roof: 0, x0: x, z0: 150, w: 26, d: 24 });
+
 // ---------------------------------------------------------------- the named places (metres; the game puts each in the nearest building)
 const PLACES = [
   // Lagos Island
@@ -309,7 +335,7 @@ const PLACES = [
   ["Apapa Port", "port", 300, 1280], ["Tin Can Island Port", "port", 190, 1400], ["Apapa General Hospital", "hospital", 250, 1000], ["Apapa Police Station", "police", 350, 1100], ["Apapa Market", "market", 470, 1050],
   ["Apapa Central Mosque", "mosque", 160, 1120], ["Apapa Church", "church", 400, 940], ["Apapa Grammar School", "school", 220, 900], ["Apapa Fire Station", "fire", 330, 1380], ["Apapa Hotel", "hotel", 130, 1000],
   ["Oando Apapa", "fuel", 440, 1180], ["Apapa Bank", "bank", 200, 1250], ["Apapa Local Government Office", "government", 260, 1150],
-  ["Murtala Muhammed Airport", "station", 420, 140], ["Elias Park Ikeja", "park", 700, 260],
+  ["Murtala Muhammed Airport", "airport", 420, 150], ["Elias Park Ikeja", "park", 700, 260],
 ];
 
 // ---------------------------------------------------------------- places: put each on the nearest ground that suits it
@@ -318,13 +344,13 @@ const taken = new Set();
 for (const [name, kind, x, z] of PLACES) {
   if (taken.has(name)) continue;
   taken.add(name);
-  const open = ["park", "market", "stadium", "port"].includes(kind);
+  const open = ["park", "market", "stadium", "port", "airport"].includes(kind);
   let best = null, bestD = 1e9;
   for (let dz = -150; dz <= 150; dz += 6) {
     for (let dx = -150; dx <= 150; dx += 6) {
       const px = x + dx, pz = z + dz;
       const c = at(px, pz);
-      const ok = open ? (kind === "market" ? c === MARKET : kind === "port" ? c === BLOCK || c === STREET : c === PARK) : c === BLOCK;
+      const ok = open ? (kind === "market" ? c === MARKET : kind === "port" || kind === "airport" ? c === BLOCK || c === STREET : c === PARK) : c === BLOCK;
       if (!ok) continue;
       if (!open && !solid(px - 8, pz - 8, px + 8, pz + 8)) continue;
       const d = Math.hypot(dx, dz);
@@ -336,11 +362,12 @@ for (const [name, kind, x, z] of PLACES) {
 }
 
 // ---------------------------------------------------------------- write
+const districtsTs = JSON.stringify(DISTRICTS.map((d) => ({ name: d.name, x0: d.rect[0] + (d.inset ?? INSET), z0: d.rect[1] + (d.inset ?? INSET), x1: d.rect[2] - (d.inset ?? INSET), z1: d.rect[3] - (d.inset ?? INSET) })), null, 2);
 const rle = [];
 for (let i = 0; i < W * H;) { let j = i; while (j < W * H && g.a[j] === g.a[i] && j - i < 65535) j++; rle.push(g.a[i], (j - i) & 255, (j - i) >> 8); i = j; }
 const b64 = Buffer.from(rle).toString("base64");
 const HEAD = "// Generated by tools/city/build.mjs (the game's own Lagos: no outside map data). Do not edit by hand.\n";
-writeFileSync(join(outDir, "lagosData.ts"), `${HEAD}// The ground of Lagos at ${CELL} m per cell: 0 water, 1 street, 2 built-up ground, 3 park, 5 market.\nexport const LAGOS_CELL = ${CELL};\nexport const LAGOS_W = ${W};\nexport const LAGOS_H = ${H};\nexport interface LagosPlace {\n  name: string;\n  kind: string;\n  /** In cells. */\n  x: number;\n  y: number;\n}\nexport const LAGOS_PLACES: LagosPlace[] = ${JSON.stringify(places, null, 2)};\nexport const LAGOS_RLE = "${b64}";\n`);
+writeFileSync(join(outDir, "lagosData.ts"), `${HEAD}// The ground of Lagos at ${CELL} m per cell: 0 water, 1 street, 2 built-up ground, 3 park, 5 market.\nexport const LAGOS_CELL = ${CELL};\nexport const LAGOS_W = ${W};\nexport const LAGOS_H = ${H};\nexport interface LagosPlace {\n  name: string;\n  kind: string;\n  /** In cells. */\n  x: number;\n  y: number;\n}\nexport const LAGOS_PLACES: LagosPlace[] = ${JSON.stringify(places, null, 2)};\nexport interface LagosDistrict {\n  name: string;\n  /** Metres. */\n  x0: number;\n  z0: number;\n  x1: number;\n  z1: number;\n}\nexport const LAGOS_DISTRICTS: LagosDistrict[] = ${districtsTs};\nexport const LAGOS_RLE = "${b64}";\n`);
 const rows = buildings.map((b) => {
   const x0 = Math.round(b.x0 * 10), z0 = Math.round(b.z0 * 10), w = Math.round(b.w * 10), d = Math.round(b.d * 10);
   return [b.kind, b.floors, 0, b.roof, x0, z0, w, 0, 0, d, -w, 0];

@@ -31,4 +31,7 @@ fetch_itch quaternius modular-character-outfits-fantasy outfits
 # Kenney (CC0)
 fetch_kenney furniture-kit "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip"
 fetch_kenney car-kit "https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip"
+fetch_kenney city-kit-commercial "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip"
+fetch_kenney city-kit-suburban "https://kenney.nl/media/pages/assets/city-kit-suburban/2c871b7af2-1745479373/kenney_city-kit-suburban_20.zip"
+fetch_kenney city-kit-industrial "https://kenney.nl/media/pages/assets/city-kit-industrial/0ec35b139d-1788171848/kenney_city-kit-industrial_2.0.zip"
 echo "done"

@@ -56,6 +56,24 @@ export const CREDITS = {
     licence: "CC0 1.0",
     url: "https://kenney.nl/assets/furniture-kit",
   },
+  "kenney-city-commercial": {
+    name: "City Kit (Commercial) 2.1",
+    author: "Kenney",
+    licence: "CC0 1.0",
+    url: "https://kenney.nl/assets/city-kit-commercial",
+  },
+  "kenney-city-suburban": {
+    name: "City Kit (Suburban)",
+    author: "Kenney",
+    licence: "CC0 1.0",
+    url: "https://kenney.nl/assets/city-kit-suburban",
+  },
+  "kenney-city-industrial": {
+    name: "City Kit (Industrial) 2.0",
+    author: "Kenney",
+    licence: "CC0 1.0",
+    url: "https://kenney.nl/assets/city-kit-industrial",
+  },
   "kenney-cars": {
     name: "Car Kit",
     author: "Kenney",

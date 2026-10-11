@@ -473,3 +473,15 @@ Owner request: use a map like Lagos Life (a whole-Lagos board), not just Lagos I
 - Tests updated for the new size. Players whose saved position is not on dry ground in the new map are put back at the spawn (existing server rule).
 
 To do next: more detail per district (landmark buildings, coastal roads, beaches), a look at night, and more building density in the mainland.
+
+## The city map is now a 3D board (like the Lagos Life look)
+
+Owner feedback: the map was not like the reference (Lagos Life): a city board with districts as plates in the sea, real building models, moving things. Built:
+
+- **Plates in the sea**: `tools/city/build.mjs` now makes every district its own plate (rounded corners, a waterfront road round the edge) with a channel of water between plates and bridges across the channels (plus Third Mainland, Carter, Eko, Falomo, Lekki-Ikoyi Link bridges). Districts and their names are exported as `LAGOS_DISTRICTS`. The airport is at Ikeja with a runway, terminal, hangars and parked planes.
+- **`map/CityBoard.ts`** (new): the big map is a three.js scene instead of a 2D canvas. Day and night looks (dark plates, deep blue sea, glowing windows and lamps after dark), moving sea, Kenney car-kit cars, taxis, vans and trucks driving the real roads (instanced), planes taking off and circling, boats crossing the lagoon, stadium pitch and stands, port containers, market stalls. Pins, district names and the player dot stay as screen labels (`CityMap.tsx`), now positioned by projecting through the 3D camera.
+- **`map/cityModels.ts`** (new): every building is an instance of a model from the Kenney City Kits (CC0; credits in `tools/assets/sources.mjs` and `docs/ASSET_PIPELINE.md`), chosen by proportions to fit the lot, stretched to its footprint. The whole city uses light "low detail" shapes; the buildings round the middle of the screen (up to 700 on desktop, 260 on phones, only when zoomed in) swap to the full models. Only the instances in use are drawn. Trees and shipping containers are kit models too. If the kit fails to load, plain blocks stand in. Bundles: `node tools/assets/build-city.mjs` (1.6 MB in total).
+- Fixes found on the way: the "online" chip sat on top of "Show list" on desktop; the camera's near and far planes now follow the zoom so far plates do not vanish behind the sea on weaker depth buffers.
+- Dev: `?hour=21` forces night or day on the board; `window.__board` is the board.
+
+Not done: the walking (street) world still uses its own blocks and props, not the kit models; people are not shown on the board; landmark buildings use ordinary kit models tinted by their pins rather than unique models.

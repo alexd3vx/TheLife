@@ -539,6 +539,10 @@ export function generateLagos(seed = 7): District {
       props.push({ kind: "pitch", x: lm.x, z: lm.z, yaw: 0, variant: 0 });
       for (const [dx, dz, yaw, side] of [[0, -64, 0, 0], [0, 64, 0, 1], [-50, 0, 90, 0], [50, 0, 90, 1]] as const) props.push({ kind: "stand", x: lm.x + dx, z: lm.z + dz, yaw, variant: side });
     }
+    if (lm.kind === "airport") {
+      // aircraft parked on the apron in front of the terminal
+      for (let i = -3; i <= 3; i++) props.push({ kind: "plane", x: lm.x + i * 52, z: lm.z + 28, yaw: 0, variant: (i + 3) % 3 });
+    }
     if (lm.kind === "port") {
       // stacks of containers in rows on whatever dry ground is round the pin
       for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) {
