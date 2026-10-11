@@ -345,6 +345,23 @@ export function buildChunk(chunk: ChunkData, lod: Lod): BuiltChunk {
     group.add(instancedLamps(chunk.lamps));
     triangles += chunk.lamps.length * (SHARED_LAMP.getAttribute("position").count / 3);
   }
+  if (lod === 0 && chunk.wires.length) {
+    // overhead cables: two sagging lines per span, one draw call per chunk
+    const wire: number[] = [];
+    for (const [x1, z1, x2, z2] of chunk.wires) {
+      const along = Math.abs(x2 - x1) > Math.abs(z2 - z1);
+      for (const off of [-0.6, 0.6]) {
+        const ax = x1 + (along ? 0 : off), az = z1 + (along ? off : 0), bx = x2 + (along ? 0 : off), bz = z2 + (along ? off : 0);
+        const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+        wire.push(ax, 7.6, az, mx, 7.1, mz, mx, 7.1, mz, bx, 7.6, bz);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(wire, 3));
+    g.computeBoundingSphere();
+    group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: "#1c1d20" })));
+    geometries.push(g);
+  }
   group.matrixAutoUpdate = false;
   return { group, triangles, geometries };
 }

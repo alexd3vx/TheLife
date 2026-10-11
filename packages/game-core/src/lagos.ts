@@ -452,13 +452,99 @@ export function generateLagos(seed = 7): District {
       lamps.push({ x: px, z: pz, facing });
     }
   }
-  for (let z = 10; z < t.size.z; z += 40) {
-    for (let x = 10; x < t.size.x; x += 40) {
-      const px = x + between(-15, 15), pz = z + between(-15, 15);
-      if (t.classAt(px, pz) !== STREET || t.streetKind(px, pz) !== "asphalt" || rand() < 0.7) continue;
-      // Along the street: look at which way the asphalt runs.
-      const along = t.classAt(px + 8, pz) === STREET && t.classAt(px - 8, pz) === STREET ? 90 : 0;
-      props.push({ kind: "car", x: px, z: pz, yaw: along, variant: Math.floor(rand() * 6) });
+  // ---- street life: the things that make a Lagos street a Lagos street (poles and cables, kiosks, generators, market umbrellas,
+  // billboards, parked cars along the kerb, okadas, keke and danfo, boats on the lagoon, container yards, the stands of a stadium).
+  // Everything is placed from the real streets and the real buildings, the same way for every player.
+  /** Which way the street runs here: 90 when the asphalt goes along x. */
+  const runs = (x: number, z: number): 0 | 90 => (t.classAt(x + 9, z) === STREET && t.classAt(x - 9, z) === STREET ? 90 : 0);
+  const onSidewalk = (x: number, z: number) => t.classAt(x, z) === STREET && t.streetKind(x, z) === "sidewalk";
+  const nearBuilding = (x: number, z: number, pad: number) => !clear(x, z, pad);
+  const poles: { x: number; z: number }[] = [];
+  const poleGrid = new Map<string, { x: number; z: number }[]>();
+  const poleKey = (x: number, z: number) => `${Math.floor(x / 50)},${Math.floor(z / 50)}`;
+  // power poles along the pavements: a dense scan, keeping one wherever no pole stands within a span, so each street gets a row about 25 to 35 m apart
+  const spacing = 26;
+  for (let z = 4; z < t.size.z; z += 7) {
+    for (let x = 4; x < t.size.x; x += 7) {
+      const px = x + between(-3, 3), pz = z + between(-3, 3);
+      if (!onSidewalk(px, pz) || t.edgeDistance(px, pz) > 1.6 || !clear(px, pz, 0.8)) continue;
+      let crowded = false;
+      for (let dx = -1; dx <= 1 && !crowded; dx++) for (let dz = -1; dz <= 1 && !crowded; dz++) {
+        for (const q of poleGrid.get(`${Math.floor(px / 50) + dx},${Math.floor(pz / 50) + dz}`) ?? []) if (Math.hypot(q.x - px, q.z - pz) < spacing) { crowded = true; break; }
+      }
+      if (crowded) continue;
+      const p = { x: px, z: pz };
+      poles.push(p);
+      props.push({ kind: "pole", x: px, z: pz, yaw: runs(px, pz), variant: 0 });
+      const k = poleKey(px, pz);
+      (poleGrid.get(k) ?? poleGrid.set(k, []).get(k)!).push(p);
+    }
+  }
+  const wires: District["wires"] = [];
+  const links = new Map<{ x: number; z: number }, number>();
+  for (const a of poles) {
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      for (const b of poleGrid.get(`${Math.floor(a.x / 50) + dx},${Math.floor(a.z / 50) + dz}`) ?? []) {
+        if (b === a || (links.get(a) ?? 0) >= 2 || (links.get(b) ?? 0) >= 2) continue;
+        const dist = Math.hypot(a.x - b.x, a.z - b.z);
+        if (dist < 14 || dist > 46 || (b.x < a.x || (b.x === a.x && b.z < a.z))) continue;
+        // a cable follows a street: its middle must be over the street, not through a building
+        const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+        if (t.classAt(mx, mz) !== STREET) continue;
+        wires.push([a.x, a.z, b.x, b.z]);
+        links.set(a, (links.get(a) ?? 0) + 1);
+        links.set(b, (links.get(b) ?? 0) + 1);
+      }
+    }
+  }
+  // the rest of the pavement
+  for (let z = 5; z < t.size.z; z += 6) {
+    for (let x = 5; x < t.size.x; x += 6) {
+      const px = x + between(-2, 2), pz = z + between(-2, 2);
+      const c = t.classAt(px, pz);
+      const r = rand();
+      if (c === STREET && t.streetKind(px, pz) === "sidewalk") {
+        if (!clear(px, pz, 0.7)) continue;
+        const wall = nearBuilding(px, pz, 3.2);
+        if (r < 0.02) props.push({ kind: "bin", x: px, z: pz, yaw: 0, variant: 0 });
+        else if (r < 0.024) props.push({ kind: "hydrant", x: px, z: pz, yaw: 0, variant: 0 });
+        else if (r < 0.032 && t.edgeDistance(px, pz) < 1.4) props.push({ kind: "bench", x: px, z: pz, yaw: runs(px, pz), variant: 0 });
+        else if (r < 0.04) props.push({ kind: "sign", x: px, z: pz, yaw: 0, variant: 0 });
+        else if (r < 0.043) props.push({ kind: "busStop", x: px, z: pz, yaw: 0, variant: 0 });
+        else if (wall && r < 0.075) props.push({ kind: "kiosk", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 8) });
+        else if (wall && r < 0.095) props.push({ kind: "generator", x: px, z: pz, yaw: 0, variant: Math.floor(rand() * 3) });
+        else if (r < 0.1025) props.push({ kind: "okada", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 4) });
+        else if (r < 0.1075) props.push({ kind: "billboard", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 6) });
+      } else if (c === MARKET) {
+        // market stalls under bright umbrellas, in loose rows
+        if (clear(px, pz, 1.5) && (Math.floor(x / 6) + Math.floor(z / 6)) % 2 === 0 && r < 0.55) props.push({ kind: "stall", x: px, z: pz, yaw: rand() < 0.5 ? 0 : 90, variant: Math.floor(rand() * 8) });
+      } else if (c === STREET && t.streetKind(px, pz) === "asphalt") {
+        // parked beside the kerb (never in the middle of the road): cars mostly, with keke and danfo
+        const e = t.edgeDistance(px, pz);
+        if (e < 1.7 || e > 3.6 || !clear(px, pz, 0.5)) continue;
+        if (r < 0.06) props.push({ kind: "car", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 6) });
+        else if (r < 0.068) props.push({ kind: "keke", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 3) });
+        else if (r < 0.0715) props.push({ kind: "danfo", x: px, z: pz, yaw: runs(px, pz), variant: Math.floor(rand() * 3) });
+      } else if (c === WATER && rand() < 0.7) {
+        // a boat tied up where the water meets the land
+        let shore = false;
+        for (const [ox, oz] of [[9, 0], [-9, 0], [0, 9], [0, -9]] as const) if (t.classAt(px + ox, pz + oz) !== WATER && t.classAt(px + ox, pz + oz) !== STREET) shore = true;
+        if (shore && r < 0.08) props.push({ kind: "boat", x: px, z: pz, yaw: rand() < 0.5 ? 0 : 90, variant: Math.floor(rand() * 4) });
+      }
+    }
+  }
+  // stadiums: four stands round the pitch, and the ports' container yards
+  for (const lm of landmarks) {
+    if (lm.kind === "stadium" && !lm.lotId) {
+      props.push({ kind: "pitch", x: lm.x, z: lm.z, yaw: 0, variant: 0 });
+      for (const [dx, dz, yaw, side] of [[0, -64, 0, 0], [0, 64, 0, 1], [-50, 0, 90, 0], [50, 0, 90, 1]] as const) props.push({ kind: "stand", x: lm.x + dx, z: lm.z + dz, yaw, variant: side });
+    }
+    if (lm.kind === "port") {
+      // stacks of containers in rows on whatever dry ground is round the pin
+      for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) {
+        const x = lm.x + i * 4.2, z = lm.z + j * 7.4;
+        if (t.classAt(x, z) !== WATER && t.classAt(x, z) !== STREET && clear(x, z, 1)) props.push({ kind: "container", x, z, yaw: 0, variant: (i * 3 + j * 5 + 40) % 6 });
+      }
     }
   }
 
@@ -487,7 +573,7 @@ export function generateLagos(seed = 7): District {
     landmarks,
     runway: rect(0, 0, 0, 0),
     props,
-    wires: [],
+    wires,
     paving: [],
     fields: [],
     spawn: { x: start.x, z: start.z, yaw: 0 },

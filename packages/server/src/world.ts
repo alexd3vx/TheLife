@@ -232,7 +232,9 @@ export class Room {
   arrive(player: Player, to: { x: number; z: number }, now: number): MoveResult {
     const b = this.district.bounds;
     const inside = to.x > b.minX && to.x < b.maxX && to.z > b.minZ && to.z < b.maxZ;
-    if (player.rideUntil < now || !inside || !walkableAt(this.district, to.x, to.z, 0.1)) {
+    // (a test server started with THELIFE_FREE_TELEPORT=1 lets a developer jump anywhere to look at the city)
+    const free = process.env.THELIFE_FREE_TELEPORT === "1";
+    if ((player.rideUntil < now && !free) || !inside || !walkableAt(this.district, to.x, to.z, 0.1)) {
       return { ok: false, correct: { x: player.x, y: player.y, z: player.z, level: player.level } };
     }
     player.rideUntil = 0;

@@ -449,3 +449,15 @@ Chronological record of decisions and changes. Newest first.
 - **Survival** (`game-core/survival.ts`, ticked by the sim, server-run): hydration (a sachet is ₦100), health, rain that soaks you outdoors (an umbrella stops it) and a cold from it, malaria from night mosquitoes (a net helps; tablets cure it early, the hospital later), food poisoning from a bad plate, infected cuts, slips on wet or dark roads (sprain slows you, a cut can infect), a collapse at zero health with an emergency ward bill, and NEPA cuts: a ₦120,000 generator and ₦700 a litre of fuel keep the power on (it burns about 1.2 L an hour while the power is out). Nothing new happens while you are away. Sold at the hospital pharmacy (painkillers, malaria tablets, first aid kit, net, treatment), the market (umbrella, first aid) and the fuel station (generator, fuel). The HUD shows a row of troubles under the needs; tap one for what to do. 14 tests in `survival.test.ts`.
 - **ID numbers** (`game-core/identity.ts`): a character's date of birth and the numbers on their ID documents (National ID, driver's licence, voter's card, passport) are worked out from the character and shown on the bank form, which now checks them. Before, the form asked for a number nobody had.
 - **Arrival film on phones:** the home is built only after the film ends on a phone (building a 3D house behind the film made it stutter), the film's character renders at 30 frames a second with no anti-aliasing and a lower pixel count. In the software renderer the film now holds a 17 ms median frame.
+
+## Map round 2: street life (poles, cables, kiosks, stalls, boats, stadium)
+
+The Lagos Island map was bland at street level: 200 randomly parked cars and nothing else. Now the street is placed from the real streets and buildings, the same for every player (`generateLagos`, "street life" block):
+
+- **Power poles** every 25 to 35 m along the pavements (about 4,000), joined by **overhead cables** (2,400 spans; they follow a street, never cross a building). Cables are now part of each chunk (`ChunkData.wires`) and drawn at the nearest detail level.
+- **Pavement furniture**: bins, hydrants, benches, signs, bus shelters, painted **kiosks** and **generators** beside buildings, parked **okadas**, tall **billboards**.
+- **Markets**: rows of coloured-umbrella **stalls** (about 1,200) on market ground. **Kerbs**: cars, **keke** and yellow **danfo** parked by the kerb, never mid-road. **Waterfront**: **boats** where land meets the lagoon. **Ports**: container stacks.
+- **Stadiums**: a pitch with mown stripes, lines, goals and a running track, and four tiered stands with seats.
+- Walking and path-finding use a per-kind footprint (`propHalfSize`), so a bin no longer blocks the path like a car did; boats, billboards and pitches don't block at all.
+
+Not done yet: ground-colour variety between buildings (the flat beige), richer landmark buildings, a night-lighting pass for the new props. Needs a look on a real phone.

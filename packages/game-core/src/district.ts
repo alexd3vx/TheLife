@@ -79,7 +79,7 @@ export interface Lamp {
   facing: Facing;
 }
 
-export type PropKind = "pole" | "hydrant" | "bin" | "bench" | "busStop" | "sign" | "car" | "plane";
+export type PropKind = "pole" | "hydrant" | "bin" | "bench" | "busStop" | "sign" | "car" | "plane" | "kiosk" | "generator" | "stall" | "billboard" | "okada" | "keke" | "danfo" | "boat" | "stand" | "container" | "pitch";
 
 /** Street furniture and parked cars. `yaw` is a multiple of 90 degrees (0 faces +x along the crossarm/length, 90 turns it). */
 export interface Prop {
@@ -426,6 +426,8 @@ export interface ChunkData {
   trees: Tree[];
   lamps: Lamp[];
   props: Prop[];
+  /** Cable spans, kept in the chunk holding their middle. */
+  wires: [number, number, number, number][];
 }
 
 /** Everything in the district sorted into its chunk (a lot, tree or lamp belongs to the chunk holding its centre). */
@@ -437,7 +439,7 @@ export function indexChunks(d: District): Map<string, ChunkData> {
     const key = chunkKey(cx, cz);
     let c = map.get(key);
     if (!c) {
-      c = { cx, cz, bounds: rect(cx * CHUNK_SIZE, (cx + 1) * CHUNK_SIZE, cz * CHUNK_SIZE, (cz + 1) * CHUNK_SIZE), lots: [], trees: [], lamps: [], props: [] };
+      c = { cx, cz, bounds: rect(cx * CHUNK_SIZE, (cx + 1) * CHUNK_SIZE, cz * CHUNK_SIZE, (cz + 1) * CHUNK_SIZE), lots: [], trees: [], lamps: [], props: [], wires: [] };
       map.set(key, c);
     }
     return c;
@@ -449,7 +451,16 @@ export function indexChunks(d: District): Map<string, ChunkData> {
   for (const t of d.trees) get(t.x, t.z).trees.push(t);
   for (const l of d.lamps) get(l.x, l.z).lamps.push(l);
   for (const p of d.props) get(p.x, p.z).props.push(p);
+  for (const w of d.wires) get((w[0] + w[2]) / 2, (w[1] + w[3]) / 2).wires.push(w);
   return map;
+}
+
+/** Half the footprint (x, z) of a prop at yaw 0, for walking and path-finding. */
+export function propHalfSize(kind: PropKind): [number, number] {
+  return ({
+    pole: [0.15, 0.15], hydrant: [0.2, 0.2], bin: [0.3, 0.3], sign: [0.1, 0.1], bench: [0.9, 0.3], busStop: [1.5, 0.8], car: [0.95, 2.2], plane: [4.8, 5.2],
+    kiosk: [1.0, 1.0], generator: [0.6, 0.4], stall: [1.1, 0.9], billboard: [0.2, 0.2], okada: [0.4, 1.0], keke: [0.8, 1.3], danfo: [1.0, 2.6], boat: [0.9, 2.2], stand: [6, 2], container: [1.3, 3.1], pitch: [0.01, 0.01],
+  } as Record<PropKind, [number, number]>)[kind];
 }
 
 /** Things a walking character can't pass: buildings, fences' footprints are the plots' edges (kept simple), tree trunks. */
@@ -462,7 +473,7 @@ export function walkBlockers(d: District): Rect[] {
   for (const t of d.trees) out.push(rect(t.x - 0.35, t.x + 0.35, t.z - 0.35, t.z + 0.35));
   for (const l of d.lamps) out.push(rect(l.x - 0.15, l.x + 0.15, l.z - 0.15, l.z + 0.15));
   for (const p of d.props) {
-    const r = { pole: [0.15, 0.15], hydrant: [0.2, 0.2], bin: [0.3, 0.3], sign: [0.1, 0.1], bench: [0.9, 0.3], busStop: [1.5, 0.8], car: [0.95, 2.2], plane: [4.8, 5.2] }[p.kind];
+    const r = propHalfSize(p.kind);
     const [hx, hz] = p.yaw === 90 ? [r[1]!, r[0]!] : [r[0]!, r[1]!];
     // A car is long along the road: yaw 0 means the road runs north-south (z), so its long side is z; the table above is (x, z) for yaw 0.
     out.push(rect(p.x - hx, p.x + hx, p.z - hz, p.z + hz));

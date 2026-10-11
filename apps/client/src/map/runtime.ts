@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { blockOutside, blockRectCentres, createNavGrid, isFree, type NavGrid } from "@thelife/shared";
-import { hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotIndexOf, coarseRoute, nearPolygon, type BuildingPlan, type Lot, type PlanStairs, type Rect } from "@thelife/game-core";
+import { propHalfSize, hasInterior, generatePlan, climbStep, planBlockers, stairProgress, lotIndexOf, coarseRoute, nearPolygon, type BuildingPlan, type Lot, type PlanStairs, type Rect } from "@thelife/game-core";
 import { getDistrict } from "./districtData";
 import { pinTexture } from "./pins";
 import { Avatar } from "../lab/avatar";
@@ -10,6 +10,7 @@ import { locomotionClip } from "../lab/locomotion";
 import type { AssetManifest } from "../lab/manifest";
 import { CharacterController, type GameBridge } from "../play/controller";
 import { grassTexture } from "../play/world";
+import { world } from "../net/world";
 import type { TapMenu } from "../play/runtime";
 import { buildInteriorScene, capHideLevel, capHideLot } from "./chunkBuilder";
 import { buildTerrain } from "./terrain";
@@ -245,7 +246,12 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     }
     for (const t of district.trees) if (Math.abs(t.x - cx) < NAV_HALF && Math.abs(t.z - cz) < NAV_HALF) blockRectCentres(g, { minX: t.x - 0.35, maxX: t.x + 0.35, minZ: t.z - 0.35, maxZ: t.z + 0.35 }, 0.25);
     for (const l of district.lamps) if (Math.abs(l.x - cx) < NAV_HALF && Math.abs(l.z - cz) < NAV_HALF) blockRectCentres(g, { minX: l.x - 0.15, maxX: l.x + 0.15, minZ: l.z - 0.15, maxZ: l.z + 0.15 }, 0.25);
-    for (const p of district.props) if (Math.abs(p.x - cx) < NAV_HALF && Math.abs(p.z - cz) < NAV_HALF) blockRectCentres(g, p.yaw === 90 ? { minX: p.x - 2.2, maxX: p.x + 2.2, minZ: p.z - 0.95, maxZ: p.z + 0.95 } : { minX: p.x - 0.95, maxX: p.x + 0.95, minZ: p.z - 2.2, maxZ: p.z + 2.2 }, 0.2);
+    for (const p of district.props) {
+      if (Math.abs(p.x - cx) >= NAV_HALF || Math.abs(p.z - cz) >= NAV_HALF || p.kind === "boat" || p.kind === "billboard" || p.kind === "pitch") continue;
+      const [hw, hd] = propHalfSize(p.kind);
+      const [hx, hz] = p.yaw === 90 ? [hd, hw] : [hw, hd];
+      blockRectCentres(g, { minX: p.x - hx, maxX: p.x + hx, minZ: p.z - hz, maxZ: p.z + hz }, 0.2);
+    }
     return g;
   }
   let navCentre = { x: district.spawn.x, z: district.spawn.z };
@@ -974,6 +980,7 @@ export async function startMap(container: HTMLElement, manifest: AssetManifest, 
     debug: {
       stats: currentStats,
       teleport: (x, z) => {
+        world.send({ t: "arrive", x, z }); // (a developer's test server accepts it; the real one only after a paid ride)
         controller.place(x, z, 0);
         resetView();
       },
