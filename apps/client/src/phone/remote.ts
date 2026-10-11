@@ -133,6 +133,11 @@ export const atmDeposit = remote("atmDeposit", core.atmDeposit as (s: GameState,
 export const atmAirtime = remote("atmAirtime", core.atmAirtime as (s: GameState, amount: number, pin: string) => BR);
 export const atmChangePin = remote("atmChangePin", core.atmChangePin as (s: GameState, oldPin: string, newPin: string) => BR);
 
+// ---- staying alive
+export const survivalBuy = remote("survivalBuy", core.buyItem as (s: GameState, item: "umbrella" | "generator" | "bednet" | "firstAid") => core.SurvivalResult);
+export const survivalFuel = remote("survivalFuel", core.buyFuel as (s: GameState, litres: number) => core.SurvivalResult);
+export const survivalFirstAid = remote("survivalFirstAid", core.useFirstAid as (s: GameState) => core.SurvivalResult);
+
 // ---- the hospital (in person)
 type HoR = core.HospitalResult;
 export const hospital = remote("hospital", core.hospitalService as (s: GameState, id: string) => HoR);

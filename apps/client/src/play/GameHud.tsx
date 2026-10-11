@@ -6,7 +6,7 @@ import { GameIcon, type FaName } from "../ui/icons";
 import { GameSession, type HudSnapshot } from "./gameSession";
 import "./play.css";
 import ProfileSheet from "../ui/ProfileSheet";
-import { NeedsRow, ProfileButton, TopPill } from "./HudParts";
+import { MoodleRow, NeedsRow, ProfileButton, TopPill } from "./HudParts";
 
 const NEED_META: { id: NeedId; icon: FaName; label: string }[] = [
   { id: "hunger", icon: "hunger", label: "Hunger" },
@@ -131,6 +131,7 @@ export default function GameHud({ onHour, session: given, children }: { onHour?(
       <ProfileButton hud={hud} />
       <TopPill hud={hud} />
       <NeedsRow hud={hud} />
+          <MoodleRow hud={hud} />
 
       <div className="play-toasts" aria-live="polite">
         {toasts.map((toast) => (

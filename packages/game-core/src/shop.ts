@@ -2,6 +2,7 @@ import { PLAYER, SINK, transfer } from "./ledger";
 import { clampNeed } from "./needs";
 import { openStatus } from "./places";
 import { clockOf } from "./sim";
+import { drink } from "./survival";
 import { NEED_IDS, type GameState, type NeedId } from "./types";
 
 /**
@@ -17,12 +18,14 @@ export interface Snack {
   blurb: string;
   price: number;
   effect: Partial<Record<NeedId, number>>;
+  /** Hydration it gives (0 to 100). */
+  thirst?: number;
 }
 
 export const SNACKS: Snack[] = [
-  { id: "water", name: "Sachet water", blurb: "Cold pure water.", price: 100, effect: { energy: 2, hunger: 1 } },
-  { id: "zobo", name: "Zobo", blurb: "Chilled hibiscus drink in a bottle.", price: 300, effect: { hunger: 4, fun: 4 } },
-  { id: "cola", name: "Cold soft drink", blurb: "Fizzy and sweet. A quick lift.", price: 450, effect: { energy: 8, fun: 5 } },
+  { id: "water", name: "Sachet water", blurb: "Cold pure water.", price: 100, effect: { energy: 2, hunger: 1 }, thirst: 45 },
+  { id: "zobo", name: "Zobo", blurb: "Chilled hibiscus drink in a bottle.", price: 300, effect: { hunger: 4, fun: 4 }, thirst: 35 },
+  { id: "cola", name: "Cold soft drink", blurb: "Fizzy and sweet. A quick lift.", price: 450, effect: { energy: 8, fun: 5 }, thirst: 22 },
   { id: "chinchin", name: "Chin chin", blurb: "A crunchy bag to nibble on.", price: 300, effect: { hunger: 10, fun: 3 } },
   { id: "pie", name: "Meat pie", blurb: "Warm from the glass case.", price: 700, effect: { hunger: 22 } },
   { id: "puff", name: "Puff-puff", blurb: "Hot, sugary, by the dozen.", price: 500, effect: { hunger: 14, fun: 5 } },
@@ -56,6 +59,7 @@ export function shopSnack(state: GameState, kind: ShopPlace, id: string, scale =
   const r = transfer(state.ledger, PLAYER, SINK, price, s.name, state.minute);
   if (!r.ok) return { ok: false, reason: `${s.name} costs ₦${price.toLocaleString()}. You don't have enough.` };
   state.stats.totalSpent += price;
+  if (s.thirst) drink(state, s.thirst);
   for (const n of NEED_IDS) {
     const add = s.effect[n];
     if (add) state.needs[n] = clampNeed(state.needs[n] + add);

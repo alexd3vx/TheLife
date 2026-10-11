@@ -3,6 +3,7 @@ import { createGameState } from "./sim";
 import { MINT, PLAYER, balance, ledgerTotal, transfer } from "./ledger";
 import { ATM_FEE, ATM_PER_DAY, APPLICATION_MINUTES, BANKS, TRANSFER_FEE, applicationReady, applyForAccount, atmAirtime, atmChangePin, atmDeposit, atmLogin, atmWithdraw, bankBorrow, bankDeposit, bankRepay, bankTransferOut, bankWithdraw, checkPin, collectCard, counterOpen, parseBank, savingsBalance, statement, unblockCard } from "./bank";
 import { parseGameState } from "./persist";
+import { dobOf, idNumberOf } from "./identity";
 import { phoneSendCheck, sendMoney, weekly } from "./phone";
 
 const weekdayMorning = () => {
@@ -14,7 +15,7 @@ const weekdayMorning = () => {
   }
   return s;
 };
-const FORM = ["1998-04-23", "National ID (NIN)", "12345678901", "12 Awolowo Road, Ikoyi"] as const;
+const FORM = [dobOf(null), "National ID (NIN)", idNumberOf(null, "National ID (NIN)"), "12 Awolowo Road, Ikoyi"] as const;
 
 /** A state with an open account (Eko Trust) and the PIN 2580. */
 function withAccount() {
@@ -35,6 +36,9 @@ describe("opening an account", () => {
     expect(applyForAccount(s, "ekotrust", "2015-01-01", "National ID (NIN)", "12345678901", "12 Awolowo Road").ok).toBe(false); // too young
     expect(applyForAccount(s, "ekotrust", FORM[0], "A made-up ID", FORM[2], FORM[3]).ok).toBe(false);
     expect(applyForAccount(s, "ekotrust", FORM[0], FORM[1], "123", FORM[3]).ok).toBe(false);
+    expect(applyForAccount(s, "ekotrust", FORM[0], FORM[1], "99999999999", FORM[3]).ok).toBe(false); // not the number on your card
+    const lic = applyForAccount(s, "ekotrust", FORM[0], "Driver's licence", FORM[2], FORM[3]);
+    expect(lic.ok).toBe(false); // a licence has its own number
     expect(applyForAccount(s, "nobank", ...FORM).ok).toBe(false);
     expect(applyForAccount(s, "ekotrust", ...FORM).ok).toBe(true);
     expect(applyForAccount(s, "unity", ...FORM).ok).toBe(false); // one at a time

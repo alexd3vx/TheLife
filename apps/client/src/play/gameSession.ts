@@ -6,12 +6,15 @@ import {
   createGameState,
   mood,
   moodLabel,
+  moodles,
+  type Moodle,
   parseGameState,
   isDead,
   simulateAbsence,
   unreadCount,
   skillLevel,
   speedFactor,
+  survivalSpeed,
   type GameState,
   type NeedId,
   type Profile,
@@ -36,6 +39,8 @@ export interface HudSnapshot {
   needs: Record<NeedId, number>;
   mood: number;
   moodLabel: string;
+  /** The troubles you have right now (thirst, illness, an injury, rain, no power), worst first. */
+  moodles: Moodle[];
   portions: number;
   meals: number;
   rentOwed: number;
@@ -168,7 +173,7 @@ export class GameSession implements GameBridge {
     return a ? { id: a.def.id, forced: a.forced } : null;
   }
   speedFactor() {
-    return speedFactor(this.sim.state.needs);
+    return speedFactor(this.sim.state.needs) * survivalSpeed(this.sim.state);
   }
   needs() {
     return this.sim.state.needs;
@@ -222,6 +227,7 @@ export class GameSession implements GameBridge {
       needs,
       mood: mood(s.needs),
       moodLabel: moodLabel(s.needs),
+      moodles: moodles(s),
       portions: s.inventory.portions,
       meals: s.inventory.meals,
       rentOwed: s.rentOwed,

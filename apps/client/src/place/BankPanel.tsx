@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BANKS, ID_TYPES, PLAYER, SAVINGS, APPLICATION_MINUTES, accountOf, applicationReady, balance, bankById, counterOpen, loanLimit, statement, TRANSFER_FEE, type BankBrand } from "@thelife/game-core";
+import { BANKS, ID_TYPES, dobOf, formatId, idNumberOf, PLAYER, SAVINGS, APPLICATION_MINUTES, accountOf, applicationReady, balance, bankById, counterOpen, loanLimit, statement, TRANSFER_FEE, type BankBrand } from "@thelife/game-core";
 import { normalisePhone } from "@thelife/shared";
 import { bankApply, bankBorrow, bankCollect, bankDeposit, bankRepay, bankUnblock, bankWithdraw } from "../phone/remote";
 import { social } from "../net/social";
@@ -107,14 +107,15 @@ function BankCard({ state }: { state: PanelProps["state"] }) {
 
 function OpenForm({ state, run, closed, counterText }: { state: PanelProps["state"]; run: PanelProps["run"]; closed: boolean; counterText: string }) {
   const [bank, setBank] = useState<string>(BANKS[0]!.id);
-  const [dob, setDob] = useState("");
   const [idType, setIdType] = useState<string>(ID_TYPES[0]!);
-  const [idNo, setIdNo] = useState("");
   const [address, setAddress] = useState("");
   const p = state.profile;
   const full = `${p?.firstName ?? ""} ${p?.surname ?? ""}`.trim();
+  // Nobody types these in when making a character: they are on the character's ID, worked out from who they are.
+  const dob = dobOf(p);
+  const idNo = idNumberOf(p, idType);
   return (
-    <form className="bank-form" onSubmit={(e) => { e.preventDefault(); run(() => bankApply(state, bank, dob, idType, idNo.replace(/\s/g, ""), address)); }}>
+    <form className="bank-form" onSubmit={(e) => { e.preventDefault(); run(() => bankApply(state, bank, dob, idType, idNo, address)); }}>
       <h3>Open an account</h3>
       <p className="place-note">Fill in the form. The bank checks it, which takes about {APPLICATION_MINUTES / 60} hours, then you collect your debit card and choose your PIN.</p>
       <div className="bank-brands" role="radiogroup" aria-label="Choose a bank">
@@ -122,14 +123,18 @@ function OpenForm({ state, run, closed, counterText }: { state: PanelProps["stat
           <button type="button" role="radio" aria-checked={bank === b.id} key={b.id} className={bank === b.id ? "is-on" : ""} onClick={() => setBank(b.id)} style={{ "--b": b.color } as React.CSSProperties}>{b.name}</button>
         ))}
       </div>
-      <label><span>Full name</span><input value={full} readOnly aria-label="Full name" /></label>
-      <label><span>Date of birth</span><input type="date" value={dob} min="1930-01-01" max="2007-12-31" onChange={(e) => setDob(e.target.value)} required aria-label="Date of birth" /></label>
-      <label><span>Phone number</span><input value={social.selfPhone ? social.selfPhone.replace(/(\d{4})(\d{3})(\d{4})/, "$1 $2 $3") : "—"} readOnly aria-label="Phone number" /></label>
-      <label><span>ID type</span><select value={idType} onChange={(e) => setIdType(e.target.value)} aria-label="ID type">{ID_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
-      <label><span>ID number</span><input value={idNo} maxLength={16} onChange={(e) => setIdNo(e.target.value.replace(/[^A-Za-z0-9]/g, ""))} placeholder="8 to 16 letters and digits" required aria-label="ID number" /></label>
+      <div className="bank-idcard" aria-label="Your ID">
+        <small>Your ID, as the bank sees it</small>
+        <b>{full}</b>
+        <span>Born {dob}</span>
+        <span>{idType}: <i>{formatId(idType, idNo)}</i></span>
+      </div>
+      <label><span>ID to show</span><select value={idType} onChange={(e) => setIdType(e.target.value)} aria-label="ID type">{ID_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+      <label><span>ID number (from your card)</span><input value={formatId(idType, idNo)} readOnly aria-label="ID number" /></label>
+      <label><span>Date of birth</span><input value={dob} readOnly aria-label="Date of birth" /></label>
       <label><span>Home address</span><input value={address} maxLength={100} onChange={(e) => setAddress(e.target.value)} placeholder="House number, street, area" required aria-label="Home address" /></label>
       {closed && <p className="place-note is-bad">The counter is closed ({counterText}).</p>}
-      <button type="submit" className="bank-big" disabled={closed || !dob || idNo.length < 8 || address.trim().length < 6}>Submit application</button>
+      <button type="submit" className="bank-big" disabled={closed || address.trim().length < 6}>Submit application</button>
     </form>
   );
 }

@@ -1,3 +1,4 @@
+import { makeIll, survivalOf } from "./survival";
 import { describe, expect, it } from "vitest";
 import { createGameState } from "./sim";
 import { MINT, PLAYER, balance, ledgerTotal, transfer } from "./ledger";
@@ -56,7 +57,10 @@ describe("the hospital", () => {
   it("every service has a known id and sensible price", () => {
     for (const x of HOSPITAL_SERVICES) {
       expect(x.price).toBeGreaterThanOrEqual(0);
-      expect(hospitalService(rich(), x.id).ok).toBe(true);
+      const s = rich();
+      if (x.id === "treat_illness") makeIll(s, "cold");
+      if (x.id === "dress_wound") survivalOf(s).injury = { id: "cut", since: s.minute, until: s.minute + 600 };
+      expect(hospitalService(s, x.id).ok).toBe(true);
     }
   });
 });

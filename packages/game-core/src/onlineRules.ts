@@ -14,6 +14,7 @@ import { shopSnack } from "./shop";
 import { policeService } from "./police";
 import { worshipService } from "./worship";
 import { schoolService } from "./school";
+import { buyFuel, buyItem, useFirstAid } from "./survival";
 import { applyForAccount, atmAirtime, atmChangePin, atmDeposit, atmLogin, atmWithdraw, bankBorrow, bankDeposit, bankRepay, bankWithdraw, collectCard, unblockCard } from "./bank";
 import { buyIngredient, cancelRecipe, chooseDish, chooseRecipe, discardDish, discardLot } from "./kitchen";
 import { BACKGROUNDS, profileFrom, type Profile } from "./profile";
@@ -65,6 +66,9 @@ const HANDLERS: Record<string, Handler> = {
   atmDeposit: (sim, [amount, pin]) => (typeof amount === "number" && str(pin, 4) ? atmDeposit(sim.state, amount, pin as string) : no(bad)),
   atmAirtime: (sim, [amount, pin]) => (typeof amount === "number" && str(pin, 4) ? atmAirtime(sim.state, amount, pin as string) : no(bad)),
   atmChangePin: (sim, [oldPin, newPin]) => (str(oldPin, 4) && str(newPin, 4) ? atmChangePin(sim.state, oldPin as string, newPin as string) : no(bad)),
+  survivalBuy: (sim, [item]) => (item === "umbrella" || item === "generator" || item === "bednet" || item === "firstAid" ? buyItem(sim.state, item) : no(bad)),
+  survivalFuel: (sim, [litres]) => (int(litres, 1, 20) !== null ? buyFuel(sim.state, litres as number) : no(bad)),
+  survivalFirstAid: (sim) => useFirstAid(sim.state),
   hospital: (sim, [id]) => (str(id, 20) ? hospitalService(sim.state, id as string) : no(bad)),
   hospitalFirstAid: (sim) => hospitalFirstAid(sim.state),
   worship: (sim, [faith, id]) => (str(faith, 10) && str(id, 20) ? worshipService(sim.state, faith as "church" | "mosque", id as string) : no(bad)),

@@ -105,7 +105,7 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       sun.position.set(3, 7, 5);
       sun.castShadow = true;
       sun.shadow.mapSize.set(1024, 1024);
-      Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 7, bottom: -7, near: 0.5, far: 24 });
+      Object.assign(sun.shadow.camera, { left: -13, right: 13, top: 11, bottom: -11, near: 0.5, far: 36 });
       scene.add(sun);
 
       // a ring on the floor at every place you can stand to use something
@@ -203,7 +203,8 @@ export default function PlaceInterior({ place, session, onClose }: { place: Land
       const want = new THREE.Vector3();
       const follow = (dt: number, snap: boolean) => {
         const b = room.bounds;
-        camTarget.set(THREE.MathUtils.clamp(walker.pos.x * 0.6, -2.4, 2.4), 0.5, THREE.MathUtils.clamp(walker.pos.z - 1.2, b.minZ + 1.5, b.maxZ - 2.5));
+        const reach = Math.max(2.4, b.maxX - 3.2); // a wide room lets the view slide further sideways
+        camTarget.set(THREE.MathUtils.clamp(walker.pos.x * 0.6, -reach, reach), 0.5, THREE.MathUtils.clamp(walker.pos.z - 1.2, b.minZ + 1.5, b.maxZ - 2.5));
         const portrait = camera.aspect < 0.8;
         want.set(camTarget.x, portrait ? 5.4 : 4.3, camTarget.z + (portrait ? 8.6 : 6.4));
         if (snap) camPos.copy(want);

@@ -7,7 +7,10 @@ import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
  */
 export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom {
   const g = new THREE.Group();
-  const W = 10, D = 8, H = 3.3;
+  // A roomy store (about 16 by 12 m): rows of shelves, a fridge wall, a produce area and a long counter.
+  const W = 16, D = 12, H = 3.5;
+  const zb = (d: number) => -D / 2 + d;
+  const COUNTER_Z = zb(2.3);
   const market = kind === "market";
   const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number, shadow = true) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -50,14 +53,15 @@ export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom 
     c.font = "600 40px system-ui, sans-serif";
     c.fillText(market ? "FRESH FOOD · PROVISIONS · SNACKS" : "MINI-MART · DRINKS · SNACKS", 512, 200);
   });
-  const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.4), new THREE.MeshBasicMaterial({ map: sign }));
-  signMesh.position.set(0, 2.55, -D / 2 + 0.05);
+  const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 1.8), new THREE.MeshBasicMaterial({ map: sign }));
+  signMesh.position.set(0, 2.7, -D / 2 + 0.05);
   g.add(signMesh);
 
   // shelves along the left wall, stocked with coloured packs
+  const SHELF_Z = [-4.0, -2.0, 0, 2.0];
   const shelfMat = std("#8d6b4a", 0.8);
   const packs = ["#e04b3a", "#f2b632", "#3f8fd6", "#3fae6b", "#f0f0f0", "#c46ad1"].map((c) => std(c, 0.6));
-  for (const z of [-2.8, -0.8, 1.2]) {
+  for (const z of SHELF_Z) {
     box(0.5, 2.0, 1.6, shelfMat, -W / 2 + 0.4, 0, z);
     for (let row = 0; row < 4; row++) for (let i = 0; i < 5; i++) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.2), packs[(row + i + Math.abs(Math.round(z))) % packs.length]);
@@ -67,34 +71,35 @@ export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom 
   }
 
   // a drinks fridge on the right wall
-  box(0.8, 2.0, 2.4, std("#dfe8f2", 0.4, 0.3), W / 2 - 0.5, 0, -1.8);
+  box(0.8, 2.0, 4.8, std("#dfe8f2", 0.4, 0.3), W / 2 - 0.5, 0, -2.4);
   const fridgeGlass = new THREE.MeshStandardMaterial({ color: "#bfe3ff", emissive: "#6fb8ff", emissiveIntensity: 0.6, transparent: true, opacity: 0.8, roughness: 0.1 });
-  const door = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.7), fridgeGlass);
-  door.position.set(W / 2 - 0.5 - 0.41, 1.05, -1.8);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 1.7), fridgeGlass);
+  door.position.set(W / 2 - 0.5 - 0.41, 1.05, -2.4);
   door.rotation.y = -Math.PI / 2;
   g.add(door);
   const bottle = [std("#e04b3a"), std("#f2b632"), std("#3fae6b")];
-  for (let r = 0; r < 3; r++) for (let i = 0; i < 6; i++) {
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 12; i++) {
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), bottle[(r + i) % 3]);
-    b.position.set(W / 2 - 0.9, 0.5 + r * 0.5, -2.8 + i * 0.35);
+    b.position.set(W / 2 - 0.9, 0.5 + r * 0.5, -4.4 + i * 0.35);
     g.add(b);
   }
 
   // the counter and shopkeeper's shelf
-  box(4.0, 1.0, 0.8, std(market ? "#b9722f" : "#2f55d8", 0.6), -0.2, 0, -1.7);
-  box(4.2, 0.07, 0.95, std("#f4efe4", 0.4), -0.2, 1.0, -1.7);
-  box(0.5, 0.28, 0.4, std("#12233f", 0.4), 1.2, 1.07, -1.75); // the till
-  box(4.2, 1.9, 0.4, shelfMat, -0.2, 0, -3.6);
-  for (let row = 0; row < 3; row++) for (let i = 0; i < 12; i++) {
+  box(6.0, 1.0, 0.8, std(market ? "#b9722f" : "#2f55d8", 0.6), -0.2, 0, COUNTER_Z);
+  box(6.2, 0.07, 0.95, std("#f4efe4", 0.4), -0.2, 1.0, COUNTER_Z);
+  box(0.5, 0.28, 0.4, std("#12233f", 0.4), 1.6, 1.07, COUNTER_Z - 0.05); // the till
+  box(6.2, 1.9, 0.4, shelfMat, -0.2, 0, zb(0.5));
+  for (let row = 0; row < 3; row++) for (let i = 0; i < 18; i++) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.14), packs[(row * 3 + i) % packs.length]);
-    p.position.set(-2.1 + i * 0.34, 0.4 + row * 0.55, -3.35);
+    p.position.set(-2.9 + i * 0.34, 0.4 + row * 0.55, zb(0.75));
     g.add(p);
   }
 
   // produce crates
+  const CRATES: [number, number][] = [[-3.2, 2.8], [-2.0, 2.8], [2.0, 2.8], [3.2, 2.8], [-3.2, 4.2], [3.2, 4.2]];
   const crate = std("#a8794a", 0.9);
   const produce = [std("#d6402a", 0.8), std("#7ab648", 0.8), std("#e8a02a", 0.8), std("#9a2f2f", 0.8)];
-  [[-3.2, 1.6], [-2.0, 1.6], [2.0, 1.6], [3.2, 1.6]].forEach(([x, z], k) => {
+  CRATES.forEach(([x, z], k) => {
     box(0.9, 0.35, 0.65, crate, x!, 0, z!);
     for (let i = 0; i < 9; i++) {
       const f = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), produce[k % 4]);
@@ -102,24 +107,39 @@ export function buildShopRoom(name: string, kind: "market" | "fuel"): PlaceRoom 
       g.add(f);
     }
   });
-  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 3.0, false); // the charging socket
+  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 4.8, false); // the charging socket
+
+  // a second aisle of shelves (a free-standing rack) in the middle of the floor
+  const RACK_Z = 0.4;
+  for (const x of [-2.2, 1.8]) {
+    box(3.0, 1.7, 0.5, shelfMat, x, 0, RACK_Z);
+    for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.2), packs[(row + i) % packs.length]);
+      p.position.set(x - 1.25 + i * 0.36, 0.4 + row * 0.5, RACK_Z - 0.3);
+      g.add(p);
+    }
+  }
 
   return {
     group: g,
-    spawn: new THREE.Vector3(0.6, 0, 3.0),
-    bounds: rect(0, 0, 9.2, 7.6),
-    blockers: [rect(-0.2, -2.5, 4.6, 2.6), rect(-W / 2 + 0.55, -0.8, 1.0, 5.6), rect(W / 2 - 0.5, -1.8, 1.0, 2.6), rect(-2.6, 1.6, 2.4, 0.8), rect(2.6, 1.6, 2.4, 0.8)],
+    spawn: new THREE.Vector3(0.6, 0, D / 2 - 1.0),
+    bounds: rect(0, 0, W - 0.8, D - 0.4),
+    blockers: [rect(-0.2, -D / 2 + 1.6, 6.6, 3.2), rect(-W / 2 + 0.55, -1.0, 1.0, 7.6), rect(W / 2 - 0.5, -2.4, 1.0, 5.0), rect(-2.2, RACK_Z, 3.2, 0.8), rect(1.8, RACK_Z, 3.2, 0.8), ...CRATES.map(([x, z]) => rect(x, z, 1.0, 0.8))],
     door: rect(0, D / 2 + 0.3, 2.4, 0.6),
     spots: [
-      { id: "counter", label: market ? "Buy food and drinks" : "Pay at the counter", x: -0.2, z: -0.3, r: 1.9, face: Math.PI, focus: "eat" },
-      { id: "shelves", label: "Browse the shelves", x: -3.3, z: -0.4, r: 1.3, face: -Math.PI / 2, focus: "groceries" },
-      { id: "produce", label: "Buy groceries", x: 0.0, z: 1.5, r: 1.2, face: Math.PI, focus: "groceries" },
-      { id: "fridge", label: "Cold drinks", x: 3.5, z: -1.8, r: 1.3, face: Math.PI / 2, focus: "eat" },
-      { id: "socket", label: "Charge your phone", x: -4.0, z: 3.0, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+      { id: "counter", label: market ? "Buy food and drinks" : "Pay at the counter", x: -0.2, z: COUNTER_Z + 1.5, r: 2.1, face: Math.PI, focus: "eat" },
+      { id: "shelves", label: "Browse the shelves", x: -W / 2 + 1.9, z: -1.0, r: 1.5, face: -Math.PI / 2, focus: "groceries" },
+      { id: "produce", label: "Buy groceries", x: 0.0, z: 3.4, r: 1.4, face: Math.PI, focus: "groceries" },
+      { id: "gear", label: market ? "Umbrellas and first aid" : "Generators and fuel", x: W / 2 - 3.0, z: 2.8, r: 1.6, face: Math.PI, focus: "gear" },
+      { id: "fridge", label: "Cold drinks", x: W / 2 - 1.9, z: -2.4, r: 1.5, face: Math.PI / 2, focus: "eat" },
+      { id: "socket", label: "Charge your phone", x: -W / 2 + 0.9, z: 4.8, r: 1.2, face: -Math.PI / 2, focus: "charge" },
     ],
-    staff: [{ x: -0.2, z: -2.7, yaw: 0, clip: "Idle_Loop", greeting: "Welcome, welcome! What will you buy?" }],
-    waypoints: [[-3.0, 0.8], [3.0, 0.2], [-1.2, 2.8], [1.6, 3.0], [2.6, -0.2], [-3.4, 2.4]],
-    visitors: market ? 5 : 2,
+    staff: [
+      { x: -0.2, z: COUNTER_Z - 1.0, yaw: 0, clip: "Idle_Loop", greeting: "Welcome, welcome! What will you buy?" },
+      { x: 2.6, z: COUNTER_Z - 1.0, yaw: 0, clip: "Idle_Loop", greeting: "Good day! Anything you need?" },
+    ],
+    waypoints: [[-4.6, 1.8], [4.0, 0.2], [-1.2, 3.8], [1.6, 4.6], [5.0, 3.0], [-4.4, 4.4], [0, 1.8], [4.4, 5.0]],
+    visitors: market ? 8 : 3,
     update() {},
   };
 }

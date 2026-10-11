@@ -5,7 +5,10 @@ import { canvasTexture, rect, std, type PlaceRoom } from "./roomKit";
 
 export function buildBankRoom(name: string): PlaceRoom {
   const g = new THREE.Group();
-  const W = 10, D = 8, H = 3.4;
+  // A roomy hall (about 16 by 12 m): space to walk, queue and wait, with the counter and the cash machines spread out.
+  const W = 16, D = 12, H = 3.6;
+  /** z of something a given distance from the back wall. */
+  const zb = (d: number) => -D / 2 + d;
   const box = (w: number, h: number, d: number, m: THREE.Material, x: number, y: number, z: number, shadow = true) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
     mesh.position.set(x, y + h / 2, z);
@@ -56,14 +59,14 @@ export function buildBankRoom(name: string): PlaceRoom {
     c.font = "600 40px system-ui, sans-serif";
     c.fillText("SAVINGS · LOANS · CASH", 512, 210);
   });
-  const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.4), new THREE.MeshBasicMaterial({ map: sign }));
-  signMesh.position.set(0, 2.55, -D / 2 + 0.05);
+  const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 1.8), new THREE.MeshBasicMaterial({ map: sign }));
+  signMesh.position.set(0, 2.7, -D / 2 + 0.05);
   g.add(signMesh);
 
   // windows on the side walls
   const glass = new THREE.MeshStandardMaterial({ color: "#bfe0ff", emissive: "#6fb0ff", emissiveIntensity: 0.55, roughness: 0.1, transparent: true, opacity: 0.85 });
-  for (const z of [-1.8, 1.8]) {
-    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.6), glass);
+  for (const z of [-3.6, 0, 3.6]) {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), glass);
     w.position.set(-W / 2 + 0.02, 1.9, z);
     w.rotation.y = Math.PI / 2;
     g.add(w);
@@ -72,21 +75,22 @@ export function buildBankRoom(name: string): PlaceRoom {
   // the counter and the glass over it
   const counterTop = std("#12233f", 0.35, 0.2);
   const counterBody = std("#2f55d8", 0.6);
-  box(5.2, 1.0, 0.9, counterBody, 0, 0, -1.6);
-  box(5.4, 0.08, 1.05, counterTop, 0, 1.0, -1.6);
+  box(8.2, 1.0, 0.9, counterBody, 0, 0, zb(2.4));
+  box(8.4, 0.08, 1.05, counterTop, 0, 1.0, zb(2.4));
   const screen = new THREE.MeshStandardMaterial({ color: "#c8e3ff", transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.1 });
-  for (const x of [-1.7, 0, 1.7]) {
-    const pane = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.04), screen);
-    pane.position.set(x, 1.55, -1.95);
+  for (const x of [-2.8, 0, 2.8]) {
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 0.04), screen);
+    pane.position.set(x, 1.55, zb(2.05));
     g.add(pane);
   }
-  box(5.2, 0.12, 0.5, std("#a8c8ff", 0.5), 0, 0, -3.4); // the shelf behind the teller
-  box(5.2, 1.0, 0.5, std("#dfe8f7", 0.8), 0, 0.12, -3.5);
+  box(8.2, 0.12, 0.5, std("#a8c8ff", 0.5), 0, 0, zb(0.7)); // the shelf behind the teller
+  box(8.2, 1.0, 0.5, std("#dfe8f7", 0.8), 0, 0.12, zb(0.6));
 
   // cash machines along the right wall
+  const ATM_Z = [0.4, 1.7, 3.0];
   const atmBody = std("#1d2f5c", 0.5, 0.3);
   const atmScreen = new THREE.MeshStandardMaterial({ color: "#7fb8ff", emissive: "#4d8dff", emissiveIntensity: 1.2 });
-  for (const z of [0.2, 1.5]) {
+  for (const z of ATM_Z) {
     box(0.7, 1.7, 0.9, atmBody, W / 2 - 0.55, 0, z);
     const s = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), atmScreen);
     s.position.set(W / 2 - 0.55 - 0.351, 1.35, z);
@@ -96,26 +100,28 @@ export function buildBankRoom(name: string): PlaceRoom {
   }
 
   // waiting benches, rope posts, plants
+  const PLANTS: [number, number][] = [[-W / 2 + 0.6, -D / 2 + 0.6], [W / 2 - 0.6, -D / 2 + 0.6], [-W / 2 + 0.6, D / 2 - 0.6], [W / 2 - 0.6, D / 2 - 0.6], [-W / 2 + 0.6, 0.6]];
+  const BENCHES: [number, number][] = [[-5.8, 4.2], [-4.2, 4.2], [-5.8, 5.2], [-4.2, 5.2]];
   const bench = std("#f4f8ff", 0.7);
   const legs = std("#5c6f92", 0.5, 0.4);
-  for (const x of [-3.2, -1.7]) {
-    box(1.2, 0.12, 0.45, bench, x, 0.42, 2.7);
-    box(1.2, 0.5, 0.08, bench, x, 0.5, 2.9);
-    box(0.08, 0.42, 0.4, legs, x - 0.5, 0, 2.7);
-    box(0.08, 0.42, 0.4, legs, x + 0.5, 0, 2.7);
+  for (const [x, z] of BENCHES) {
+    box(1.2, 0.12, 0.45, bench, x, 0.42, z);
+    box(1.2, 0.5, 0.08, bench, x, 0.5, z + 0.2);
+    box(0.08, 0.42, 0.4, legs, x - 0.5, 0, z);
+    box(0.08, 0.42, 0.4, legs, x + 0.5, 0, z);
   }
-  for (const x of [-2.6, -0.7, 0.7, 2.6]) {
+  for (const x of [-3.9, -1.4, 1.4, 3.9]) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 10), std("#c9d6ee", 0.3, 0.6));
-    post.position.set(x, 0.45, 0.2);
+    post.position.set(x, 0.45, 0.6);
     post.castShadow = true;
     g.add(post);
   }
-  for (const cx of [-1.65, 1.65]) {
-    const rope = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.03, 0.03), std("#2f55d8", 0.7));
-    rope.position.set(cx, 0.8, 0.2);
+  for (const cx of [-2.65, 2.65]) {
+    const rope = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.03, 0.03), std("#2f55d8", 0.7));
+    rope.position.set(cx, 0.8, 0.6);
     g.add(rope);
   }
-  for (const [x, z] of [[-4.4, -3.4], [4.4, 3.4], [-4.4, 3.4]] as const) {
+  for (const [x, z] of PLANTS) {
     const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.45, 12), std("#7a8cb8", 0.8));
     pot.position.set(x, 0.22, z);
     g.add(pot);
@@ -126,24 +132,33 @@ export function buildBankRoom(name: string): PlaceRoom {
     g.add(leaves);
   }
   // a charging socket plate on the side wall
-  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 2.4, false);
+  box(0.04, 0.2, 0.14, std("#ffffff", 0.4), -W / 2 + 0.03, 0.6, 4.6, false);
 
   // light fittings
 
   return {
     group: g,
-    spawn: new THREE.Vector3(0.6, 0, 3.0),
-    bounds: rect(0, 0, 9.2, 7.6),
-    blockers: [rect(0, -2.5, 5.8, 2.6), rect(W / 2 - 0.55, 0.2, 0.8, 1.0), rect(W / 2 - 0.55, 1.5, 0.8, 1.0), rect(-3.2, 2.8, 1.4, 0.6), rect(-1.7, 2.8, 1.4, 0.6), rect(-4.4, -3.4, 0.7, 0.7), rect(4.4, 3.4, 0.7, 0.7), rect(-4.4, 3.4, 0.7, 0.7)],
+    spawn: new THREE.Vector3(0.6, 0, D / 2 - 1.0),
+    bounds: rect(0, 0, W - 0.8, D - 0.4),
+    blockers: [
+      rect(0, -D / 2 + 1.7, 8.8, 3.4),
+      ...ATM_Z.map((z) => rect(W / 2 - 0.55, z, 0.8, 1.0)),
+      ...BENCHES.map(([x, z]) => rect(x, z + 0.1, 1.4, 0.6)),
+      ...PLANTS.map(([x, z]) => rect(x, z, 0.7, 0.7)),
+    ],
     door: rect(0, D / 2 + 0.3, 2.4, 0.6),
     spots: [
-      { id: "teller", label: "Talk to the teller", x: 0, z: -0.3, r: 1.9, face: Math.PI, focus: "teller" },
-      { id: "atm", label: "Use the cash machine", x: 3.5, z: 0.85, r: 1.5, face: Math.PI / 2, focus: "atm" },
-      { id: "socket", label: "Charge your phone", x: -4.1, z: 2.4, r: 1.2, face: -Math.PI / 2, focus: "charge" },
+      { id: "teller", label: "Talk to the teller", x: 0, z: zb(3.7), r: 2.1, face: Math.PI, focus: "teller" },
+      { id: "atm", label: "Use the cash machine", x: W / 2 - 1.5, z: ATM_Z[1]!, r: 1.7, face: Math.PI / 2, focus: "atm" },
+      { id: "socket", label: "Charge your phone", x: -W / 2 + 0.9, z: 4.6, r: 1.2, face: -Math.PI / 2, focus: "charge" },
     ],
-    staff: [{ x: -0.1, z: -2.75, yaw: 0, clip: "Life_Type_Loop", greeting: `Welcome to ${name}. How can I help?` }],
-    waypoints: [[-3.6, 0.9], [-0.9, 1.5], [2.6, 2.3], [3.0, 3.1], [-0.6, 3.1], [1.6, 0.9], [-3.4, 0.2]],
-    visitors: 3,
+    staff: [
+      { x: -0.1, z: zb(1.35), yaw: 0, clip: "Life_Type_Loop", greeting: `Welcome to ${name}. How can I help?` },
+      { x: -2.8, z: zb(1.35), yaw: 0, clip: "Life_Type_Loop", greeting: "One moment, please." },
+      { x: 2.8, z: zb(1.35), yaw: 0, clip: "Idle_Loop", greeting: "Good day. The first window will help you." },
+    ],
+    waypoints: [[-5.4, 0.9], [-1.4, 2.4], [2.6, 3.6], [4.2, 4.8], [-1.0, 4.6], [1.8, 1.6], [-4.4, -0.8], [5.0, -1.6], [-2.6, 3.4], [3.4, 0.2]],
+    visitors: 5,
     update() {},
   };
 }

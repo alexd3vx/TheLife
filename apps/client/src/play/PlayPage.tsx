@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOnlineLife } from "../net/useOnlineLife";
 import { world } from "../net/world";
 import ArrivalFilm from "../arrival/ArrivalFilm";
+import { liteRender } from "../lab/renderTier";
 import "../iso/iso.css";
 import InventoryPanel from "../inventory/InventoryPanel";
 import KitchenPanel from "../kitchen/KitchenPanel";
@@ -22,7 +23,7 @@ import "./play.css";
 import OnlineCount from "../net/OnlineCount";
 import "../net/stats.css";
 import ProfileSheet from "../ui/ProfileSheet";
-import { BottomNav, Chips, MoreMenu, NeedsRow, ProfileButton, TopPill } from "./HudParts";
+import { BottomNav, Chips, MoreMenu, MoodleRow, NeedsRow, ProfileButton, TopPill } from "./HudParts";
 
 interface Toast {
   id: number;
@@ -96,6 +97,9 @@ export default function PlayPage() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !life.session) return;
+    // On a phone the arrival film plays first and the home is built after it: building a 3D house takes the phone's whole attention, and
+    // doing it behind the film made the film stutter.
+    if (life.justArrived && !filmDone && liteRender()) return;
     let disposed = false;
     loadManifest()
       .then((manifest) =>
@@ -125,7 +129,7 @@ export default function PlayPage() {
       runtimeRef.current?.dispose();
       runtimeRef.current = null;
     };
-  }, [pushToasts, life.session]);
+  }, [pushToasts, life.session, filmDone, life.justArrived]);
 
   useEffect(() => runtimeRef.current?.setFollow(follow), [follow]);
   useEffect(() => runtimeRef.current?.setPhoneOpen(phoneOpen), [phoneOpen]);
@@ -193,6 +197,7 @@ export default function PlayPage() {
           <TopPill hud={hud} />
           <Chips hud={hud} />
           <NeedsRow hud={hud} />
+          <MoodleRow hud={hud} />
           <OnlineCount />
         </>
       )}

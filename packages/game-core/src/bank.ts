@@ -1,4 +1,5 @@
 import { PLAYER, SINK, balance, transfer } from "./ledger";
+import { ID_TYPES, dobOf, idNumberOf } from "./identity";
 import { PHONE_SEND_LIMIT, SAVINGS, loanLimit } from "./phone";
 import { openStatus } from "./places";
 import { clockOf } from "./sim";
@@ -26,7 +27,7 @@ export const BANKS: BankBrand[] = [
 ];
 export const bankById = (id: string): BankBrand | undefined => BANKS.find((b) => b.id === id);
 
-export const ID_TYPES = ["National ID (NIN)", "Driver's licence", "Voter's card", "International passport"] as const;
+export { ID_TYPES } from "./identity";
 
 export const ATM_FEE = 65; // using another bank's machine
 export const MIN_AMOUNT = 100;
@@ -163,11 +164,12 @@ export function applyForAccount(state: GameState, bankId: string, dob: string, i
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
   if (!m || +m[1]! < 1930 || +m[1]! > 2020 || +m[2]! < 1 || +m[2]! > 12 || +m[3]! < 1 || +m[3]! > 31) return { ok: false, reason: "Write your date of birth as year-month-day, for example 1998-04-23." };
   if (+m[1]! > 2007) return { ok: false, reason: "You must be 18 or older to open an account." };
+  if (dob !== dobOf(state.profile)) return { ok: false, reason: "That date of birth does not match your ID. Check the form." };
   if (!(ID_TYPES as readonly string[]).includes(idType)) return { ok: false, reason: "Choose an ID type." };
-  if (!/^[A-Za-z0-9]{8,16}$/.test(idNo)) return { ok: false, reason: "The ID number should be 8 to 16 letters and digits." };
+  if (idNo.replace(/\s/g, "").toUpperCase() !== idNumberOf(state.profile, idType)) return { ok: false, reason: `That ${idType} number does not match your ID. Check the number on your card.` };
   if (address.trim().length < 6 || address.length > 100) return { ok: false, reason: "Write your home address." };
   const b = today(state);
-  b.application = { bank: bankId, at: state.minute, readyAt: state.minute + APPLICATION_MINUTES, dob, idType, idNo: idNo.toUpperCase(), address: address.trim() };
+  b.application = { bank: bankId, at: state.minute, readyAt: state.minute + APPLICATION_MINUTES, dob, idType, idNo: idNo.replace(/\s/g, "").toUpperCase(), address: address.trim() };
   return { ok: true, text: `Application sent to ${bankById(bankId)!.name}. It takes about ${APPLICATION_MINUTES / 60} hours. Come back to collect your card.` };
 }
 

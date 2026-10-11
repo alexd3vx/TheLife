@@ -9,7 +9,7 @@ import {
 } from "./index.js";
 
 const background = (tier: string) => BACKGROUNDS.find((b) => b.tier === tier)!;
-const sim = (tier: "lapo" | "middle" | "nepo") => new Sim(createGameState(profileFrom(background(tier), () => 0.5, "male")));
+const sim = (tier: "lapo" | "middle" | "nepo") => new Sim(createGameState(profileFrom(background(tier), () => 0.5, "male")), { survival: false });
 const run = (s: Sim, minutes: number) => {
   for (let left = minutes; left > 0; left -= 10) s.advance(Math.min(10, left));
 };

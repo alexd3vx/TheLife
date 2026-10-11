@@ -6,6 +6,7 @@ import { createPhone, groceriesFor, jobPayBoost, notify, startLateFeeClock, tick
 import { lagosMinuteNow } from "./lagosClock";
 import { createKitchen, finishCooking, finishEating, recipeById, tickKitchen } from "./kitchen";
 import { combineTraits, type TraitEffects } from "./traits";
+import { makeIll, tickSurvival } from "./survival";
 import { DAY_MINUTES, NEED_IDS, type ActionDef, type GameState, type NeedId, type SimEvent, type SimEventKind } from "./types";
 
 const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing is being "skipped" (the fast test clock)
@@ -13,6 +14,8 @@ const FREE_MINUTES_PER_SECOND = 1; // game minutes per real second when nothing 
 export const REAL_CLOCK_NEEDS_SPEED = 2;
 
 export interface SimOptions {
+  /** Thirst, illness, injury and the weather's toll (on by default; some money tests switch it off so a long idle run does not end in the ward). */
+  survival?: boolean;
   /** Follow the real Lagos clock: time passes one second per second, and needs fall slowly. */
   realClock?: boolean;
 }
@@ -92,13 +95,17 @@ export class Sim {
   private events: SimEvent[] = [];
   /** Offline catch-up softens decay and removes accidents; see simulateAbsence. */
   offline = false;
+  /** Standing out in the city (rain and the dark reach you) rather than at home or inside a place. The server says so each tick. */
+  outdoors = false;
 
   readonly realClock: boolean;
+  private readonly survivalOn: boolean;
   private readonly needsSpeed: number;
 
   constructor(state?: GameState, options: SimOptions = {}) {
     this.state = state ?? createGameState();
     this.realClock = !!options.realClock;
+    this.survivalOn = options.survival !== false;
     this.needsSpeed = this.realClock ? REAL_CLOCK_NEEDS_SPEED : 1;
     if (this.realClock) this.state.minute = lagosMinuteNow();
   }
@@ -248,7 +255,10 @@ export class Sim {
     }
     if (act.def.id === "eatDish") {
       const eaten = finishEating(this.state);
-      if (eaten) this.emit(eaten.spoiled ? "bad" : "good", eaten.text);
+      if (eaten) {
+        this.emit(eaten.spoiled ? "bad" : "good", eaten.text);
+        if (eaten.spoiled) for (const e of makeIll(this.state, "poisoning")) this.emit(e.kind, e.text);
+      }
     }
     this.active = null;
     return act;
@@ -285,6 +295,8 @@ export class Sim {
     this.checkNeeds();
     this.checkRent();
     for (const text of tickKitchen(s, clockMinutes)) this.emit("warn", text);
+    const sleeping = act?.def.id === "sleep" || act?.def.id === "passout";
+    if (this.survivalOn) for (const e of tickSurvival(s, minutes, { outdoors: this.outdoors, asleep: sleeping, offline: this.offline, speed: this.needsSpeed })) this.emit(e.kind, e.text);
     tickPhone(s, clockMinutes); // after rent, so rent is paid before the weekly bill
   }
 

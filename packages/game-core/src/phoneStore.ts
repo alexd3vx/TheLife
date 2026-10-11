@@ -1,3 +1,4 @@
+import { drink } from "./survival";
 import { MINT, PLAYER, SINK, balance, transfer } from "./ledger";
 import { skillLevel } from "./actions";
 import { isDead, modelOf, notify, wallPower, type PhoneResult } from "./phone";
@@ -394,6 +395,7 @@ export function drinkWater(state: GameState): PhoneResult {
   }
   if (w.glasses >= WATER_GOAL + 4) return fail("That's plenty of water for today.");
   w.glasses += 1;
+  drink(state, 14);
   if (w.glasses === WATER_GOAL) {
     addFun(state, 4);
     state.needs.energy = Math.min(100, state.needs.energy + 3);

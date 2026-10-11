@@ -46,7 +46,7 @@ describe("backgrounds", () => {
   it("a nepo pays no rent and gets a weekly allowance from family", () => {
     const def = BACKGROUNDS.find((b) => b.tier === "nepo")!;
     const profile = profileFrom(def, seeded(1), "male");
-    const sim = new Sim(createGameState(profile));
+    const sim = new Sim(createGameState(profile), { survival: false });
     const before = sim.money;
     runWeek(sim);
     expect(sim.state.rentOwed).toBe(0);
@@ -57,7 +57,7 @@ describe("backgrounds", () => {
   it("a lapo still has rent to find", () => {
     const def = BACKGROUNDS.find((b) => b.tier === "lapo")!;
     const profile = profileFrom(def, seeded(2), "male");
-    const sim = new Sim(createGameState(profile));
+    const sim = new Sim(createGameState(profile), { survival: false });
     runWeek(sim);
     const paid = profile.startingMoney >= profile.rentPerWeek;
     expect(paid ? sim.money : sim.state.rentOwed).toBeDefined();
@@ -113,7 +113,7 @@ describe("traits", () => {
   it("an iron stomach gets hungry slower than a big appetite", () => {
     const run = (trait: string) => {
       const profile = { ...rollBackground(seeded(5), "male"), traits: [trait] };
-      const sim = new Sim(createGameState(profile));
+      const sim = new Sim(createGameState(profile), { survival: false });
       sim.advance(240);
       return sim.state.needs.hunger;
     };
@@ -122,8 +122,8 @@ describe("traits", () => {
 
   it("thrifty cuts the grocery bill, a head-start skill is applied, and money stays whole", () => {
     const base = rollBackground(seeded(9), "female");
-    const thrifty = new Sim(createGameState({ ...base, traits: ["thrifty"] }));
-    const spender = new Sim(createGameState({ ...base, traits: ["thrifty", "spender"] }));
+    const thrifty = new Sim(createGameState({ ...base, traits: ["thrifty"] }), { survival: false });
+    const spender = new Sim(createGameState({ ...base, traits: ["thrifty", "spender"] }), { survival: false });
     expect(thrifty.groceriesPrice).toBeLessThan(ECONOMY.groceriesPrice);
     expect(spender.groceriesPrice % 100).toBe(0);
     const tech = createGameState({ ...base, traits: ["techie"] });

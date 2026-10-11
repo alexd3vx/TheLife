@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Avatar } from "../lab/avatar";
 import { createCharacter, resolveLook } from "../lab/character";
 import { locomotionRate } from "../lab/locomotion";
+import { liteRender } from "../lab/renderTier";
 import type { Tier } from "./cityFilm";
 
 /**
@@ -29,13 +30,15 @@ export class LiteFilm {
   private t = 0;
   private gone = false;
   private started = false;
+  private pending = 0;
   readonly loaded: Promise<void>;
 
   constructor(private canvas: HTMLCanvasElement, private tier: Tier, lookJson?: string | null) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+    const lite = liteRender();
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, alpha: true, powerPreference: "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 1.75));
     // golden hour on the street: a low warm light from the side the sun is, a cool sky fill, a warm rim from behind
     this.scene.add(new THREE.HemisphereLight("#bcd0ff", "#c89a6c", 1.15));
     const key = new THREE.DirectionalLight("#ffd9a8", 2.4);
@@ -89,6 +92,11 @@ export class LiteFilm {
 
   draw(dt: number) {
     if (this.gone) return;
+    // 30 frames a second on a phone: every other frame is skipped, and the time it took is carried over
+    this.pending += dt;
+    if (liteRender() && this.pending < 0.03) return;
+    dt = this.pending;
+    this.pending = 0;
     this.t += dt;
     const a = this.avatar;
     const cam = this.camera;

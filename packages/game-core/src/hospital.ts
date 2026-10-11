@@ -1,6 +1,7 @@
 import { PLAYER, SINK, balance, transfer } from "./ledger";
 import { clampNeed, mostUrgent } from "./needs";
 import { NEED_IDS, type GameState, type NeedId } from "./types";
+import { ILLNESS, INJURY, SURVIVAL_PRICES, buyItem, survivalOf, treat } from "./survival";
 
 /**
  * The hospital: the one place that mends what a day wears down, for a price. It is open all day and night. Services change the
@@ -31,7 +32,20 @@ export const HOSPITAL_SERVICES: HospitalService[] = [
   { id: "soap", group: "pharmacy", name: "Soap and sanitiser", blurb: "Hands, face, and a fresher you.", price: 800, effect: { hygiene: 20 } },
   { id: "ors", group: "pharmacy", name: "ORS and water", blurb: "Rehydration salts for a hot day.", price: 600, effect: { hunger: 8, energy: 5 } },
   { id: "canteen", group: "canteen", name: "Canteen: rice and chicken", blurb: "A hot plate from the hospital canteen.", price: 2200, effect: { hunger: 50 } },
+  // treatment and medicine for illness and injury (see survival.ts); the price of the first two depends on what is wrong
+  { id: "treat_illness", group: "care", name: "See the doctor", blurb: "Treats what you are ill with. The price depends on the illness.", price: 0, effect: {} },
+  { id: "dress_wound", group: "care", name: "Dress an injury", blurb: "A nurse cleans and dresses a cut or a sprain.", price: 0, effect: {} },
+  { id: "painkiller", group: "pharmacy", name: "Painkillers", blurb: "Take the edge off a fever or an ache for a few hours.", price: SURVIVAL_PRICES.painkiller, effect: {} },
+  { id: "antimalarial", group: "pharmacy", name: "Malaria tablets", blurb: "Cure malaria if you catch it early.", price: SURVIVAL_PRICES.antimalarial, effect: {} },
+  { id: "firstaid", group: "pharmacy", name: "First aid kit", blurb: "Plasters, antiseptic and a bandage. Keep one at home.", price: SURVIVAL_PRICES.firstAid, effect: {} },
+  { id: "bednet", group: "pharmacy", name: "Mosquito net", blurb: "Hang it over your bed: far fewer mosquito bites at night.", price: SURVIVAL_PRICES.bednet, effect: {} },
 ];
+
+/** What the doctor would charge for what is wrong with you right now (0 if nothing). */
+export function treatmentPrice(state: GameState, which: "treat_illness" | "dress_wound"): number {
+  const sv = survivalOf(state);
+  return which === "treat_illness" ? (sv.illness ? ILLNESS[sv.illness.id].treat : 0) : sv.injury ? INJURY[sv.injury.id].treat : 0;
+}
 
 export const serviceById = (id: string): HospitalService | undefined => HOSPITAL_SERVICES.find((s) => s.id === id);
 
@@ -49,6 +63,14 @@ export function criticalNeed(state: GameState): NeedId | null {
 export function hospitalService(state: GameState, id: string): HospitalResult {
   const s = serviceById(id);
   if (!s) return { ok: false, reason: "They don't offer that." };
+  if (id === "treat_illness" || id === "dress_wound") {
+    const r = treat(state, id === "treat_illness" ? "illness" : "injury");
+    return r.ok ? { ok: true, text: r.text } : { ok: false, reason: r.reason };
+  }
+  if (id === "painkiller" || id === "antimalarial" || id === "bednet" || id === "firstaid") {
+    const r = buyItem(state, id === "firstaid" ? "firstAid" : id);
+    return r.ok ? { ok: true, text: r.text } : { ok: false, reason: r.reason };
+  }
   const before = { ...state.needs };
   // the check-up sees to the neediest thing
   const effect: Partial<Record<NeedId, number>> = { ...s.effect };

@@ -28,6 +28,7 @@ import type { PhoneState } from "./phone.js";
 import type { KitchenState } from "./kitchen.js";
 import type { HomeChanges } from "./home.js";
 import type { BankRecord } from "./bank.js";
+import type { SurvivalState } from "./survival.js";
 
 export interface Inventory {
   /** Raw food portions from the shop. */
@@ -63,6 +64,8 @@ export interface GameState {
   home?: HomeChanges;
   /** How the character looks (a cleaned JSON string; see the client's Look). Kept with the life, on the server. */
   look?: string;
+  /** Thirst, health, illness, injuries, and the umbrella, the net and the generator. */
+  survival?: SurvivalState;
   /** The bank account, its card and PIN, or the application for one. */
   bank?: BankRecord;
   /** Papers and reports from the police station, and what you do at church or the mosque. */

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "@thelife/shared";
-import { BACKGROUNDS, MINT, SAVINGS, applyForAccount, balance, collectCard, counterOpen, transfer } from "@thelife/game-core";
+import { BACKGROUNDS, MINT, SAVINGS, dobOf, idNumberOf, applyForAccount, balance, collectCard, counterOpen, transfer } from "@thelife/game-core";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -564,7 +564,7 @@ describe("bank transfers between players", () => {
     const st = ada.life!.state;
     const saved = st.minute;
     for (let d = 10; d < 17 && !counterOpen(st).open; d++) st.minute = d * 1440 + 10 * 60;
-    expect(applyForAccount(st, "ekotrust", "1998-04-23", "National ID (NIN)", "12345678901", "12 Awolowo Road, Ikoyi").ok).toBe(true);
+    expect(applyForAccount(st, "ekotrust", dobOf(st.profile), "National ID (NIN)", idNumberOf(st.profile, "National ID (NIN)"), "12 Awolowo Road, Ikoyi").ok).toBe(true);
     st.minute += 240;
     while (!counterOpen(st).open) st.minute += 30;
     expect(collectCard(st, "2580").ok).toBe(true);

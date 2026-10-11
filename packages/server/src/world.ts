@@ -194,6 +194,7 @@ export class Room {
       const dt = Math.max(0, Math.min(5, (now - p.lastStepAt) / 1000));
       p.lastStepAt = now;
       try {
+        p.life.outdoors = p.where === "world" && !p.inside;
         p.life.step(dt);
       } catch (e) {
         // One broken life must never take the whole server (and everyone else's connection) down with it.

@@ -58,6 +58,28 @@ export function NeedsRow({ hud }: { hud: HudSnapshot }) {
   );
 }
 
+const MOODLE_ICON: Record<string, string> = { thirst: "💧", ill: "🤒", hurt: "🩹", wet: "🌧️", dark: "🔌", weak: "❤️" };
+
+/** Under the needs: the troubles you have right now (thirst, a fever, a twisted ankle, a soaking, a power cut). Tap one to read what to do. */
+export function MoodleRow({ hud }: { hud: HudSnapshot }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!hud.moodles?.length) return null;
+  const sel = hud.moodles.find((m) => m.id === open);
+  return (
+    <div className="hud-moodles" role="group" aria-label="How you are doing">
+      <div className="hud-moodle-row">
+        {hud.moodles.map((m) => (
+          <button key={m.id} className={`hud-moodle lv${m.level}`} onClick={() => setOpen(open === m.id ? null : m.id)} aria-pressed={open === m.id}>
+            <span aria-hidden>{MOODLE_ICON[m.id] ?? "•"}</span>
+            <b>{m.label}</b>
+          </button>
+        ))}
+      </div>
+      {sel && <p className="hud-moodle-hint">{sel.hint}</p>}
+    </div>
+  );
+}
+
 /** Left side: small chips for what is on your plate (food in the house, rent, allowance, skills). */
 export function Chips({ hud }: { hud: HudSnapshot }) {
   const soon = hud.rentPerWeek > 0 && (hud.rentOwed > 0 || hud.rentInDays <= 1);

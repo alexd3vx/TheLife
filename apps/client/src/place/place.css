@@ -161,3 +161,14 @@
 .atm-receipt { display: grid; justify-self: center; gap: 1px; width: 190px; padding: 10px 12px 14px; border: 0; background: #fffef6; color: #222; font: 600 .66rem ui-monospace, monospace; text-align: left; cursor: pointer; clip-path: polygon(0 0, 100% 0, 100% 96%, 94% 100%, 88% 96%, 82% 100%, 76% 96%, 70% 100%, 64% 96%, 58% 100%, 52% 96%, 46% 100%, 40% 96%, 34% 100%, 28% 96%, 22% 100%, 16% 96%, 10% 100%, 4% 96%, 0 100%); }
 .atm-receipt em { margin-top: 6px; color: #888; font-style: normal; text-align: center; }
 .atm-list b, .bank-statement b { white-space: nowrap; }
+
+.bank-idcard { display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg, #e8f0ff, #cfe0ff); border: 1px solid #b5cdf5; font: 600 .86rem system-ui; color: #12233f; }
+.bank-idcard small { color: #5c6f92; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .66rem; }
+.bank-idcard b { font-size: 1rem; }
+.bank-idcard i { font: 700 .95rem ui-monospace, monospace; font-style: normal; letter-spacing: .04em; }
+
+.place-condition { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.place-condition span { display: grid; gap: 1px; padding: 7px 9px; border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(18, 35, 63, .07); min-width: 0; }
+.place-condition small { color: #5c6f92; font: 700 .62rem system-ui; text-transform: uppercase; letter-spacing: .05em; }
+.place-condition b { font: 800 .8rem system-ui; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-condition .is-owe b { color: #b3322a; }

@@ -60,3 +60,11 @@
 /* locked parts of the nav */
 .hud-nav .is-locked { opacity: .55; }
 .hud-lock-note { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); width: max-content; max-width: min(300px, 86vw); padding: 10px 14px; border-radius: 14px; background: #12233f; color: #fff; font: 600 13px/1.35 system-ui; text-align: center; box-shadow: var(--hud-shadow); }
+
+.hud-moodles { position: absolute; z-index: 2; left: 50%; transform: translateX(-50%); top: calc(max(12px, env(safe-area-inset-top)) + 104px); display: grid; gap: 4px; justify-items: center; max-width: calc(100% - 24px); }
+.hud-moodle-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.hud-moodle { display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px; padding: 4px 9px; background: rgba(244, 248, 255, .78); color: #12233f; font: 700 .72rem system-ui; cursor: pointer; backdrop-filter: blur(6px); }
+.hud-moodle.lv2 { background: #ffe9b0; }
+.hud-moodle.lv3 { background: #ffb8b0; animation: moodle-pulse 1.4s ease-in-out infinite; }
+@keyframes moodle-pulse { 50% { transform: scale(1.06); } }
+.hud-moodle-hint { margin: 0; max-width: 300px; padding: 7px 12px; border-radius: 14px; background: rgba(18, 35, 63, .88); color: #fff; font: 600 .76rem system-ui; text-align: center; }
